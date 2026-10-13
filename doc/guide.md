@@ -117,8 +117,8 @@ Copy and paste work with other programs both ways. File > Open Recent lists the 
 ## Effects
 
 Adjustments and Effects run on the selection, or on the whole layer when nothing is selected; their dialogs show the
-change as the values move. Ctrl+F repeats the last effect. Every effect is a plugin, and more can be added: see
-[Plugins](plugins.md).
+change as the values move. Ctrl+F repeats the last effect. Every effect is a plugin, and more can be added:
+Effects > Manage Plugins writes and tries them beside an image; see [Plugins](plugins.md).
 
 ## Settings
 

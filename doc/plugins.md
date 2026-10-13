@@ -4,6 +4,18 @@ A plugin is a JavaScript file. OUI Paint loads its own built-in plugins and then
 folder beside its settings file (`oui_paint.ini`), in alphabetical order. A plugin declares effects, which appear in
 the Adjustments or Effects menu, and hooks, which run after a file is saved.
 
+## Writing one and trying it
+
+Effects > Manage Plugins lists the plugins, built in and your own, with the effects each declares or why it failed to
+load. **New** opens a tab to write one in, and **Edit** opens one; a built-in plugin opens as a new one, to save as your
+own. The code is on the left; on the right, its effect on an image, made again a moment after each change: the test
+card, an image open in another tab, or one loaded from a file (Try on). Under it are the effect's parameters, what the
+plugin prints with `console.log`, and why it fails, with its line, which a click goes to. A run taking over three
+seconds counts as stuck.
+
+Ctrl+S saves it in the plugins folder, and its effects are in the menus at once. **Reload** loads every plugin again
+after changing them elsewhere.
+
 ## Effects
 
 ```js

@@ -8,21 +8,23 @@
 #include "codecs/codecs.h"
 #include "codecs/openraster.h"
 #include "codecs/palettes.h"
+#include "effects/plugin_trial.h"
 #include "tools/fill.h"
 #include "tools/gradient.h"
 #include "tools/shapes.h"
 #include "tools/text.h"
 #include "ui/canvas_view.h"
 #include "ui/color_dialog.h"
-#include "ui/help_dialogs.h"
 #include "ui/color_panel.h"
 #include "ui/effect_dialog.h"
+#include "ui/help_dialogs.h"
 #include "ui/layer_properties_dialog.h"
 #include "ui/layers_panel.h"
-#include "ui/palettes_panel.h"
-#include "ui/side_column.h"
 #include "ui/main_frame.h"
 #include "ui/new_image_dialog.h"
+#include "ui/palettes_panel.h"
+#include "ui/plugin_workbench.h"
+#include "ui/side_column.h"
 #include "ui/tool_options.h"
 #include "ui/tool_panel.h"
 #include "ui/transform_dialogs.h"
@@ -163,13 +165,13 @@ void PaintApp::register_commands()
                                   });
         commands.bind(id, {static_cast<char32_t>(U'0' + number), false, true});
     }
-    add("edit.undo", "&Undo", [this] { undo(); }, {U'z', true});
-    add("edit.redo", "&Redo", [this] { redo(); }, {U'y', true});
+    add("edit.undo", "&Undo", [this] { if(!edit_text(TextAction::undo)) { undo(); } }, {U'z', true});
+    add("edit.redo", "&Redo", [this] { if(!edit_text(TextAction::redo)) { redo(); } }, {U'y', true});
     add("colors.swap", "Swap Colors", [this] { m_color_panel->swap(); }, {U'x'});
     add("edit.cut", "Cu&t",
         [this]
         {
-            if(copy(false))
+            if(!edit_text(TextAction::cut) && copy(false))
             {
                 change_layers("Cut",
                               [](Document& document)
@@ -180,9 +182,25 @@ void PaintApp::register_commands()
             }
         },
         {U'x', true});
-    add("edit.copy", "&Copy", [this] { static_cast<void>(copy(false)); }, {U'c', true});
+    add("edit.copy", "&Copy",
+        [this]
+        {
+            if(!edit_text(TextAction::copy))
+            {
+                static_cast<void>(copy(false));
+            }
+        },
+        {U'c', true});
     add("edit.copy_merged", "Copy M&erged", [this] { static_cast<void>(copy(true)); }, {U'c', true, false, true});
-    add("edit.paste", "&Paste", [this] { paste(PasteInto::layer); }, {U'v', true});
+    add("edit.paste", "&Paste",
+        [this]
+        {
+            if(!edit_text(TextAction::paste))
+            {
+                paste(PasteInto::layer);
+            }
+        },
+        {U'v', true});
     add("edit.paste_new_layer", "Paste into New &Layer", [this] { paste(PasteInto::new_layer); },
         {U'v', true, false, true});
     add("edit.paste_new_image", "Paste into New &Image", [this] { paste(PasteInto::new_image); }, {U'v', true, true});
@@ -225,7 +243,13 @@ void PaintApp::register_commands()
                                                       [](PieceTransform& t) { t.radians += 2.0 * quarter; });
                               });
     add("edit.select_all", "Select &All",
-        [this] { change_layers("Select All", [](Document& document) { document.selection().select_all(); }); },
+        [this]
+        {
+            if(!edit_text(TextAction::select_all))
+            {
+                change_layers("Select All", [](Document& document) { document.selection().select_all(); });
+            }
+        },
         {U'a', true});
     add("edit.deselect", "&Deselect",
         [this] { change_layers("Deselect", [](Document& document) { document.selection().clear(); }); }, {U'd', true});
@@ -480,12 +504,12 @@ void PaintApp::build_window()
 {
     auto frame{std::make_unique<MainFrame>(m_application.commands())};
     m_frame = frame.get();
-    m_frame->menu_bar().add_menu("&File", {"file.new", "file.open",
+    add_menu("&File", {"file.new", "file.open",
                                            oui::menu_submenu("Open &Recent", [this] { return recent_items(); }),
                                            oui::menu_separator(), "file.save",
                                            "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
                                            "file.quit"});
-    m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy",
+    add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy",
                                            "edit.copy_merged", "edit.paste", "edit.paste_new_layer",
                                            "edit.paste_new_image", oui::menu_separator(), "edit.erase_selection",
                                            "edit.fill_selection", oui::menu_separator(), "edit.select_all",
@@ -493,7 +517,7 @@ void PaintApp::build_window()
                                            "edit.flip_selection_horizontal", "edit.flip_selection_vertical",
                                            "edit.rotate_selection_clockwise", "edit.rotate_selection_counter_clockwise",
                                            "edit.rotate_selection_180"});
-    m_frame->menu_bar().add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size",
+    add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size",
                                             oui::menu_separator(), "image.convert_indexed", "image.convert_color",
                                             oui::menu_submenu("&Palettes",
                                                               std::vector<oui::MenuItem>{
@@ -507,12 +531,12 @@ void PaintApp::build_window()
                                             oui::menu_separator(), "image.rotate_clockwise",
                                             "image.rotate_counter_clockwise", "image.rotate_180",
                                             oui::menu_separator(), "image.flatten"});
-    m_frame->menu_bar().add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down",
+    add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down",
                                              oui::menu_separator(), "layers.move_up", "layers.move_down",
                                              "layers.toggle_visible", oui::menu_separator(), "layers.flip_horizontal",
                                              "layers.flip_vertical", "layers.rotate_zoom", oui::menu_separator(),
                                              "layers.properties"});
-    m_frame->menu_bar().add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
+    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
                                            "view.actual_size", oui::menu_separator(), "view.interface_bigger",
                                            "view.interface_smaller", "view.interface_reset"});
     auto left{oui::column()};
@@ -699,6 +723,43 @@ void PaintApp::refresh_titles()
         if(const auto* const document{document_in_tab(index)})
         {
             m_tabs->set_title(index, document->modified() ? document->title() + " *" : document->title());
+        }
+        else if(const auto* const workbench{workbench_in_tab(index)})
+        {
+            m_tabs->set_title(index, workbench->title());
+        }
+    }
+    refresh_workbench_images();
+}
+
+void PaintApp::refresh_workbench_images()
+{
+    std::vector<std::string> names;
+    for(std::size_t index{}; index < m_tabs->child_count(); ++ index)
+    {
+        if(const auto* const document{document_in_tab(index)})
+        {
+            names.push_back(document->title());
+        }
+    }
+    // The n-th image open when it is asked for, flattened as it shows.
+    const auto image{[this](std::size_t wanted) -> std::optional<Image>
+                     {
+                         for(std::size_t index{}, seen{}; index < m_tabs->child_count(); ++ index)
+                         {
+                             const auto* const document{document_in_tab(index)};
+                             if(document != nullptr && seen++ == wanted)
+                             {
+                                 return document->document().flatten();
+                             }
+                         }
+                         return std::nullopt;
+                     }};
+    for(std::size_t index{}; index < m_tabs->child_count(); ++ index)
+    {
+        if(auto* const workbench{workbench_in_tab(index)})
+        {
+            workbench->set_open_images(names, image);
         }
     }
 }
@@ -1057,6 +1118,10 @@ void PaintApp::tell_saved(const std::filesystem::path& path)
 
 bool PaintApp::save(bool ask_for_path)
 {
+    if(auto* const workbench{workbench_in_tab(m_tabs->selected_index())})
+    {
+        return save_workbench(*workbench, ask_for_path);
+    }
     auto* const document{current()};
     if(document == nullptr)
     {
@@ -1082,6 +1147,23 @@ bool PaintApp::save(bool ask_for_path)
 
 bool PaintApp::close(std::size_t index)
 {
+    if(auto* const workbench{workbench_in_tab(index)})
+    {
+        if(workbench->modified())
+        {
+            m_tabs->select(index);
+            const auto answer{oui::message_box(m_application, "Close", "Save the plugin " + workbench->title() + "?",
+                                               {"&Save", "&Don't Save", "Cancel"})};
+            if(!answer || *answer == 2u || (*answer == 0u && !save_workbench(*workbench, false)))
+            {
+                return false;
+            }
+        }
+        m_tabs->close_tab(index);
+        refresh_titles();
+        show_layers();
+        return true;
+    }
     auto* const document{document_in_tab(index)};
     if(document == nullptr)
     {
@@ -2450,8 +2532,195 @@ void PaintApp::edit_color(bool primary)
     }
 }
 
+bool PaintApp::edit_text(TextAction action)
+{
+    auto* const text{dynamic_cast<oui::TextEdit*>(m_application.focused())};
+    if(text == nullptr)
+    {
+        return false;
+    }
+    std::string taken;
+    switch(action)
+    {
+    case TextAction::undo:
+        static_cast<void>(text->undo());
+        break;
+    case TextAction::redo:
+        static_cast<void>(text->redo());
+        break;
+    case TextAction::cut:
+        text->cut_selection(taken);
+        break;
+    case TextAction::copy:
+        text->copy_selection(taken);
+        break;
+    case TextAction::paste:
+        text->paste(m_application.clipboard().text());
+        break;
+    case TextAction::select_all:
+        text->select_all();
+        break;
+    }
+    if(!taken.empty())
+    {
+        static_cast<void>(m_application.clipboard().set_text(taken));
+    }
+    return true;
+}
+
+PluginWorkbench* PaintApp::workbench_in_tab(std::size_t index)
+{
+    return m_tabs->content_at<PluginWorkbench>(index);
+}
+
+void PaintApp::manage_plugins()
+{
+    const auto choice{ask_manage_plugins(m_application, m_plugin_records, plugins_folder())};
+    switch(choice.action)
+    {
+    case PluginsChoice::Action::close:
+        return;
+    case PluginsChoice::Action::new_plugin:
+        open_workbench(std::string{new_plugin_source()}, std::nullopt);
+        return;
+    case PluginsChoice::Action::edit:
+    {
+        if(choice.plugin >= m_plugin_records.size())
+        {
+            return;
+        }
+        const auto& record{m_plugin_records[choice.plugin]};
+        // One already open is shown, not opened twice.
+        for(std::size_t index{}; record.file && index < m_tabs->child_count(); ++ index)
+        {
+            if(auto* const open{workbench_in_tab(index)}; open != nullptr && open->file() == record.file)
+            {
+                m_tabs->select(index);
+                return;
+            }
+        }
+        // A built-in plugin opens as a new one to save as one's own: the program's own stay as they are.
+        open_workbench(record.source, record.file);
+        return;
+    }
+    case PluginsChoice::Action::reload:
+        load_plugins();
+        manage_plugins();
+        return;
+    }
+}
+
+void PaintApp::open_workbench(std::string source, std::optional<std::filesystem::path> file)
+{
+    auto workbench{std::make_unique<PluginWorkbench>(m_application, std::move(source), std::move(file))};
+    auto* const shown{workbench.get()};
+    shown->on_title_changed([this] { refresh_titles(); });
+    shown->on_load_image(
+        [this, shown]
+        {
+            oui::FileDialogOptions options;
+            options.mode = oui::FileDialogMode::open_file;
+            options.directory = m_last_folder;
+            options.filters = image_filters();
+            const auto chosen{oui::file_dialog(m_application, options)};
+            if(!chosen)
+            {
+                return;
+            }
+            std::string error;
+            std::optional<Image> image;
+            if(const auto bytes{read_file(*chosen, error)})
+            {
+                if(file_format_of(oui::utf8_of(*chosen)) == FileFormat::openraster)
+                {
+                    if(const auto layered{read_openraster(*bytes, error)})
+                    {
+                        image = layered->flatten();
+                    }
+                }
+                else
+                {
+                    image = read_image(*bytes, error);
+                }
+            }
+            if(!image)
+            {
+                show_error("Load Image", oui::utf8_of(chosen->filename()) + ": " + error);
+                return;
+            }
+            shown->set_loaded_image(oui::utf8_of(chosen->filename()), std::move(*image));
+        });
+    auto& added{m_tabs->add_tab(shown->title(), std::move(workbench))};
+    m_tabs->select(m_tabs->child_count() - 1);
+    refresh_titles();
+    show_layers();
+    m_application.focus(added.code());
+}
+
+bool PaintApp::save_workbench(PluginWorkbench& workbench, bool ask_for_name)
+{
+    auto file{workbench.file()};
+    if(ask_for_name || !file)
+    {
+        oui::PromptOptions options;
+        options.title = "Save Plugin";
+        options.label = "Name, saved in the plugins folder:";
+        options.text = file ? oui::utf8_of(file->stem()) : std::string{"my_plugin"};
+        options.validate = [](std::string_view text) -> std::optional<std::string>
+        {
+            if(text.empty() || text.find_first_of("/\\:*?\"<>|") != std::string_view::npos)
+            {
+                return std::string{"A name without / \\ : * ? \" < > |"};
+            }
+            return std::nullopt;
+        };
+        const auto name{oui::prompt(m_application, options)};
+        if(!name)
+        {
+            return false;
+        }
+        auto chosen{oui::path_from_utf8(*name)};
+        if(chosen.extension() != ".js")
+        {
+            chosen += ".js";
+        }
+        file = plugins_folder() / chosen;
+    }
+    std::error_code ignored;
+    std::filesystem::create_directories(file->parent_path(), ignored);
+    std::string error;
+    if(!write_file_atomically(*file, workbench.code().text(), error))
+    {
+        show_error("Save Plugin", error);
+        return false;
+    }
+    workbench.saved(*file);
+    // Its effects in the menus as they are now.
+    load_plugins();
+    return true;
+}
+
+std::filesystem::path PaintApp::plugins_folder() const
+{
+    // A plugin of the person's own is a .js file in the plugins folder beside the settings.
+    return m_settings.file_path().parent_path() / "plugins";
+}
+
 void PaintApp::load_plugins()
 {
+    const auto first{m_plugins == nullptr};
+    auto& commands{m_application.commands()};
+    // The effects' commands of the plugins loaded before go with them.
+    if(m_plugins != nullptr)
+    {
+        for(const auto& effect : m_plugins->effects())
+        {
+            commands.unregister_command("effect." + std::to_string(effect.index));
+        }
+    }
+    m_effect_values.clear();
+    m_last_effect.reset();
+    m_system.reset();
     m_plugins = std::make_unique<PluginHost>();
     oui::script::SystemApi::Hooks hooks;
     hooks.print = [](std::string_view text, bool) { std::fwrite(text.data(), 1, text.size(), stderr); };
@@ -2461,13 +2730,30 @@ void PaintApp::load_plugins()
     m_system = std::make_unique<oui::script::SystemApi>(m_plugins->engine(), m_application, hooks);
     m_plugins->engine().run("globalThis.oui = Object.freeze({...globalThis.__ouiSystem}); delete globalThis.__ouiSystem;",
                             "system.js");
-    std::string failures;
+    m_plugin_records.clear();
+    const auto load{[this](std::string source, std::string name, std::optional<std::filesystem::path> file)
+                    {
+                        PluginRecord record{std::move(name), std::move(file), std::move(source), {}, std::nullopt};
+                        const auto before{m_plugins->effects().size()};
+                        try
+                        {
+                            m_plugins->load(record.source, record.name);
+                        }
+                        catch(const std::exception& failure)
+                        {
+                            record.error = failure.what();
+                        }
+                        for(auto index{before}; index < m_plugins->effects().size(); ++ index)
+                        {
+                            record.effects.push_back(m_plugins->effects()[index].name);
+                        }
+                        m_plugin_records.push_back(std::move(record));
+                    }};
     for(const auto& [source, name] : built_in_plugins())
     {
-        m_plugins->load(source, name);
+        load(std::string{source}, std::string{name}, std::nullopt);
     }
-    // A plugin of the person's own is a .js file in the plugins folder beside the settings.
-    const auto folder{m_settings.file_path().parent_path() / "plugins"};
+    const auto folder{plugins_folder()};
     std::error_code ignored;
     std::vector<std::filesystem::path> files;
     for(std::filesystem::directory_iterator entry{folder, ignored}, end; !ignored && entry != end; entry.increment(ignored))
@@ -2478,18 +2764,16 @@ void PaintApp::load_plugins()
         }
     }
     std::sort(files.begin(), files.end());
+    std::string failures;
     for(const auto& file : files)
     {
         std::string error;
         if(const auto source{read_file(file, error)})
         {
-            try
+            load(*source, oui::utf8_of(file.filename()), file);
+            if(const auto& failed{m_plugin_records.back().error})
             {
-                m_plugins->load(*source, oui::utf8_of(file.filename()));
-            }
-            catch(const std::exception& failure)
-            {
-                failures += oui::utf8_of(file.filename()) + ": " + failure.what() + "\n";
+                failures += oui::utf8_of(file.filename()) + ": " + *failed + "\n";
             }
         }
     }
@@ -2500,7 +2784,6 @@ void PaintApp::load_plugins()
         {"Invert Alpha", {U'i', true, true}},                 {"Invert Colors", {U'i', true, false, true}},
         {"Levels", {U'l', true}},                             {"Posterize", {U'p', true, false, true}},
         {"Sepia", {U'e', true, false, true}}};
-    auto& commands{m_application.commands()};
     std::vector<oui::MenuItem> adjustments;
     std::map<std::string, std::vector<oui::MenuItem>> submenus;
     for(const auto& effect : m_plugins->effects())
@@ -2521,27 +2804,48 @@ void PaintApp::load_plugins()
             submenus[effect.menu].emplace_back(id);
         }
     }
-    commands.register_command("effects.repeat", "&Repeat Last Effect",
-                              [this]
-                              {
-                                  if(m_last_effect)
+    if(first)
+    {
+        commands.register_command("effects.repeat", "&Repeat Last Effect",
+                                  [this]
                                   {
-                                      run_effect(*m_last_effect, true);
-                                  }
-                              });
-    commands.bind("effects.repeat", {U'f', true});
+                                      if(m_last_effect)
+                                      {
+                                          run_effect(*m_last_effect, true);
+                                      }
+                                  });
+        commands.bind("effects.repeat", {U'f', true});
+        commands.register_command("effects.manage", "&Manage Plugins...", [this] { manage_plugins(); });
+    }
     std::vector<oui::MenuItem> effects{"effects.repeat", oui::menu_separator()};
     for(auto& [menu, items] : submenus)
     {
         effects.push_back(oui::menu_submenu(menu, std::move(items)));
     }
-    m_frame->menu_bar().add_menu("&Adjustments", std::move(adjustments));
-    m_frame->menu_bar().add_menu("Effe&cts", std::move(effects));
-    m_frame->menu_bar().add_menu("&Help", {"help.documentation", oui::menu_separator(), "help.about"});
-    if(!failures.empty())
+    effects.push_back(oui::menu_separator());
+    effects.emplace_back("effects.manage");
+    if(first)
     {
-        show_error("Plugins", "These plugins could not be loaded:\n" + failures);
+        m_adjustments_menu = m_menu_count;
+        add_menu("&Adjustments", std::move(adjustments));
+        add_menu("Effe&cts", std::move(effects));
+        add_menu("&Help", {"help.documentation", oui::menu_separator(), "help.about"});
+        if(!failures.empty())
+        {
+            show_error("Plugins", "These plugins could not be loaded:\n" + failures);
+        }
     }
+    else
+    {
+        m_frame->menu_bar().set_menu_items(m_adjustments_menu, std::move(adjustments));
+        m_frame->menu_bar().set_menu_items(m_adjustments_menu + 1, std::move(effects));
+    }
+}
+
+void PaintApp::add_menu(std::string_view title, std::vector<oui::MenuItem> items)
+{
+    m_frame->menu_bar().add_menu(title, std::move(items));
+    ++ m_menu_count;
 }
 
 void PaintApp::run_effect(std::size_t index, bool again)

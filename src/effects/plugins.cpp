@@ -76,7 +76,7 @@ std::vector<double> table_of(const Value& value)
 PluginHost::PluginHost()
 {
     // Effects may take a while on big images; a plugin that loops forever is still stopped.
-    m_engine.set_time_limit(std::chrono::minutes{2});
+    m_engine.set_time_limit(m_time_limit);
     const auto number{[](const std::vector<Value>& arguments, std::size_t index)
                       { return index < arguments.size() ? arguments[index].to_number() : 0.0; }};
     const auto define_image{[this](std::string_view name, std::function<WorkImage(const std::vector<Value>&)> make)
@@ -243,6 +243,18 @@ const WorkImage& PluginHost::image(const Value& id) const
     return found->second;
 }
 
+void PluginHost::set_time_limit(std::chrono::milliseconds limit)
+{
+    m_time_limit = limit;
+    m_engine.set_time_limit(limit);
+}
+
+void PluginHost::set_print(std::function<void(std::string_view text)> print)
+{
+    m_print = print;
+    m_engine.set_print(std::move(print));
+}
+
 void PluginHost::load(std::string_view source, std::string_view name)
 {
     m_engine.run(source, name);
@@ -300,6 +312,11 @@ WorkImage PluginHost::apply(const Effect& effect, const WorkImage& source, const
                     try
                     {
                         PluginHost worker;
+                        worker.set_time_limit(m_time_limit);
+                        if(m_print)
+                        {
+                            worker.set_print(m_print);
+                        }
                         for(const auto& [code, name] : m_sources)
                         {
                             worker.load(code, name);

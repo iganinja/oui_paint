@@ -5,6 +5,8 @@
 
 #include <oui/script/script_engine.h>
 
+#include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -72,6 +74,10 @@ class PluginHost
                                   const std::map<std::string, double>& values, const EffectContext& context);
     // Tells the hooks a file was saved.
     void saved(std::string_view path);
+    // How long loading a plugin or making an effect may take, two minutes unless set, and where console.log writes,
+    // nowhere unless set: also for the copies that make rows on other cores, so `print` may be called from them.
+    void set_time_limit(std::chrono::milliseconds limit);
+    void set_print(std::function<void(std::string_view text)> print);
     [[nodiscard]] olagarro::oui::script::ScriptEngine& engine() { return m_engine; }
 
   private:
@@ -91,6 +97,8 @@ class PluginHost
     // Every plugin loaded, in order, for the copies that make rows on other cores.
     std::vector<std::pair<std::string, std::string>> m_sources;
     olagarro::oui::script::Value m_saved;
+    std::chrono::milliseconds m_time_limit{std::chrono::minutes{2}};
+    std::function<void(std::string_view)> m_print;
 };
 
 // The plugins built into OUI Paint, their sources and names.

@@ -7,6 +7,7 @@
 #include "tools/floating.h"
 #include "tools/stroke.h"
 #include "ui/canvas_view.h"
+#include "ui/plugins_dialog.h"
 #include "ui/icons.h"
 
 #include <oui/application.h>
@@ -28,6 +29,7 @@ namespace oui_paint
 {
 
 class CanvasView;
+class PluginWorkbench;
 class ColorPanel;
 class LayersPanel;
 class PalettesPanel;
@@ -77,6 +79,29 @@ class PaintApp
     void use_tool(const ToolEvent& event);
     // The image a tab holds; none for a tab of another kind.
     [[nodiscard]] OpenDocument* document_in_tab(std::size_t index);
+    // The plugin a tab holds being written; none for a tab of another kind.
+    [[nodiscard]] PluginWorkbench* workbench_in_tab(std::size_t index);
+    // What the edit commands do to the text with the focus, as a plugin's code: false, leaving them to the image,
+    // when no text has it.
+    enum class TextAction
+    {
+        undo,
+        redo,
+        cut,
+        copy,
+        paste,
+        select_all
+    };
+    bool edit_text(TextAction action);
+    [[nodiscard]] std::filesystem::path plugins_folder() const;
+    void add_menu(std::string_view title, std::vector<olagarro::oui::MenuItem> items);
+    void manage_plugins();
+    // A plugin to write and try in a tab of its own; `file` is where it is saved, none for a new one.
+    void open_workbench(std::string source, std::optional<std::filesystem::path> file);
+    // Saves the plugin into the plugins folder and loads the plugins again, so its effects are in the menus.
+    bool save_workbench(PluginWorkbench& workbench, bool ask_for_name);
+    // Tells the workbenches which images are open, to try their effects on.
+    void refresh_workbench_images();
     // Hands a tool what the pointer did, keeping only the last move of a frame for tools that do not trace it.
     void take_tool_event(const ToolEvent& event);
     void use_pending_move();
@@ -164,6 +189,11 @@ class PaintApp
     // Each effect's values as last used, and the effect run last, for Ctrl+F.
     std::map<std::size_t, std::map<std::string, double>> m_effect_values;
     std::optional<std::size_t> m_last_effect;
+    // The plugins as they loaded, for Manage Plugins.
+    std::vector<PluginRecord> m_plugin_records;
+    // The menus added, and where Adjustments is, which Effects follows: loading the plugins again changes both.
+    std::size_t m_menu_count{0};
+    std::size_t m_adjustments_menu{0};
     // A rectangle or ellipse being drawn to select: where it began, how it combines, and the selection before it.
     struct Selecting
     {

@@ -58,6 +58,7 @@ add_library(oui_paint_core STATIC
     src/core/tile.cpp
     src/core/transform.cpp
     src/effects/pieces.cpp
+    src/effects/plugin_trial.cpp
     src/effects/plugins.cpp
     src/effects/test_card.cpp
     src/render/display_cache.cpp
@@ -72,6 +73,7 @@ add_library(oui_paint_core STATIC
     src/ui/canvas_view.cpp
     src/ui/color_dialog.cpp
     src/ui/color_panel.cpp
+    src/ui/effect_controls.cpp
     src/ui/effect_dialog.cpp
     src/ui/help_dialogs.cpp
     src/ui/icons.cpp
@@ -80,6 +82,8 @@ add_library(oui_paint_core STATIC
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
     src/ui/palettes_panel.cpp
+    src/ui/plugin_workbench.cpp
+    src/ui/plugins_dialog.cpp
     src/ui/tool_options.cpp
     src/ui/transform_dialogs.cpp
     src/ui/tool_panel.cpp)
@@ -157,6 +161,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/openraster_test.cpp
         tests/palettes_test.cpp
         tests/pieces_test.cpp
+        tests/plugin_trial_test.cpp
         tests/plugins_test.cpp
         tests/recent_files_test.cpp
         tests/render_test.cpp
