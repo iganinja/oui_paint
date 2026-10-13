@@ -32,6 +32,7 @@ class CanvasView;
 class PluginWorkbench;
 class ColorPanel;
 class LayersPanel;
+class HistoryPanel;
 class PalettesPanel;
 class MainFrame;
 class ToolOptions;
@@ -97,6 +98,10 @@ class PaintApp
     void add_menu(std::string_view title, std::vector<olagarro::oui::MenuItem> items);
     // Shows or hides the layers and palettes on the right, as View > Layers Panel and F7 do.
     void show_layers_panel(bool shown);
+    // Shows or hides the history over the layers, as View > History Panel and F6 do.
+    void show_history_panel(bool shown);
+    // Undoes or redoes as many steps as it takes for `position` to be done, as a click in the history asks.
+    void history_go_to(std::size_t position);
     void manage_plugins();
     // A plugin to write and try in a tab of its own; `file` is where it is saved, none for a new one.
     void open_workbench(std::string source, std::optional<std::filesystem::path> file);
@@ -180,6 +185,7 @@ class PaintApp
     ColorPanel* m_color_panel{};
     LayersPanel* m_layers_panel{};
     PalettesPanel* m_palettes_panel{};
+    HistoryPanel* m_history_panel{};
     // In an indexed image, the indices picked as primary and secondary; none when a colour was picked, whose nearest
     // index of the layer's palette is used.
     std::optional<int> m_primary_index;

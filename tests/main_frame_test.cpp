@@ -1,4 +1,5 @@
 #include "ui/main_frame.h"
+#include "ui/side_column.h"
 
 #include <oui/label.h>
 
@@ -66,4 +67,21 @@ TEST(MainFrame, AHiddenRightPanelLeavesItsWidthToTheCenter)
     panel->set_visible(true);
     frame.arrange({0, 0, 80, 25});
     EXPECT_EQ(frame.center()->bounds().width, 74);
+}
+
+TEST(SideColumn, TheHistoryTakesAThirdOverTheLayersAndNoneHidden)
+{
+    auto history{oui::label("history")};
+    auto* const shown{history.get()};
+    oui_paint::SideColumn column{std::move(history), oui::label("layers"), oui::label("palettes")};
+    column.arrange({0, 0, 24, 31});
+    // The palettes take the one row a label asks, the history a third of the rest, the layers what is left.
+    EXPECT_EQ(shown->bounds().height, 10);
+    EXPECT_EQ(column.child_at(1).bounds().y, 10);
+    EXPECT_EQ(column.child_at(1).bounds().height, 20);
+    EXPECT_EQ(column.child_at(2).bounds().y, 30);
+    shown->set_visible(false);
+    column.arrange({0, 0, 24, 31});
+    EXPECT_EQ(column.child_at(1).bounds().y, 0);
+    EXPECT_EQ(column.child_at(1).bounds().height, 30);
 }

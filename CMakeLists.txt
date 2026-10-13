@@ -78,6 +78,7 @@ add_library(oui_paint_core STATIC
     src/ui/effect_controls.cpp
     src/ui/effect_dialog.cpp
     src/ui/help_dialogs.cpp
+    src/ui/history_panel.cpp
     src/ui/icons.cpp
     src/ui/layer_properties_dialog.cpp
     src/ui/layers_panel.cpp
@@ -99,7 +100,7 @@ set_source_files_properties(src/codecs/stb_api.cpp src/codecs/zip_api.cpp
 # The icons the program shows, built into it. Only those it uses: add one here when a button or a menu needs it.
 set(OUI_PAINT_GODOT_ICONS
     Add Bucket ColorPick Duplicate Edit Eraser Gradient GuiVisibilityHidden GuiVisibilityVisible Line MoveDown MoveUp
-    RegionEdit Remove ToolMove ToolPan ToolSelect Tools Zoom)
+    RegionEdit Remove RotateLeft RotateRight ToolMove ToolPan ToolSelect Tools Zoom)
 list(TRANSFORM OUI_PAINT_GODOT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
 set(OUI_PAINT_OWN_ICONS CloneStamp EllipseSelect Lasso MagicWand MergeDown Paintbrush Recolor Shapes Text)
 list(TRANSFORM OUI_PAINT_OWN_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/oui_paint/)
@@ -159,6 +160,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/fonts_test.cpp
         tests/gradient_test.cpp
         tests/help_test.cpp
+        tests/history_panel_test.cpp
         tests/history_test.cpp
         tests/icons_test.cpp
         tests/indexed_test.cpp

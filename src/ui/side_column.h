@@ -2,40 +2,52 @@
 
 #include <oui/container.h>
 
+#include <algorithm>
 #include <memory>
 
 namespace oui_paint
 {
 
-// Two widgets one over the other: the lower as tall as it asks, the upper filling what is left above it, as the
-// palettes under the layers.
+// Three widgets one over the other, as the right side holds the history, the layers and the palettes: the lowest as
+// tall as it asks, the highest a third of what is left above it, the middle one the rest. A hidden one takes no room.
 class SideColumn final : public olagarro::oui::Container
 {
   public:
-    SideColumn(std::unique_ptr<olagarro::oui::Widget> upper, std::unique_ptr<olagarro::oui::Widget> lower)
+    SideColumn(std::unique_ptr<olagarro::oui::Widget> top, std::unique_ptr<olagarro::oui::Widget> middle,
+               std::unique_ptr<olagarro::oui::Widget> bottom)
     {
-        m_upper = &add(std::move(upper));
-        m_lower = &add(std::move(lower));
+        m_top = &add(std::move(top));
+        m_middle = &add(std::move(middle));
+        m_bottom = &add(std::move(bottom));
     }
 
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override
     {
-        const auto upper{m_upper->measure(constraints)};
-        const auto lower{m_lower->measure(constraints)};
-        return {std::max(upper.width, lower.width), constraints.max_height};
+        auto width{0};
+        for(const auto* const part : {m_top, m_middle, m_bottom})
+        {
+            width = std::max(width, part->measure(constraints).width);
+        }
+        return {width, constraints.max_height};
     }
 
     void arrange(const olagarro::oui::Rect& bounds) override
     {
         Widget::arrange(bounds);
-        const auto lower{std::min(bounds.height, m_lower->measure({bounds.width, bounds.height}).height)};
-        m_upper->arrange({bounds.x, bounds.y, bounds.width, bounds.height - lower});
-        m_lower->arrange({bounds.x, bounds.y + bounds.height - lower, bounds.width, lower});
+        const auto bottom{
+            m_bottom->is_visible() ? std::min(bounds.height, m_bottom->measure({bounds.width, bounds.height}).height)
+                                   : 0};
+        const auto above{bounds.height - bottom};
+        const auto top{m_top->is_visible() ? above / 3 : 0};
+        m_top->arrange({bounds.x, bounds.y, bounds.width, top});
+        m_middle->arrange({bounds.x, bounds.y + top, bounds.width, above - top});
+        m_bottom->arrange({bounds.x, bounds.y + above, bounds.width, bottom});
     }
 
   private:
-    olagarro::oui::Widget* m_upper{};
-    olagarro::oui::Widget* m_lower{};
+    olagarro::oui::Widget* m_top{};
+    olagarro::oui::Widget* m_middle{};
+    olagarro::oui::Widget* m_bottom{};
 };
 
 } // namespace oui_paint

@@ -115,3 +115,28 @@ TEST(History, AGrownCanvasShrinksBackOnUndo)
     history.redo(document);
     EXPECT_EQ(document.height(), 200);
 }
+
+TEST(History, GoingToAStepUndoesOrRedoesAsManyAsItTakesAtOnce)
+{
+    Document document{600, 300, PixelFormat::gray_alpha8};
+    document.add_layer("Background");
+    History history;
+    for(const std::uint8_t value : {10, 20, 30})
+    {
+        history.begin_step(document);
+        dot(document, value, 10, value);
+        history.finish_step("Dot", document);
+    }
+    const auto back{history.go_to(document, 1)};
+    EXPECT_EQ(history.position(), 1u);
+    EXPECT_EQ(value_at(document, 10, 10), 10);
+    EXPECT_EQ(value_at(document, 20, 10), 0);
+    EXPECT_EQ(value_at(document, 30, 10), 0);
+    EXPECT_EQ(back, (std::vector<TilePoint>{{0, 0}})) << "each tile once";
+    static_cast<void>(history.go_to(document, 3));
+    EXPECT_EQ(history.position(), 3u);
+    EXPECT_EQ(value_at(document, 30, 10), 30);
+    static_cast<void>(history.go_to(document, 0));
+    EXPECT_EQ(value_at(document, 10, 10), 0) << "the image as it opened";
+    EXPECT_THROW(static_cast<void>(history.go_to(document, 9)), std::out_of_range) << "no such step";
+}

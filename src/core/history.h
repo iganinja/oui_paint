@@ -55,6 +55,9 @@ class History
     // Puts the document back as before the last step; returns the tiles that changed.
     std::vector<TilePoint> undo(Document& document);
     std::vector<TilePoint> redo(Document& document);
+    // Undoes or redoes as many steps as it takes for `position` to be done, 0 for none: the tiles that changed, each
+    // once. Throws std::out_of_range past the last step.
+    std::vector<TilePoint> go_to(Document& document, std::size_t position);
     [[nodiscard]] const std::vector<Step>& steps() const { return m_steps; }
     // How many steps are done: the rest are there to redo.
     [[nodiscard]] std::size_t position() const { return m_position; }

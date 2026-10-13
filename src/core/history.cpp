@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <set>
+#include <stdexcept>
 
 namespace oui_paint
 {
@@ -123,6 +124,30 @@ std::vector<TilePoint> History::redo(Document& document)
     ++ m_position;
     step.after.restore_into(document);
     return changed_tiles(step.before, step.after);
+}
+
+std::vector<TilePoint> History::go_to(Document& document, std::size_t position)
+{
+    if(position > m_steps.size())
+    {
+        throw std::out_of_range{"no such step in the history"};
+    }
+    std::set<TilePoint> changed;
+    while(m_position > position)
+    {
+        for(const auto& tile : undo(document))
+        {
+            changed.insert(tile);
+        }
+    }
+    while(m_position < position)
+    {
+        for(const auto& tile : redo(document))
+        {
+            changed.insert(tile);
+        }
+    }
+    return {changed.begin(), changed.end()};
 }
 
 } // namespace oui_paint
