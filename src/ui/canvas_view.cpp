@@ -24,6 +24,11 @@ void CanvasView::on_tool(std::function<void(const ToolEvent&)> tool)
     m_tool = std::move(tool);
 }
 
+void CanvasView::on_pointer(std::function<oui::Pointer(bool held)> pointer)
+{
+    m_pointer_for_tool = std::move(pointer);
+}
+
 void CanvasView::changed()
 {
     if(m_changed)
@@ -186,6 +191,7 @@ bool CanvasView::handle_event(const oui::Event& event)
     {
         ToolEvent tool;
         tool.at = viewport.image_at(*at);
+        tool.in_view = *at;
         tool.shift = mouse->shift;
         tool.control = mouse->control;
         tool.alt = mouse->alt;
@@ -234,7 +240,11 @@ bool CanvasView::takes_raw_pointer() const
 
 oui::Pointer CanvasView::pointer_at(oui::Point) const
 {
-    return m_panning_from ? oui::Pointer::grabbing : oui::Pointer::crosshair;
+    if(m_panning_from)
+    {
+        return oui::Pointer::grabbing;
+    }
+    return m_pointer_for_tool ? m_pointer_for_tool(m_tool_button.has_value()) : oui::Pointer::crosshair;
 }
 
 bool CanvasView::is_focusable() const

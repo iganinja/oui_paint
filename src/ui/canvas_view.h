@@ -24,6 +24,8 @@ struct ToolEvent
     Phase phase{Phase::press};
     // In the image's pixels, between whole ones too: (0.5, 0.5) is the middle of the top left pixel.
     Position at;
+    // In the view's pixels, which stay put while the view scrolls, as panning needs.
+    Position in_view;
     // The right button, which paints with the secondary colour.
     bool secondary{false};
     bool shift{false};
@@ -45,6 +47,8 @@ class CanvasView final : public olagarro::oui::Widget
     // Called after the view changed, by zoom or scrolling, or the pointer moved over it.
     void on_changed(std::function<void()> changed);
     void on_tool(std::function<void(const ToolEvent&)> tool);
+    // What the pointer looks like over the image, as the tool in use asks, told whether a button is held.
+    void on_pointer(std::function<olagarro::oui::Pointer(bool held)> pointer);
 
     // Where the marching ants are along the selection's edge; they move as it grows.
     void set_ants_phase(int phase) { m_ants_phase = phase; }
@@ -71,6 +75,7 @@ class CanvasView final : public olagarro::oui::Widget
     OpenDocument& m_document;
     std::function<void()> m_changed;
     std::function<void(const ToolEvent&)> m_tool;
+    std::function<olagarro::oui::Pointer(bool)> m_pointer_for_tool;
     // The button a tool is being used with, from its press to its release.
     std::optional<bool> m_tool_button;
     std::optional<Position> m_pointer;

@@ -466,6 +466,24 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
 {
     auto view{std::make_unique<CanvasView>(*document)};
     view->on_tool([this](const ToolEvent& event) { use_tool(event); });
+    view->on_pointer(
+        [this](bool held)
+        {
+            const auto& tool{m_tool_panel->selected()};
+            if(tool == "pan")
+            {
+                return held ? oui::Pointer::grabbing : oui::Pointer::hand;
+            }
+            if(tool == "move_pixels" || tool == "move_selection")
+            {
+                return oui::Pointer::move;
+            }
+            if(tool == "text")
+            {
+                return oui::Pointer::text;
+            }
+            return oui::Pointer::crosshair;
+        });
     m_documents.push_back(std::move(document));
     auto& added{m_tabs->add_tab(m_documents.back()->title(), std::move(view))};
     m_tabs->select(m_documents.size() - 1);
@@ -727,6 +745,31 @@ void PaintApp::use_tool(const ToolEvent& event)
         else
         {
             m_color_panel->set_primary(color);
+        }
+        return;
+    }
+    if(tool == "pan")
+    {
+        if(event.phase != ToolEvent::Phase::press && m_panning)
+        {
+            open->viewport().scroll_by(event.in_view.x - m_panning->x, event.in_view.y - m_panning->y);
+        }
+        m_panning = event.phase == ToolEvent::Phase::release ? std::nullopt : std::optional<Position>{event.in_view};
+        return;
+    }
+    if(tool == "zoom")
+    {
+        // A click zooms in where it is, a right click out.
+        if(event.phase == ToolEvent::Phase::press)
+        {
+            if(event.secondary)
+            {
+                open->viewport().zoom_out(event.in_view);
+            }
+            else
+            {
+                open->viewport().zoom_in(event.in_view);
+            }
         }
         return;
     }

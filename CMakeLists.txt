@@ -50,6 +50,9 @@ add_library(oui_paint_core STATIC
     src/core/tile.cpp
     src/render/display_cache.cpp
     src/render/viewport.cpp
+    src/tools/fill.cpp
+    src/tools/gradient.cpp
+    src/tools/shapes.cpp
     src/tools/stroke.cpp
     src/ui/canvas_view.cpp
     src/ui/color_panel.cpp
@@ -89,12 +92,15 @@ if(OUI_PAINT_BUILD_TESTS)
     add_executable(oui_paint_tests
         tests/codecs_test.cpp
         tests/core_test.cpp
+        tests/fill_test.cpp
+        tests/gradient_test.cpp
         tests/history_test.cpp
         tests/icons_test.cpp
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
         tests/render_test.cpp
         tests/selection_test.cpp
+        tests/shapes_test.cpp
         tests/stroke_test.cpp
         tests/tool_panel_test.cpp
         tests/tools_test.cpp)

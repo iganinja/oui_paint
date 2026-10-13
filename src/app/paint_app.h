@@ -133,6 +133,8 @@ class PaintApp
         std::optional<Layer> selection;
     };
     std::optional<Moving> m_moving;
+    // Where the Pan tool's drag was last, in the view.
+    std::optional<Position> m_panning;
     // The marching ants move while there is a selection to show.
     olagarro::oui::Timer m_ants;
     int m_ants_phase{0};
