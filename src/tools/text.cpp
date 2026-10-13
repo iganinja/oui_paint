@@ -62,7 +62,11 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                                  }
                                  const auto x{pen + glyph.left + column};
                                  const auto y{baseline + glyph.top + row};
-                                 const auto amount{coverage * selection.at(x, y) / 255.0};
+                                 auto amount{coverage * selection.at(x, y) / 255.0};
+                                 if(!antialias)
+                                 {
+                                     amount = amount >= 0.5 ? 1.0 : 0.0;
+                                 }
                                  if(amount <= 0.0 || x < 0 || y < 0 || x >= selection.width() ||
                                     y >= selection.height())
                                  {

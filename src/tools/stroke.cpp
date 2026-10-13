@@ -95,8 +95,11 @@ void Stroke::cover_segment(Position from, Position to)
     {
         for(auto x{left}; x <= right; ++ x)
         {
-            const auto covered{coverage(distance_to_segment({x + 0.5, y + 0.5}, from, to)) *
-                               m_selection.at(x, y) / 255.0};
+            auto covered{coverage(distance_to_segment({x + 0.5, y + 0.5}, from, to)) * m_selection.at(x, y) / 255.0};
+            if(m_settings.exact)
+            {
+                covered = covered >= 0.5 ? 1.0 : 0.0;
+            }
             if(covered <= 0.0)
             {
                 continue;
@@ -210,7 +213,8 @@ void Stroke::apply(TilePoint point, const Area& area)
 namespace
 {
 
-template <typename Change> std::vector<TilePoint> change_selected(Layer& layer, const Selection& selection, Change change)
+template <typename Change>
+std::vector<TilePoint> change_selected(Layer& layer, const Selection& selection, bool exact, Change change)
 {
     const auto area{selection.bounds()};
     std::set<TilePoint> touched;
@@ -222,7 +226,11 @@ template <typename Change> std::vector<TilePoint> change_selected(Layer& layer, 
                      {
                          for(auto x{area.x}; x < area.x + area.width; ++ x)
                          {
-                             const auto amount{selection.at(x, y) / 255.0};
+                             auto amount{selection.at(x, y) / 255.0};
+                             if(exact)
+                             {
+                                 amount = amount >= 0.5 ? 1.0 : 0.0;
+                             }
                              if(amount <= 0.0)
                              {
                                  continue;
@@ -242,9 +250,9 @@ template <typename Change> std::vector<TilePoint> change_selected(Layer& layer, 
 
 } // namespace
 
-std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, const Color& color)
+std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, const Color& color, bool exact)
 {
-    return change_selected(layer, selection,
+    return change_selected(layer, selection, exact,
                            [&color](auto pixel, double amount)
                            {
                                using PixelType = decltype(pixel);
@@ -252,9 +260,9 @@ std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, c
                            });
 }
 
-std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection)
+std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection, bool exact)
 {
-    return change_selected(layer, selection,
+    return change_selected(layer, selection, exact,
                            [](auto pixel, double amount)
                            {
                                using PixelType = decltype(pixel);

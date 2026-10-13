@@ -148,3 +148,25 @@ TEST(Stroke, TheCloneStampCopiesFromTheSourceAndRecolorReplacesOneColourOnly)
     EXPECT_EQ(layer.read(18, 15, 1, 1).pixel<Rgba8>(0, 0).value, (std::array<std::uint8_t, 4>{0, 0, 255, 255}))
         << "blue is not yellow, so it stays";
 }
+
+TEST(Stroke, AnExactStrokeWritesWholePixelsOnly)
+{
+    Layer layer{PixelFormat::gray_alpha8, "Indices"};
+    Selection selection{40, 40};
+    selection.add_ellipse(0, 0, 40, 40, SelectionMode::replace);
+    BrushSettings settings;
+    settings.width = 7.0;
+    settings.exact = true;
+    Stroke stroke{layer, selection, {5 / 255.0, 5 / 255.0, 5 / 255.0, 1.0}, settings, StrokeMode::paint};
+    stroke.line_to({2.5, 20.5});
+    stroke.line_to({37.5, 20.5});
+    const auto image{layer.read(0, 0, 40, 40)};
+    for(int y{}; y < 40; ++ y)
+    {
+        for(int x{}; x < 40; ++ x)
+        {
+            const auto pixel{image.pixel<GrayAlpha8>(x, y)};
+            ASSERT_TRUE(pixel.alpha() == 0 || (pixel.alpha() == 255 && pixel.value[0] == 5)) << x << ", " << y;
+        }
+    }
+}

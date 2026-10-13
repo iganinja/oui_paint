@@ -40,7 +40,8 @@ struct PieceTransform
 [[nodiscard]] std::array<Position, 4> piece_corners(const FloatingPiece& piece, const PieceTransform& transform);
 // Lays the piece, transformed, over `base` into `layer`, and makes the selection its mask where it went. A transform
 // that only moves, mirrors or turns by quarter turns keeps every pixel exactly. Returns nothing; the caller redraws.
+// With `exact`, every transform takes the nearest pixel, as indices need.
 void place_piece(Layer& layer, const Layer& base, Selection& selection, const FloatingPiece& piece,
-                 const PieceTransform& transform);
+                 const PieceTransform& transform, bool exact = false);
 
 } // namespace oui_paint

@@ -66,7 +66,7 @@ std::array<Position, 4> piece_corners(const FloatingPiece& piece, const PieceTra
 }
 
 void place_piece(Layer& layer, const Layer& base, Selection& selection, const FloatingPiece& piece,
-                 const PieceTransform& transform)
+                 const PieceTransform& transform, bool exact_pixels)
 {
     layer = base;
     const auto corners{piece_corners(piece, transform)};
@@ -90,7 +90,7 @@ void place_piece(Layer& layer, const Layer& base, Selection& selection, const Fl
     const auto to_piece{Affine::translation(-piece.x, -piece.y)
                             .after(piece_forward(piece, transform).inverse())
                             .after(Affine::translation(box_x, box_y))};
-    const auto resampling{exact(transform) ? Resampling::nearest : Resampling::bilinear};
+    const auto resampling{exact_pixels || exact(transform) ? Resampling::nearest : Resampling::bilinear};
     const auto pixels{transformed(piece.pixels, to_piece, box_width, box_height, resampling)};
     static_cast<void>(lay_over(layer, pixels, box_x, box_y));
     const auto mask{transformed(piece.mask, to_piece, box_width, box_height, resampling)};

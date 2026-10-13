@@ -79,7 +79,7 @@ namespace
 // inside the selection.
 template <typename Cover>
 void paint(Layer& layer, const Selection& selection, double left, double top, double right, double bottom,
-           const Color& color, Cover cover, std::set<TilePoint>& touched)
+           const Color& color, bool antialias, Cover cover, std::set<TilePoint>& touched)
 {
     const auto first_x{std::max(0, static_cast<int>(std::floor(left)) - 1)};
     const auto first_y{std::max(0, static_cast<int>(std::floor(top)) - 1)};
@@ -110,7 +110,12 @@ void paint(Layer& layer, const Selection& selection, double left, double top, do
                      {
                          for(auto x{first_x}; x <= last_x; ++ x)
                          {
-                             const auto amount{cover(x + 0.5, y + 0.5) * selection.at(x, y) / 255.0};
+                             auto amount{cover(x + 0.5, y + 0.5) * selection.at(x, y) / 255.0};
+                             // Without antialiasing nothing is mixed, the selection's soft edge neither.
+                             if(!antialias)
+                             {
+                                 amount = amount >= 0.5 ? 1.0 : 0.0;
+                             }
                              if(amount <= 0.0)
                              {
                                  continue;
@@ -186,13 +191,13 @@ std::vector<TilePoint> draw_shape(Layer& layer, const Selection& selection, Shap
         const auto& inner{style == ShapeStyle::filled ? outline : fill};
         // Filled under the outline, as far as the outline's middle, so the two meet without a gap.
         const auto inset{style == ShapeStyle::outline_and_fill ? width / 2.0 : 0.0};
-        paint(layer, selection, left, top, right, bottom, inner,
+        paint(layer, selection, left, top, right, bottom, inner, antialias,
               [&](double x, double y) { return inside(distance(x, y) + inset, antialias); }, touched);
     }
     if(style != ShapeStyle::filled)
     {
         // The outline inside the edge, `width` deep.
-        paint(layer, selection, left, top, right, bottom, outline,
+        paint(layer, selection, left, top, right, bottom, outline, antialias,
               [&](double x, double y)
               {
                   const auto from_edge{distance(x, y)};
@@ -235,7 +240,7 @@ std::vector<TilePoint> draw_line(Layer& layer, const Selection& selection, Posit
     const auto reach{std::max(width, head)};
     std::set<TilePoint> touched;
     paint(layer, selection, std::min(from.x, to.x) - reach, std::min(from.y, to.y) - reach,
-          std::max(from.x, to.x) + reach, std::max(from.y, to.y) + reach, color,
+          std::max(from.x, to.x) + reach, std::max(from.y, to.y) + reach, color, antialias,
           [&](double x, double y)
           {
               auto distance{segment_distance(x, y, start, end) - width / 2.0};

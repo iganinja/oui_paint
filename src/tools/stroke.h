@@ -20,6 +20,8 @@ struct BrushSettings
     // How much of the radius is solid before it fades to the edge: 1 is a hard brush, 0 fades from the middle.
     double hardness{0.75};
     bool antialias{true};
+    // Every pixel either painted whole or left, the selection's soft edge too, as indices need: no mixing.
+    bool exact{false};
 };
 
 enum class StrokeMode
@@ -89,9 +91,10 @@ class Stroke
 
 // Mixes `color` over the layer wherever `selection` selects, as much as it selects, as Backspace does; returns the
 // tiles written.
-std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, const Color& color);
+// With `exact`, a pixel is filled whole where it is selected half or more, and left otherwise, as indices need.
+std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, const Color& color, bool exact = false);
 // Takes away the layer's pixels wherever `selection` selects, as much as it selects, as Delete does.
-std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection);
+std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection, bool exact = false);
 
 // The layer's pixels inside the selection's bounds, each as see-through as the selection leaves it, and where they were:
 // what Move Selected Pixels lifts.

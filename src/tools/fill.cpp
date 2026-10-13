@@ -149,7 +149,7 @@ std::vector<TilePoint> bucket_fill(Document& document, int x, int y, const Color
     Layer mask_layer{PixelFormat::gray_alpha8, "Fill"};
     mask_layer.write(mask, 0, 0);
     where.set_mask(std::move(mask_layer));
-    return fill_selected(document.layers()[document.active_layer()], where, color);
+    return fill_selected(document.layers()[document.active_layer()], where, color, settings.exact);
 }
 
 } // namespace oui_paint

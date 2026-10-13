@@ -17,6 +17,8 @@ struct FillSettings
     double tolerance{0.5};
     // Compares the pixels of the whole image as it shows rather than those of the active layer.
     bool sample_image{false};
+    // Fills whole pixels only, as indices need.
+    bool exact{false};
 };
 
 // Which pixels a fill from (x, y) reaches, as a coverage of 0 or 255 for each pixel of the image, row by row.

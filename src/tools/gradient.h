@@ -32,5 +32,10 @@ enum class GradientKind
 std::vector<TilePoint> draw_gradient(Layer& layer, const Layer& base, const Selection& selection, GradientKind kind,
                                      Position start, Position end, const Color& from, const Color& to,
                                      bool transparency);
+// The same between two indices of an indexed layer, each pixel the one or the other by an ordered dither, as consoles
+// draw gradients: `from` and `to` are the pixels themselves.
+std::vector<TilePoint> draw_dithered_gradient(Layer& layer, const Layer& base, const Selection& selection,
+                                              GradientKind kind, Position start, Position end, GrayAlpha8 from,
+                                              GrayAlpha8 to);
 
 } // namespace oui_paint

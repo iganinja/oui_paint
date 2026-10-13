@@ -133,4 +133,31 @@ std::vector<TilePoint> draw_gradient(Layer& layer, const Layer& base, const Sele
     return {touched.begin(), touched.end()};
 }
 
+std::vector<TilePoint> draw_dithered_gradient(Layer& layer, const Layer& base, const Selection& selection,
+                                              GradientKind kind, Position start, Position end, GrayAlpha8 from,
+                                              GrayAlpha8 to)
+{
+    // Bayer's 4 by 4 order: a pixel takes `to` where the gradient is past its threshold.
+    constexpr int bayer[4][4]{{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+    const auto area{selection.bounds()};
+    std::set<TilePoint> touched;
+    layer = base;
+    for(auto y{area.y}; y < area.y + area.height; ++ y)
+    {
+        for(auto x{area.x}; x < area.x + area.width; ++ x)
+        {
+            if(selection.at(x, y) < 128)
+            {
+                continue;
+            }
+            const auto t{gradient_position(kind, start, end, {x + 0.5, y + 0.5})};
+            const auto threshold{(bayer[y & 3][x & 3] + 0.5) / 16.0};
+            const TilePoint point{x / tile_size, y / tile_size};
+            layer.writable_tile(point).set_pixel(x % tile_size, y % tile_size, t >= threshold ? to : from);
+            touched.insert(point);
+        }
+    }
+    return {touched.begin(), touched.end()};
+}
+
 } // namespace oui_paint

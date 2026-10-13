@@ -55,3 +55,25 @@ TEST(Gradient, TransparencyModeFadesTheLayerItself)
     EXPECT_LT(row.pixel<Rgba8>(9, 0).alpha(), 25);
     EXPECT_EQ(row.pixel<Rgba8>(9, 0).value[0], 255) << "its colour stays";
 }
+
+TEST(Gradient, ADitheredGradientUsesOnlyItsTwoIndicesMoreOfTheSecondFurtherOn)
+{
+    Layer layer{PixelFormat::gray_alpha8, "Indices"};
+    const Layer base{layer};
+    const Selection everything{64, 4};
+    draw_dithered_gradient(layer, base, everything, GradientKind::linear, {0, 0}, {64, 0}, GrayAlpha8{{2, 255}},
+                           GrayAlpha8{{9, 255}});
+    const auto image{layer.read(0, 0, 64, 4)};
+    auto seconds_left{0};
+    auto seconds_right{0};
+    for(int y{}; y < 4; ++ y)
+    {
+        for(int x{}; x < 64; ++ x)
+        {
+            const auto value{image.pixel<GrayAlpha8>(x, y).value[0]};
+            ASSERT_TRUE(value == 2 || value == 9);
+            (x < 16 ? seconds_left : seconds_right) += (x < 16 || x >= 48) && value == 9 ? 1 : 0;
+        }
+    }
+    EXPECT_LT(seconds_left, seconds_right);
+}
