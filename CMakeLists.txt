@@ -64,6 +64,7 @@ add_library(oui_paint_core STATIC
     src/ui/canvas_view.cpp
     src/ui/color_dialog.cpp
     src/ui/color_panel.cpp
+    src/ui/effect_dialog.cpp
     src/ui/icons.cpp
     src/ui/layer_properties_dialog.cpp
     src/ui/layers_panel.cpp

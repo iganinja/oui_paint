@@ -3,6 +3,7 @@
 #include "app/new_image.h"
 #include "app/open_document.h"
 #include "core/selection.h"
+#include "effects/plugins.h"
 #include "tools/floating.h"
 #include "tools/stroke.h"
 #include "ui/icons.h"
@@ -10,6 +11,7 @@
 #include <oui/application.h>
 #include <oui/graphics/font.h>
 #include <oui/graphics/pixel_backend.h>
+#include <oui/script/system_api.h>
 #include <oui/settings.h>
 #include <oui/tab_view.h>
 
@@ -60,6 +62,14 @@ class PaintApp
 
   private:
     void register_commands();
+    // Loads the plugins built in and those in the plugins folder beside the settings, and puts their effects in the
+    // Adjustments and Effects menus.
+    void load_plugins();
+    // Runs an effect on the active layer, inside the selection: asking for its parameters, showing it as they change,
+    // unless `again`, which runs it with the values it had last.
+    void run_effect(std::size_t index, bool again);
+    // Tells the plugins' hooks a file was saved, and what went wrong in them, if anything.
+    void tell_saved(const std::filesystem::path& path);
     // What the tool in use does with the pointer on the current document.
     void use_tool(const ToolEvent& event);
     // Changes the current document's layers as one undoable step called `name`, and draws again what changed.
@@ -124,6 +134,11 @@ class PaintApp
     LayersPanel* m_layers_panel{};
     ToolOptions* m_tool_options{};
     std::unique_ptr<Stroke> m_stroke;
+    std::unique_ptr<PluginHost> m_plugins;
+    std::unique_ptr<olagarro::oui::script::SystemApi> m_system;
+    // Each effect's values as last used, and the effect run last, for Ctrl+F.
+    std::map<std::size_t, std::map<std::string, double>> m_effect_values;
+    std::optional<std::size_t> m_last_effect;
     // A rectangle or ellipse being drawn to select: where it began, how it combines, and the selection before it.
     struct Selecting
     {

@@ -11,6 +11,7 @@
 #include "ui/canvas_view.h"
 #include "ui/color_dialog.h"
 #include "ui/color_panel.h"
+#include "ui/effect_dialog.h"
 #include "ui/layer_properties_dialog.h"
 #include "ui/layers_panel.h"
 #include "ui/main_frame.h"
@@ -27,6 +28,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdio>
 #include <string>
 
@@ -96,6 +98,7 @@ PaintApp::PaintApp(oui::Application& application, oui::PixelBackend& window, oui
     m_last_folder = std::filesystem::current_path(ignored);
     register_commands();
     build_window();
+    load_plugins();
     m_application.on_close_requested([this] { quit(); });
     // The interface's size, kept as it was left.
     m_application.on_zoomed(
@@ -800,6 +803,7 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
         document.set_modified(false);
         m_last_folder = path.parent_path();
         refresh_titles();
+        tell_saved(path);
         return true;
     }
     if(document.document().layers().size() > 1)
@@ -845,7 +849,20 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
     document.set_modified(false);
     m_last_folder = path.parent_path();
     refresh_titles();
+    tell_saved(path);
     return true;
+}
+
+void PaintApp::tell_saved(const std::filesystem::path& path)
+{
+    try
+    {
+        m_plugins->saved(path.string());
+    }
+    catch(const std::exception& failure)
+    {
+        show_error("After Saving", failure.what());
+    }
 }
 
 bool PaintApp::save(bool ask_for_path)
@@ -1856,6 +1873,217 @@ void PaintApp::edit_color(bool primary)
     {
         m_color_panel->set_secondary(*chosen);
     }
+}
+
+void PaintApp::load_plugins()
+{
+    m_plugins = std::make_unique<PluginHost>();
+    oui::script::SystemApi::Hooks hooks;
+    hooks.print = [](std::string_view text, bool) { std::fwrite(text.data(), 1, text.size(), stderr); };
+    hooks.report = [](std::string_view error) { std::fprintf(stderr, "oui_paint: %.*s\n", static_cast<int>(error.size()), error.data()); };
+    hooks.has_screen = [] { return true; };
+    hooks.title = "OUI Paint";
+    m_system = std::make_unique<oui::script::SystemApi>(m_plugins->engine(), m_application, hooks);
+    m_plugins->engine().run("globalThis.oui = Object.freeze({...globalThis.__ouiSystem}); delete globalThis.__ouiSystem;",
+                            "system.js");
+    std::string failures;
+    for(const auto& [source, name] : built_in_plugins())
+    {
+        m_plugins->load(source, name);
+    }
+    // A plugin of the person's own is a .js file in the plugins folder beside the settings.
+    const auto folder{m_settings.file_path().parent_path() / "plugins"};
+    std::error_code ignored;
+    std::vector<std::filesystem::path> files;
+    for(std::filesystem::directory_iterator entry{folder, ignored}, end; !ignored && entry != end; entry.increment(ignored))
+    {
+        if(entry->path().extension() == ".js")
+        {
+            files.push_back(entry->path());
+        }
+    }
+    std::sort(files.begin(), files.end());
+    for(const auto& file : files)
+    {
+        std::string error;
+        if(const auto source{read_file(file, error)})
+        {
+            try
+            {
+                m_plugins->load(*source, file.filename().string());
+            }
+            catch(const std::exception& failure)
+            {
+                failures += file.filename().string() + ": " + failure.what() + "\n";
+            }
+        }
+    }
+    // Paint.NET's keys for its adjustments.
+    const std::map<std::string, oui::Shortcut> keys{
+        {"Auto-Level", {U'l', true, false, true}},           {"Black and White", {U'g', true, false, true}},
+        {"Brightness / Contrast", {U't', true, false, true}}, {"Hue / Saturation", {U'u', true, false, true}},
+        {"Invert Alpha", {U'i', true, true}},                 {"Invert Colors", {U'i', true, false, true}},
+        {"Levels", {U'l', true}},                             {"Posterize", {U'p', true, false, true}},
+        {"Sepia", {U'e', true, false, true}}};
+    auto& commands{m_application.commands()};
+    std::vector<oui::MenuItem> adjustments;
+    std::map<std::string, std::vector<oui::MenuItem>> submenus;
+    for(const auto& effect : m_plugins->effects())
+    {
+        const auto id{"effect." + std::to_string(effect.index)};
+        const auto title{effect.parameters.empty() ? effect.name : effect.name + "..."};
+        commands.register_command(id, title, [this, index{effect.index}] { run_effect(index, false); });
+        if(const auto key{keys.find(effect.name)}; key != keys.end())
+        {
+            commands.bind(id, key->second);
+        }
+        if(effect.menu == "Adjustments")
+        {
+            adjustments.emplace_back(id);
+        }
+        else
+        {
+            submenus[effect.menu].emplace_back(id);
+        }
+    }
+    commands.register_command("effects.repeat", "&Repeat Last Effect",
+                              [this]
+                              {
+                                  if(m_last_effect)
+                                  {
+                                      run_effect(*m_last_effect, true);
+                                  }
+                              });
+    commands.bind("effects.repeat", {U'f', true});
+    std::vector<oui::MenuItem> effects{"effects.repeat", oui::menu_separator()};
+    for(auto& [menu, items] : submenus)
+    {
+        effects.push_back(oui::menu_submenu(menu, std::move(items)));
+    }
+    m_frame->menu_bar().add_menu("&Adjustments", std::move(adjustments));
+    m_frame->menu_bar().add_menu("Effe&cts", std::move(effects));
+    if(!failures.empty())
+    {
+        show_error("Plugins", "These plugins could not be loaded:\n" + failures);
+    }
+}
+
+void PaintApp::run_effect(std::size_t index, bool again)
+{
+    auto* const open{current()};
+    if(open == nullptr || m_stroke != nullptr || index >= m_plugins->effects().size())
+    {
+        return;
+    }
+    settle();
+    const auto effect{m_plugins->effects()[index]};
+    auto& document{open->document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    const auto base{layer};
+    const auto& selection{document.selection()};
+    const auto area{selection.bounds()};
+    if(area.empty())
+    {
+        return;
+    }
+    // The effect sees the whole layer, so a blur reaches past the selection's edge, and changes only what is
+    // selected, as much as it is.
+    const auto source{to_work(layer.read(0, 0, document.width(), document.height()))};
+    EffectContext context;
+    context.primary = m_color_panel->primary();
+    context.secondary = m_color_panel->secondary();
+    context.selection_x = area.x;
+    context.selection_y = area.y;
+    context.selection_width = area.width;
+    context.selection_height = area.height;
+    auto& values{m_effect_values[index]};
+    for(const auto& parameter : effect.parameters)
+    {
+        values.emplace(parameter.id, parameter.value);
+    }
+    const auto show{[&](const std::map<std::string, double>& shown)
+                    {
+                        const auto before{LayersState::of(document)};
+                        layer = base;
+                        try
+                        {
+                            const auto result{m_plugins->apply(effect, source, shown, context)};
+                            WorkImage inside{area.width, area.height};
+                            for(int y{}; y < area.height; ++ y)
+                            {
+                                for(int x{}; x < area.width; ++ x)
+                                {
+                                    const auto amount{selection.at(area.x + x, area.y + y) / 255.0f};
+                                    const auto* const was{source.at(area.x + x, area.y + y)};
+                                    const auto* const made{result.at(area.x + x, area.y + y)};
+                                    auto* const out{inside.at(x, y)};
+                                    for(int channel{}; channel < 4; ++ channel)
+                                    {
+                                        out[channel] = was[channel] + (made[channel] - was[channel]) * amount;
+                                    }
+                                }
+                            }
+                            layer.write(from_work(inside, document.format()), area.x, area.y);
+                        }
+                        catch(const std::exception& failure)
+                        {
+                            open->refresh(changed_tiles(before, LayersState::of(document)));
+                            throw;
+                        }
+                        open->refresh(changed_tiles(before, LayersState::of(document)));
+                    }};
+    open->history().begin_step(document);
+    try
+    {
+        if(effect.parameters.empty() || again)
+        {
+            show(values);
+        }
+        else
+        {
+            show(values);
+            auto failed{false};
+            const auto accepted{ask_effect(m_application, effect, values,
+                                           [&](const std::map<std::string, double>& changed)
+                                           {
+                                               if(failed)
+                                               {
+                                                   return;
+                                               }
+                                               try
+                                               {
+                                                   show(changed);
+                                               }
+                                               catch(const std::exception& failure)
+                                               {
+                                                   failed = true;
+                                                   show_error(effect.name, failure.what());
+                                               }
+                                           })};
+            if(!accepted)
+            {
+                const auto before{LayersState::of(document)};
+                layer = base;
+                open->refresh(changed_tiles(before, LayersState::of(document)));
+                open->history().cancel_step();
+                return;
+            }
+            show(values);
+        }
+    }
+    catch(const std::exception& failure)
+    {
+        const auto before{LayersState::of(document)};
+        layer = base;
+        open->refresh(changed_tiles(before, LayersState::of(document)));
+        open->history().cancel_step();
+        show_error(effect.name, failure.what());
+        return;
+    }
+    open->history().finish_step(effect.name, document);
+    m_last_effect = index;
+    open->set_modified(true);
+    refresh_titles();
 }
 
 void PaintApp::save_all()
