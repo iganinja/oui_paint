@@ -221,6 +221,59 @@ std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection)
                            });
 }
 
+Lifted lift_selected(const Layer& layer, const Selection& selection)
+{
+    const auto area{selection.bounds()};
+    Lifted lifted{layer.read(area.x, area.y, area.width, area.height), area.x, area.y};
+    visit_format(layer.format(),
+                 [&](auto tag)
+                 {
+                     using PixelType = typename decltype(tag)::Type;
+                     for(int y{}; y < area.height; ++ y)
+                     {
+                         for(int x{}; x < area.width; ++ x)
+                         {
+                             auto pixel{lifted.pixels.pixel<PixelType>(x, y)};
+                             auto& alpha{pixel.value[PixelType::channels - 1]};
+                             alpha = static_cast<typename PixelType::ChannelType>(
+                                 (alpha * selection.at(area.x + x, area.y + y) + 127u) / 255u);
+                             lifted.pixels.set_pixel(x, y, pixel);
+                         }
+                     }
+                 });
+    return lifted;
+}
+
+std::vector<TilePoint> lay_over(Layer& layer, const Image& image, int x, int y)
+{
+    std::set<TilePoint> touched;
+    visit_format(layer.format(),
+                 [&](auto tag)
+                 {
+                     using PixelType = typename decltype(tag)::Type;
+                     for(int row{}; row < image.height; ++ row)
+                     {
+                         for(int column{}; column < image.width; ++ column)
+                         {
+                             const auto above{image.pixel<PixelType>(column, row)};
+                             const auto at_x{x + column};
+                             const auto at_y{y + row};
+                             if(above.alpha() == 0 || at_x < 0 || at_y < 0)
+                             {
+                                 continue;
+                             }
+                             const TilePoint point{at_x / tile_size, at_y / tile_size};
+                             auto& tile{layer.writable_tile(point)};
+                             const auto below{tile.template pixel<PixelType>(at_x % tile_size, at_y % tile_size)};
+                             tile.set_pixel(at_x % tile_size, at_y % tile_size,
+                                            blend(below, above, 1.0, BlendMode::normal));
+                             touched.insert(point);
+                         }
+                     }
+                 });
+    return {touched.begin(), touched.end()};
+}
+
 std::vector<TilePoint> Stroke::take_changed()
 {
     std::sort(m_changed.begin(), m_changed.end());

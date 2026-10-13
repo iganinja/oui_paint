@@ -89,4 +89,16 @@ std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, c
 // Takes away the layer's pixels wherever `selection` selects, as much as it selects, as Delete does.
 std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection);
 
+// The layer's pixels inside the selection's bounds, each as see-through as the selection leaves it, and where they were:
+// what Move Selected Pixels lifts.
+struct Lifted
+{
+    Image pixels;
+    int x{0};
+    int y{0};
+};
+[[nodiscard]] Lifted lift_selected(const Layer& layer, const Selection& selection);
+// Mixes `image`, of the layer's format, over the layer with its top left corner at x, y; returns the tiles written.
+std::vector<TilePoint> lay_over(Layer& layer, const Image& image, int x, int y);
+
 } // namespace oui_paint

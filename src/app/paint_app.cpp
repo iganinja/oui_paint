@@ -267,6 +267,7 @@ void PaintApp::register_commands()
                                   {
                                       if(const auto next{tool_for_key(key, m_tool_panel->selected())})
                                       {
+                                          settle();
                                           m_tool_panel->set_selected(*next);
                                       }
                                   });
@@ -319,6 +320,7 @@ void PaintApp::build_window()
     auto left{oui::column()};
     m_tool_panel = &left->add(std::make_unique<ToolPanel>(tool_buttons(), m_icons));
     m_tool_panel->set_selected("brush");
+    m_tool_panel->on_picked([this](const std::string&) { settle(); });
     m_color_panel = &left->add(std::make_unique<ColorPanel>());
     m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
     m_frame->set_left(std::move(left));
@@ -702,6 +704,12 @@ void PaintApp::use_tool(const ToolEvent& event)
         }
         return;
     }
+    if(tool == "move_pixels" || tool == "move_selection")
+    {
+        move_selected(event, tool == "move_selection");
+        return;
+    }
+    settle();
     if(tool == "rectangle_select" || tool == "ellipse_select")
     {
         select_shape(event, tool == "ellipse_select");
@@ -760,6 +768,7 @@ void PaintApp::change_layers(std::string name, const std::function<void(Document
     {
         return;
     }
+    settle();
     auto& document{open->document()};
     const auto before{LayersState::of(document)};
     open->history().begin_step(document);
@@ -798,6 +807,7 @@ void PaintApp::layer_properties()
 
 void PaintApp::show_layers()
 {
+    settle();
     auto* const open{current()};
     m_layers_panel->set_document(open != nullptr ? &open->document() : nullptr);
     update_ants();
@@ -889,6 +899,73 @@ void PaintApp::select_shape(const ToolEvent& event, bool ellipse)
     update_ants();
 }
 
+void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
+{
+    auto* const open{current()};
+    auto& document{open->document()};
+    auto& selection{document.selection()};
+    if(event.phase == ToolEvent::Phase::press)
+    {
+        open->history().begin_step(document);
+        auto& layer{document.layers()[document.active_layer()]};
+        if(outline_only)
+        {
+            settle();
+            m_moving = Moving{event.at, 0, 0, selection.mask()};
+            return;
+        }
+        if(!m_floating || m_floating->document != open)
+        {
+            // Lifts what is selected, leaving a hole: the whole layer when nothing is selected.
+            Floating floating{open, layer, selection.mask(), lift_selected(layer, selection), 0, 0};
+            static_cast<void>(erase_selected(floating.base, selection));
+            m_floating = std::move(floating);
+        }
+        m_moving = Moving{event.at, m_floating->dx, m_floating->dy, {}};
+        return;
+    }
+    if(!m_moving)
+    {
+        return;
+    }
+    const auto dx{m_moving->dx + static_cast<int>(std::lround(event.at.x - m_moving->from.x))};
+    const auto dy{m_moving->dy + static_cast<int>(std::lround(event.at.y - m_moving->from.y))};
+    const auto before{LayersState::of(document)};
+    if(outline_only)
+    {
+        selection.set_mask(m_moving->selection);
+        selection.offset(dx, dy);
+    }
+    else
+    {
+        auto& layer{document.layers()[document.active_layer()]};
+        layer = m_floating->base;
+        static_cast<void>(lay_over(layer, m_floating->pixels.pixels, m_floating->pixels.x + dx,
+                                   m_floating->pixels.y + dy));
+        selection.set_mask(m_floating->selection);
+        selection.offset(dx, dy);
+        m_floating->dx = dx;
+        m_floating->dy = dy;
+    }
+    open->refresh(changed_tiles(before, LayersState::of(document)));
+    if(event.phase == ToolEvent::Phase::release)
+    {
+        m_moving.reset();
+        open->history().finish_step(outline_only ? "Move Selection" : "Move Selected Pixels", document);
+        if(!outline_only)
+        {
+            open->set_modified(true);
+            refresh_titles();
+        }
+    }
+    update_ants();
+}
+
+void PaintApp::settle()
+{
+    m_floating.reset();
+}
+
 void PaintApp::update_ants()
 {
     auto* const open{current()};
@@ -913,6 +990,7 @@ void PaintApp::update_ants()
 
 void PaintApp::undo()
 {
+    settle();
     if(auto* const open{current()}; open != nullptr && m_stroke == nullptr && open->history().can_undo())
     {
         open->refresh(open->history().undo(open->document()));
@@ -924,6 +1002,7 @@ void PaintApp::undo()
 
 void PaintApp::redo()
 {
+    settle();
     if(auto* const open{current()}; open != nullptr && m_stroke == nullptr && open->history().can_redo())
     {
         open->refresh(open->history().redo(open->document()));

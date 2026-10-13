@@ -90,3 +90,26 @@ TEST(Stroke, PaintGoesOnlyWhereTheSelectionSelects)
     EXPECT_EQ(layer.read(40, 50, 1, 1).pixel<GrayAlpha8>(0, 0).alpha(), 255);
     EXPECT_EQ(layer.read(60, 50, 1, 1).pixel<GrayAlpha8>(0, 0).alpha(), 0);
 }
+
+TEST(Stroke, LiftedPixelsLaidElsewhereKeepTheirSelectedShape)
+{
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    Image solid{PixelFormat::rgba8, 20, 20};
+    for(int y{}; y < 20; ++ y)
+    {
+        for(int x{}; x < 20; ++ x)
+        {
+            solid.set_pixel(x, y, Rgba8{{static_cast<std::uint8_t>(x * 10), 0, 0, 255}});
+        }
+    }
+    layer.write(solid, 0, 0);
+    Selection selection{100, 100};
+    selection.add_rectangle({2, 2, 3, 3}, SelectionMode::replace);
+    const auto lifted{lift_selected(layer, selection)};
+    EXPECT_EQ(lifted.x, 2);
+    EXPECT_EQ(lifted.pixels.width, 3);
+    static_cast<void>(erase_selected(layer, selection));
+    static_cast<void>(lay_over(layer, lifted.pixels, 50, 60));
+    EXPECT_EQ(layer.read(3, 3, 1, 1).pixel<Rgba8>(0, 0).alpha(), 0) << "a hole where it was";
+    EXPECT_EQ(layer.read(51, 61, 1, 1).pixel<Rgba8>(0, 0).value, (std::array<std::uint8_t, 4>{30, 0, 0, 255}));
+}

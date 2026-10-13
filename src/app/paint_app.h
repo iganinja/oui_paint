@@ -66,6 +66,10 @@ class PaintApp
     void show_layers();
     // Uses the rectangle or ellipse select tool.
     void select_shape(const ToolEvent& event, bool ellipse);
+    // Uses Move Selected Pixels, or Move Selection when `outline_only`.
+    void move_selected(const ToolEvent& event, bool outline_only);
+    // Puts floating pixels down where they are.
+    void settle();
     // Starts or stops the marching ants as the current document has a selection or not.
     void update_ants();
     void undo();
@@ -97,6 +101,27 @@ class PaintApp
         std::optional<Layer> before;
     };
     std::optional<Selecting> m_selecting;
+    // Pixels lifted by Move Selected Pixels, floating until something else is done: the layer with the hole they left,
+    // the selection where they were, what they are, and how far they have been moved.
+    struct Floating
+    {
+        OpenDocument* document{};
+        Layer base;
+        std::optional<Layer> selection;
+        Lifted pixels;
+        int dx{0};
+        int dy{0};
+    };
+    std::optional<Floating> m_floating;
+    // A move being dragged: where it was pressed, and the offset it started from.
+    struct Moving
+    {
+        Position from;
+        int dx{0};
+        int dy{0};
+        std::optional<Layer> selection;
+    };
+    std::optional<Moving> m_moving;
     // The marching ants move while there is a selection to show.
     olagarro::oui::Timer m_ants;
     int m_ants_phase{0};
