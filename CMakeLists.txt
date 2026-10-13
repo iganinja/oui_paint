@@ -51,6 +51,7 @@ add_library(oui_paint_core STATIC
     src/core/tile.cpp
     src/core/transform.cpp
     src/effects/pieces.cpp
+    src/effects/plugins.cpp
     src/render/display_cache.cpp
     src/render/viewport.cpp
     src/tools/color_math.cpp
@@ -72,7 +73,7 @@ add_library(oui_paint_core STATIC
     src/ui/transform_dialogs.cpp
     src/ui/tool_panel.cpp)
 target_include_directories(oui_paint_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics PRIVATE oui_paint_lodepng oui_paint_miniz)
+target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics olagarro::OUIScript PRIVATE oui_paint_lodepng oui_paint_miniz)
 target_include_directories(oui_paint_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb)
 # stb and miniz are used as they come, so OUI Paint's warnings stay off the files that hold them.
 set_source_files_properties(src/codecs/stb_api.cpp src/codecs/zip_api.cpp
@@ -88,6 +89,9 @@ list(TRANSFORM OUI_PAINT_OWN_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/oui
 set(OUI_PAINT_ICONS ${OUI_PAINT_GODOT_ICONS} ${OUI_PAINT_OWN_ICONS})
 list(TRANSFORM OUI_PAINT_ICONS APPEND .svg)
 olagarro_embed_files(oui_paint_core FUNCTION embedded_icons FILES ${OUI_PAINT_ICONS})
+# The plugins built in, the prelude every plugin runs after first.
+olagarro_embed_files(oui_paint_core FUNCTION embedded_plugins
+    FILES src/plugins/prelude.js src/plugins/adjustments.js src/plugins/effects.js)
 
 add_executable(oui_paint src/main.cpp)
 target_link_libraries(oui_paint PRIVATE oui_paint_core olagarro::OUIWindow)
@@ -110,6 +114,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
         tests/pieces_test.cpp
+        tests/plugins_test.cpp
         tests/render_test.cpp
         tests/selection_test.cpp
         tests/shapes_test.cpp
