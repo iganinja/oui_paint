@@ -135,7 +135,7 @@ void PaintApp::register_commands()
                           {
                               return [this, step]
                               {
-                                  const auto count{static_cast<int>(m_documents.size())};
+                                  const auto count{static_cast<int>(m_tabs->child_count())};
                                   if(count > 1)
                                   {
                                       const auto index{(static_cast<int>(m_tabs->selected_index()) + step + count) %
@@ -156,7 +156,7 @@ void PaintApp::register_commands()
         commands.register_command(id, "Image " + std::to_string(number),
                                   [this, number]
                                   {
-                                      if(static_cast<std::size_t>(number) <= m_documents.size())
+                                      if(static_cast<std::size_t>(number) <= m_tabs->child_count())
                                       {
                                           m_tabs->select(static_cast<std::size_t>(number - 1));
                                       }
@@ -635,8 +635,12 @@ void PaintApp::build_window()
     m_frame->set_top(std::move(options));
     auto tabs{std::make_unique<oui::TabView>()};
     m_tabs = tabs.get();
-    m_tabs->set_highlight_predicate([this](std::size_t index)
-                                    { return index < m_documents.size() && m_documents[index]->modified(); });
+    m_tabs->set_highlight_predicate(
+        [this](std::size_t index)
+        {
+            const auto* const document{document_in_tab(index)};
+            return document != nullptr && document->modified();
+        });
     static_cast<void>(m_tabs->on_close_requested([this](std::size_t index) { static_cast<void>(close(index)); }));
     static_cast<void>(m_tabs->on_selection_changed([this](auto&&...) { show_layers(); }));
     m_frame->set_center(std::move(tabs));
@@ -674,11 +678,13 @@ void PaintApp::build_window()
 
 OpenDocument* PaintApp::current()
 {
-    if(m_documents.empty())
-    {
-        return nullptr;
-    }
-    return m_documents[m_tabs->selected_index()].get();
+    return m_tabs == nullptr ? nullptr : document_in_tab(m_tabs->selected_index());
+}
+
+OpenDocument* PaintApp::document_in_tab(std::size_t index)
+{
+    auto* const view{m_tabs->content_at<CanvasView>(index)};
+    return view == nullptr ? nullptr : &view->document();
 }
 
 CanvasView* PaintApp::current_view()
@@ -688,10 +694,12 @@ CanvasView* PaintApp::current_view()
 
 void PaintApp::refresh_titles()
 {
-    for(std::size_t index{}; index < m_documents.size(); ++ index)
+    for(std::size_t index{}; index < m_tabs->child_count(); ++ index)
     {
-        const auto& document{*m_documents[index]};
-        m_tabs->set_title(index, document.modified() ? document.title() + " *" : document.title());
+        if(const auto* const document{document_in_tab(index)})
+        {
+            m_tabs->set_title(index, document->modified() ? document->title() + " *" : document->title());
+        }
     }
 }
 
@@ -748,7 +756,7 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
         });
     m_documents.push_back(std::move(document));
     auto& added{m_tabs->add_tab(m_documents.back()->title(), std::move(view))};
-    m_tabs->select(m_documents.size() - 1);
+    m_tabs->select(m_tabs->child_count() - 1);
     m_application.focus(added);
     refresh_titles();
     show_layers();
@@ -1074,15 +1082,15 @@ bool PaintApp::save(bool ask_for_path)
 
 bool PaintApp::close(std::size_t index)
 {
-    if(index >= m_documents.size())
+    auto* const document{document_in_tab(index)};
+    if(document == nullptr)
     {
         return true;
     }
-    if(m_documents[index]->modified())
+    if(document->modified())
     {
         m_tabs->select(index);
-        const auto answer{oui::message_box(m_application, "Close",
-                                           "Save the changes to " + m_documents[index]->title() + "?",
+        const auto answer{oui::message_box(m_application, "Close", "Save the changes to " + document->title() + "?",
                                            {"&Save", "&Don't Save", "Cancel"})};
         if(!answer || *answer == 2u || (*answer == 0u && !save(false)))
         {
@@ -1090,7 +1098,8 @@ bool PaintApp::close(std::size_t index)
         }
     }
     m_tabs->close_tab(index);
-    m_documents.erase(m_documents.begin() + static_cast<std::ptrdiff_t>(index));
+    m_documents.erase(std::find_if(m_documents.begin(), m_documents.end(),
+                                   [document](const auto& open) { return open.get() == document; }));
     refresh_titles();
     show_layers();
     return true;
@@ -2679,9 +2688,10 @@ void PaintApp::run_effect(std::size_t index, bool again)
 void PaintApp::save_all()
 {
     const auto selected{m_tabs->selected_index()};
-    for(std::size_t index{}; index < m_documents.size(); ++ index)
+    for(std::size_t index{}; index < m_tabs->child_count(); ++ index)
     {
-        if(m_documents[index]->modified() || !m_documents[index]->path())
+        const auto* const document{document_in_tab(index)};
+        if(document != nullptr && (document->modified() || !document->path()))
         {
             m_tabs->select(index);
             if(!save(false))
@@ -2690,7 +2700,7 @@ void PaintApp::save_all()
             }
         }
     }
-    if(selected < m_documents.size())
+    if(selected < m_tabs->child_count())
     {
         m_tabs->select(selected);
     }
@@ -2698,9 +2708,9 @@ void PaintApp::save_all()
 
 void PaintApp::quit()
 {
-    while(!m_documents.empty())
+    while(m_tabs->child_count() > 0)
     {
-        if(!close(m_documents.size() - 1))
+        if(!close(m_tabs->child_count() - 1))
         {
             return;
         }

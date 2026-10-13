@@ -75,6 +75,8 @@ class PaintApp
     void tell_saved(const std::filesystem::path& path);
     // What the tool in use does with the pointer on the current document.
     void use_tool(const ToolEvent& event);
+    // The image a tab holds; none for a tab of another kind.
+    [[nodiscard]] OpenDocument* document_in_tab(std::size_t index);
     // Hands a tool what the pointer did, keeping only the last move of a frame for tools that do not trace it.
     void take_tool_event(const ToolEvent& event);
     void use_pending_move();
