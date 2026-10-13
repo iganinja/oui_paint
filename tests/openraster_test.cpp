@@ -54,3 +54,25 @@ TEST(OpenRaster, WhatIsNotOpenRasterSaysSo)
     EXPECT_FALSE(read_openraster("not a zip", error).has_value());
     EXPECT_FALSE(error.empty());
 }
+
+TEST(OpenRaster, AnIndexedDocumentComesBackWithItsPalettesAndSlots)
+{
+    Document document{2, 1, PixelFormat::gray_alpha8};
+    auto setup{PaletteSetup::greys(2, 8)};
+    setup.palettes[1].colors[3] = {1, 0, 0, 1};
+    document.set_palettes(setup);
+    document.add_layer("Bottom");
+    auto& top{document.add_layer("Top")};
+    top.set_palette_slot(1);
+    Image dot{PixelFormat::gray_alpha8, 1, 1};
+    dot.set_pixel(0, 0, GrayAlpha8{{3, 255}});
+    top.write(dot, 1, 0);
+    std::string error;
+    const auto back{read_openraster(write_openraster(document), error)};
+    ASSERT_TRUE(back.has_value()) << error;
+    ASSERT_TRUE(back->indexed());
+    EXPECT_EQ(back->palettes()->count(), 2);
+    EXPECT_EQ(back->layers()[1].palette_slot(), 1);
+    EXPECT_EQ(back->layers()[1].read(1, 0, 1, 1).pixel<GrayAlpha8>(0, 0).value[0], 3);
+    EXPECT_EQ(back->flatten().pixel<Rgba8>(1, 0).value[0], 255);
+}

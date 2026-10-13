@@ -1,5 +1,9 @@
 #pragma once
 
+#include <optional>
+#include <string>
+#include <string_view>
+
 namespace oui_paint
 {
 
@@ -17,5 +21,9 @@ struct Color
     }
     [[nodiscard]] bool operator!=(const Color& other) const { return !(*this == other); }
 };
+
+// "#rrggbb", or "#rrggbbaa" when not solid.
+[[nodiscard]] std::string to_hex(const Color& color);
+[[nodiscard]] std::optional<Color> from_hex(std::string_view text);
 
 } // namespace oui_paint

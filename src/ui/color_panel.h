@@ -45,8 +45,5 @@ class ColorPanel final : public olagarro::oui::Widget
     std::function<void(bool)> m_edit;
 };
 
-// "#rrggbb" or "#rrggbbaa".
-[[nodiscard]] std::string to_hex(const Color& color);
-[[nodiscard]] std::optional<Color> from_hex(std::string_view text);
 
 } // namespace oui_paint

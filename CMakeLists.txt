@@ -40,9 +40,12 @@ add_library(oui_paint_core STATIC
     src/app/tools.cpp
     src/codecs/codecs.cpp
     src/codecs/openraster.cpp
+    src/codecs/palettes.cpp
     src/codecs/stb_api.cpp
     src/codecs/zip_api.cpp
+    src/core/color.cpp
     src/core/document.cpp
+    src/core/json.cpp
     src/core/history.cpp
     src/core/image.cpp
     src/core/layer.cpp
@@ -116,6 +119,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/indexed_test.cpp
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
+        tests/palettes_test.cpp
         tests/pieces_test.cpp
         tests/plugins_test.cpp
         tests/render_test.cpp

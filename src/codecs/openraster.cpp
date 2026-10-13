@@ -1,6 +1,7 @@
 #include "codecs/openraster.h"
 
 #include "codecs/codecs.h"
+#include "codecs/palettes.h"
 #include "codecs/zip_api.h"
 
 #include <algorithm>
@@ -240,12 +241,30 @@ std::string write_openraster(const Document& document)
         std::snprintf(opacity, sizeof opacity, "%.6g", layer.opacity());
         stack += "    <layer name=\"" + escaped(layer.name()) + "\" src=\"" + source + "\" x=\"0\" y=\"0\" opacity=\"" +
                  opacity + "\" visibility=\"" + (layer.visible() ? "visible" : "hidden") + "\" composite-op=\"" +
-                 std::string{name_of(layer.blend_mode())} + "\"/>\n";
+                 std::string{name_of(layer.blend_mode())} + "\"" +
+                 (document.indexed() ? " oui-paint:palette-slot=\"" + std::to_string(layer.palette_slot()) + "\"" : "") +
+                 "/>\n";
+        if(document.indexed())
+        {
+            // A PNG with the palette of its slot, which other programs show in its colours.
+            Document alone{document.width(), document.height(), PixelFormat::gray_alpha8};
+            PaletteSetup own;
+            own.size = document.palettes()->size;
+            own.palettes.push_back(document.palettes()->palettes.at(static_cast<std::size_t>(layer.palette_slot())));
+            alone.set_palettes(own);
+            alone.add_layer(layer.name()).write(layer.read(0, 0, document.width(), document.height()), 0, 0);
+            pictures.push_back({source, write_indexed_png(alone), true});
+            continue;
+        }
         pictures.push_back(
             {source, write_image(layer.read(0, 0, document.width(), document.height()), FileFormat::png), true});
     }
     stack += "  </stack>\n</image>\n";
     entries.push_back({"stack.xml", stack, false});
+    if(document.indexed())
+    {
+        entries.push_back({"oui-paint/palettes.json", write_palette_setup(*document.palettes()), false});
+    }
     for(auto& picture : pictures)
     {
         entries.push_back(std::move(picture));
@@ -299,6 +318,15 @@ std::optional<Document> read_openraster(std::string_view bytes, std::string& err
     std::vector<Read> read;
     auto bits{8};
     auto gray{true};
+    std::optional<PaletteSetup> palettes;
+    if(const auto setup_json{zip_api::unzip(bytes, "oui-paint/palettes.json")})
+    {
+        palettes = read_palette_setup(*setup_json, error);
+        if(!palettes)
+        {
+            return std::nullopt;
+        }
+    }
     for(const auto& values : elements(*stack, "layer"))
     {
         const auto source{values.find("src")};
@@ -312,7 +340,19 @@ std::optional<Document> read_openraster(std::string_view bytes, std::string& err
             error = "the OpenRaster file lacks " + source->second;
             return std::nullopt;
         }
-        auto image{read_image(*png, error)};
+        std::optional<Image> image;
+        if(palettes)
+        {
+            // Its indices as they are.
+            if(auto alone{read_indexed_png(*png, error)})
+            {
+                image = alone->layers().front().read(0, 0, alone->width(), alone->height());
+            }
+        }
+        else
+        {
+            image = read_image(*png, error);
+        }
         if(!image)
         {
             error = source->second + ": " + error;
@@ -322,18 +362,24 @@ std::optional<Document> read_openraster(std::string_view bytes, std::string& err
         gray = gray && is_gray(image->format);
         read.push_back({values, std::move(*image)});
     }
-    Document document{width, height, pixel_format(gray, bits)};
+    Document document{width, height, palettes ? PixelFormat::gray_alpha8 : pixel_format(gray, bits)};
+    document.set_palettes(palettes);
     // stack.xml lists the top layer first.
     for(auto index{read.size()}; index > 0; -- index)
     {
         const auto& [values, image]{read[index - 1]};
         const auto name{values.find("name")};
         auto& layer{document.add_layer(name != values.end() ? name->second : "Layer")};
-        layer.write(converted(image, document.format()), static_cast<int>(number(values, "x", 0)),
+        layer.write(palettes ? image : converted(image, document.format()), static_cast<int>(number(values, "x", 0)),
                     static_cast<int>(number(values, "y", 0)));
         layer.set_opacity(number(values, "opacity", 1.0));
         const auto visibility{values.find("visibility")};
         layer.set_visible(visibility == values.end() || visibility->second != "hidden");
+        if(const auto slot{values.find("oui-paint:palette-slot")}; slot != values.end() && palettes)
+        {
+            layer.set_palette_slot(std::clamp(static_cast<int>(number(values, "oui-paint:palette-slot", 0)), 0,
+                                              palettes->count() - 1));
+        }
         const auto mode{values.find("composite-op")};
         layer.set_blend_mode(mode != values.end() ? mode_of(mode->second) : BlendMode::normal);
     }
