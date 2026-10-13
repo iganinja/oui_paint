@@ -119,6 +119,8 @@ class PluginWorkbench final : public olagarro::oui::Container
     // Gone once the workbench is, for what a run posts after.
     std::shared_ptr<int> m_alive{std::make_shared<int>(0)};
     std::unique_ptr<olagarro::oui::Suggester> m_suggester;
+    // What the code can use: paint.d.ts with the values of the effect shown, made again when its parameters change.
+    std::unique_ptr<olagarro::oui::ScriptApi> m_api;
     std::function<void()> m_load_image;
     std::function<void()> m_title_changed;
     bool m_was_modified{false};

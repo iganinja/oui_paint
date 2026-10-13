@@ -13,6 +13,45 @@ const olagarro::oui::ScriptApi& plugin_api()
     return api;
 }
 
+std::string values_declarations(const Effect& effect)
+{
+    std::string declarations{"declare namespace paint {\n    class Values {\n"};
+    for(const auto& parameter : effect.parameters)
+    {
+        std::string said{parameter.name};
+        if(parameter.options.empty())
+        {
+            const auto number{[](double value)
+                              {
+                                  auto text{std::to_string(value)};
+                                  text.erase(text.find_last_not_of('0') + 1);
+                                  if(!text.empty() && text.back() == '.')
+                                  {
+                                      text.pop_back();
+                                  }
+                                  return text;
+                              }};
+            said += ", from " + number(parameter.minimum) + " to " + number(parameter.maximum) + ".";
+        }
+        else
+        {
+            said += ": the index of the one chosen of ";
+            for(std::size_t index{}; index < parameter.options.size(); ++ index)
+            {
+                said += (index == 0 ? "" : ", ") + std::to_string(index) + " " + parameter.options[index];
+            }
+            said += ".";
+        }
+        declarations += "        /**\n         * " + said + "\n         */\n        " + parameter.id + ": number;\n";
+    }
+    return declarations + "    }\n}\n";
+}
+
+olagarro::oui::ScriptApi plugin_api_for(const Effect& effect)
+{
+    return olagarro::oui::ScriptApi{std::string{embedded_plugin_api().front()} + values_declarations(effect)};
+}
+
 const std::vector<olagarro::oui::Suggestion>& javascript_words()
 {
     static const auto words{[]

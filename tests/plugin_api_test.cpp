@@ -90,3 +90,21 @@ TEST(PluginApi, TheHelpListsTheImagesMethodsFromTheDeclarations)
         << plugins;
     EXPECT_NE(plugins.find("| `width: number` | Its width in pixels. |"), std::string::npos);
 }
+
+TEST(PluginApi, TheValuesOfTheEffectBeingWrittenAreSuggestedWhateverTheyAreCalled)
+{
+    Effect effect;
+    effect.parameters = {{"radius", "Radius", 0, 50, 4, 1, {}}, {"mode", "Mode", 0, 1, 0, 1, {"Screen", "Lighten"}}};
+    const auto api{plugin_api_for(effect)};
+    const std::string code{"paint.effect({render(picture, v, context) {\n    return v."};
+    const auto found{suggestions_for(writing_at(code, code.size()), {code}, nullptr, &api)};
+    ASSERT_EQ(labels(found), (std::vector<std::string>{"radius", "mode"}));
+    const auto* const radius{api.declared("paint.Values#radius")};
+    ASSERT_NE(radius, nullptr);
+    EXPECT_EQ(radius->doc, std::vector<std::string>{"Radius, from 0 to 50."});
+    EXPECT_EQ(api.declared("paint.Values#mode")->doc,
+              std::vector<std::string>{"Mode: the index of the one chosen of 0 Screen, 1 Lighten."});
+    const std::string context{"paint.effect({render(picture, v, context) {\n    return context."};
+    EXPECT_TRUE(has(labels(suggestions_for(writing_at(context, context.size()), {context}, nullptr, &api)),
+                    "selection"));
+}

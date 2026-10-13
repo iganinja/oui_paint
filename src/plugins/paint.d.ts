@@ -40,12 +40,12 @@ declare namespace paint {
         /**
          * Makes the effect of the image, given the values of its parameters by id, and gives the result.
          */
-        render(image: Image, values: object, context: EffectContext): Image;
+        render(image: Image, values: Values, context: EffectContext): Image;
         /**
          * Makes one row, `y` of the image: red, green, blue and alpha from 0 to 1, colour multiplied by alpha,
          * changed in place or another array given back.
          */
-        row(row: Float32Array, y: number, values: object, context: EffectContext): Float32Array;
+        row(row: Float32Array, y: number, values: Values, context: EffectContext): Float32Array;
     }
 
     /**
@@ -74,6 +74,12 @@ declare namespace paint {
          * The names to choose from; the value is then the index of the one chosen.
          */
         options: string[];
+    }
+
+    /**
+     * The values of the effect's parameters, by their ids; the workbench declares those of the effect being written.
+     */
+    class Values {
     }
 
     /**

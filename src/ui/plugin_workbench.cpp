@@ -199,7 +199,8 @@ PluginWorkbench::PluginWorkbench(oui::Application& application, std::string sour
             {
                 return std::nullopt;
             }
-            return oui::Suggester::Context{m_code, &javascript_words(), &plugin_api(), {m_code->text()}, false};
+            return oui::Suggester::Context{m_code, &javascript_words(), m_api != nullptr ? m_api.get() : &plugin_api(),
+                                           {m_code->text()}, false};
         });
     show_image(m_test_card);
     run_now();
@@ -406,9 +407,10 @@ void PluginWorkbench::show(PluginTrial trial)
         const auto& effect{trial.effects[*trial.tried]};
         m_effect_name = effect.name;
         m_effects->set_selected(*trial.tried);
-        if(!same_parameters(effect.parameters, m_shown_parameters))
+        if(!same_parameters(effect.parameters, m_shown_parameters) || m_api == nullptr)
         {
             rebuild_controls(effect);
+            m_api = std::make_unique<oui::ScriptApi>(plugin_api_for(effect));
         }
     }
     else if(!trial.error)
