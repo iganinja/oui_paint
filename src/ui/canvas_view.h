@@ -94,6 +94,18 @@ class CanvasView final : public olagarro::oui::Widget
     // Where it was last painted, in the window's pixels, and what it painted.
     mutable std::optional<olagarro::oui::Rect> m_pixels;
     mutable std::vector<std::uint32_t> m_buffer;
+    // The selection's edge as last worked out, and what it was worked out for: the mask, its tiles shared, and the
+    // view.
+    struct Edge
+    {
+        std::optional<Layer> mask;
+        Position origin;
+        double zoom{0.0};
+        int width{0};
+        int height{0};
+        std::vector<int> pixels;
+    };
+    mutable Edge m_edge;
 };
 
 } // namespace oui_paint

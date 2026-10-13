@@ -107,28 +107,60 @@ void paint(Layer& layer, const Selection& selection, double left, double top, do
                          ink.value = {channel(color.red), channel(color.green), channel(color.blue),
                                       channel(color.alpha)};
                      }
-                     for(auto y{first_y}; y <= last_y; ++ y)
+                     // An opaque ink fully over a pixel replaces it, without mixing.
+                     const auto opaque{ink.value.back() == PixelType::full};
+                     const auto& mask{selection.mask()};
+                     // A tile at a time: its pixels and the selection's are looked up once, and it is only copied to
+                     // be written when something lands on it.
+                     for(auto tile_y{tile_of(first_y)}; tile_y <= tile_of(last_y); ++ tile_y)
                      {
-                         for(auto x{first_x}; x <= last_x; ++ x)
+                         for(auto tile_x{tile_of(first_x)}; tile_x <= tile_of(last_x); ++ tile_x)
                          {
-                             auto amount{cover(x + 0.5, y + 0.5) * selection.at(x, y) / 255.0};
-                             // Without antialiasing nothing is mixed, the selection's soft edge neither.
-                             if(!antialias)
-                             {
-                                 amount = amount >= 0.5 ? 1.0 : 0.0;
-                             }
-                             if(amount <= 0.0)
+                             const TilePoint point{tile_x, tile_y};
+                             const auto selected{mask ? mask->tile(point) : nullptr};
+                             if(mask && selected == nullptr)
                              {
                                  continue;
                              }
-                             const TilePoint point{tile_of(x), tile_of(y)};
-                             auto& tile{layer.writable_tile(point)};
-                             const auto local_x{x - point.x * tile_size};
-                             const auto local_y{y - point.y * tile_size};
-                             tile.set_pixel(local_x, local_y,
-                                            blend(tile.template pixel<PixelType>(local_x, local_y), ink, amount,
-                                                  BlendMode::normal));
-                             touched.insert(point);
+                             Tile* tile{};
+                             const auto from_y{std::max(first_y, tile_y * tile_size)};
+                             const auto to_y{std::min(last_y, tile_y * tile_size + tile_size - 1)};
+                             const auto from_x{std::max(first_x, tile_x * tile_size)};
+                             const auto to_x{std::min(last_x, tile_x * tile_size + tile_size - 1)};
+                             for(auto y{from_y}; y <= to_y; ++ y)
+                             {
+                                 const auto local_y{y - tile_y * tile_size};
+                                 const auto* selected_row{selected != nullptr ? selected->row(local_y) : nullptr};
+                                 for(auto x{from_x}; x <= to_x; ++ x)
+                                 {
+                                     const auto local_x{x - tile_x * tile_size};
+                                     const auto how_selected{selected_row != nullptr ? selected_row[local_x * 2] : 255};
+                                     if(how_selected == 0)
+                                     {
+                                         continue;
+                                     }
+                                     auto amount{cover(x + 0.5, y + 0.5) * how_selected / 255.0};
+                                     // Without antialiasing nothing is mixed, the selection's soft edge neither.
+                                     if(!antialias)
+                                     {
+                                         amount = amount >= 0.5 ? 1.0 : 0.0;
+                                     }
+                                     if(amount <= 0.0)
+                                     {
+                                         continue;
+                                     }
+                                     if(tile == nullptr)
+                                     {
+                                         tile = &layer.writable_tile(point);
+                                         touched.insert(point);
+                                     }
+                                     tile->set_pixel(local_x, local_y,
+                                                     opaque && amount >= 1.0
+                                                         ? ink
+                                                         : blend(tile->template pixel<PixelType>(local_x, local_y),
+                                                                 ink, amount, BlendMode::normal));
+                                 }
+                             }
                          }
                      }
                  });

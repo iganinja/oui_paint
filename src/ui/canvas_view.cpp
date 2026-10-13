@@ -106,8 +106,16 @@ void CanvasView::paint(oui::Painter& painter, const oui::Theme&) const
     const auto& document{m_document.document()};
     render_view(viewport, m_document.display(), document.width(), document.height(), m_buffer.data(),
                 m_pixels->width, m_pixels->height, 0x808080u);
-    draw_selection_edge(viewport, document.selection(), m_buffer.data(), m_pixels->width, m_pixels->height,
-                        m_ants_phase);
+    // The edge worked out again only when the selection or the view changed: the ants moving only recolour it.
+    const auto& mask{document.selection().mask()};
+    const auto same_mask{mask.has_value() == m_edge.mask.has_value() && (!mask || mask->tiles() == m_edge.mask->tiles())};
+    if(!same_mask || m_edge.origin.x != viewport.origin().x || m_edge.origin.y != viewport.origin().y ||
+       m_edge.zoom != viewport.zoom() || m_edge.width != m_pixels->width || m_edge.height != m_pixels->height)
+    {
+        m_edge = {mask, viewport.origin(), viewport.zoom(), m_pixels->width, m_pixels->height,
+                  selection_edge(viewport, document.selection(), m_pixels->width, m_pixels->height)};
+    }
+    draw_marching_ants(m_edge.pixels, m_buffer.data(), m_pixels->width, m_ants_phase);
     if(m_overlay)
     {
         m_overlay(m_buffer.data(), m_pixels->width, m_pixels->height);

@@ -52,3 +52,32 @@ TEST(Shapes, ALineCanEndInAnArrowhead)
     EXPECT_EQ(alpha_at(arrowed, 173, 52), 255) << "the head is wider than the line";
     EXPECT_EQ(alpha_at(arrowed, 100, 50), 255);
 }
+
+TEST(Shapes, AShapeLandsOnlyWhereSelectedAndLeavesUnselectedTilesUntouched)
+{
+    Selection selection{600, 300};
+    selection.add_rectangle({250, 20, 20, 20}, SelectionMode::replace);
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    draw_shape(layer, selection, ShapeKind::rectangle, ShapeStyle::filled, {0, 0}, {600, 300}, {1, 0, 0, 1}, {}, 1.0,
+               false);
+    EXPECT_EQ(alpha_at(layer, 255, 30), 255) << "selected, across a tile's edge from the next one";
+    EXPECT_EQ(alpha_at(layer, 260, 30), 255);
+    EXPECT_EQ(alpha_at(layer, 249, 30), 0) << "next to the selection";
+    EXPECT_EQ(alpha_at(layer, 255, 45), 0);
+    EXPECT_EQ(layer.tile({2, 0}), nullptr) << "a tile with nothing selected is not even made";
+    EXPECT_EQ(layer.tile({0, 1}), nullptr);
+}
+
+TEST(Shapes, AnInkNotOpaqueIsMixedOverWhatIsThere)
+{
+    const Selection everything{20, 20};
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    draw_shape(layer, everything, ShapeKind::rectangle, ShapeStyle::filled, {0, 0}, {20, 20}, {0, 0, 1, 1}, {}, 1.0,
+               false);
+    draw_shape(layer, everything, ShapeKind::rectangle, ShapeStyle::filled, {0, 0}, {20, 20}, {1, 0, 0, 0.5}, {}, 1.0,
+               false);
+    const auto pixel{layer.read(10, 10, 1, 1).pixel<Rgba8>(0, 0)};
+    EXPECT_NEAR(pixel.value[0], 128, 1);
+    EXPECT_NEAR(pixel.value[2], 127, 1);
+    EXPECT_EQ(pixel.alpha(), 255);
+}

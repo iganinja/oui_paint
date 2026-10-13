@@ -105,6 +105,8 @@ std::vector<std::uint32_t> DisplayCache::mixed(TilePoint point) const
             {
                 continue;
             }
+            // A normal layer at full opacity covers what it is opaque over, and is all there is over nothing.
+            const auto plain{layer.opacity() >= 1.0 && layer.blend_mode() == BlendMode::normal};
             // The palette's colours as pixels, worked out once for the tile.
             std::vector<Rgba8> colors(256);
             for(int index{}; index < 256; ++ index)
@@ -129,7 +131,9 @@ std::vector<std::uint32_t> DisplayCache::mixed(TilePoint point) const
                         continue;
                     }
                     auto& below{sum[static_cast<std::size_t>(y * tile_size + x)]};
-                    below = blend(below, above, layer.opacity(), layer.blend_mode());
+                    below = plain && (above.alpha() == 255 || below.alpha() == 0)
+                                ? above
+                                : blend(below, above, layer.opacity(), layer.blend_mode());
                 }
             }
         }
@@ -148,6 +152,9 @@ std::vector<std::uint32_t> DisplayCache::mixed(TilePoint point) const
                          {
                              continue;
                          }
+                         // A normal layer at full opacity covers what it is opaque over, and is all there is over
+                         // nothing.
+                         const auto plain{layer.opacity() >= 1.0 && layer.blend_mode() == BlendMode::normal};
                          for(int y{}; y < tile_size; ++ y)
                          {
                              for(int x{}; x < tile_size; ++ x)
@@ -158,7 +165,9 @@ std::vector<std::uint32_t> DisplayCache::mixed(TilePoint point) const
                                      continue;
                                  }
                                  auto& below{sum[static_cast<std::size_t>(y * tile_size + x)]};
-                                 below = blend(below, above, layer.opacity(), layer.blend_mode());
+                                 below = plain && (above.alpha() == PixelType::full || below.alpha() == 0)
+                                             ? above
+                                             : blend(below, above, layer.opacity(), layer.blend_mode());
                              }
                          }
                      }
@@ -243,34 +252,52 @@ void render_view(const Viewport& viewport, DisplayCache& cache, int image_width,
     }
 }
 
-void draw_selection_edge(const Viewport& viewport, const Selection& selection, std::uint32_t* pixels, int width,
-                         int height, int phase)
+std::vector<int> selection_edge(const Viewport& viewport, const Selection& selection, int width, int height)
 {
-    if(!selection.active())
+    std::vector<int> edge;
+    const auto& mask{selection.mask()};
+    if(!mask)
     {
-        return;
+        return edge;
     }
     const auto zoom{viewport.zoom()};
     const auto origin{viewport.origin()};
-    // Whether the image pixel under each view pixel is selected, a row at a time, and the row under it.
-    const auto image_x{[&](int x) { return static_cast<int>(std::floor((x + 0.5 - origin.x) / zoom)); }};
-    const auto image_y{[&](int y) { return static_cast<int>(std::floor((y + 0.5 - origin.y) / zoom)); }};
+    // The image column under each view column, worked out once.
     std::vector<int> columns(static_cast<std::size_t>(width) + 1);
     for(int x{}; x <= width; ++ x)
     {
-        columns[static_cast<std::size_t>(x)] = image_x(x);
+        columns[static_cast<std::size_t>(x)] = static_cast<int>(std::floor((x + 0.5 - origin.x) / zoom));
     }
-    const auto inside_row{[&](int y, std::vector<bool>& row)
+    // Whether the image pixel under each view pixel of a row is selected, reading the mask a tile row at a time.
+    const auto inside_row{[&](int y, std::vector<char>& row)
                           {
-                              const auto at_y{image_y(y)};
+                              const auto image_y{static_cast<int>(std::floor((y + 0.5 - origin.y) / zoom))};
+                              std::fill(row.begin(), row.end(), 0);
+                              if(image_y < 0 || image_y >= selection.height())
+                              {
+                                  return;
+                              }
+                              auto tile_x{-1};
+                              const std::uint8_t* tile_row{};
                               for(int x{}; x <= width; ++ x)
                               {
+                                  const auto image_x{columns[static_cast<std::size_t>(x)]};
+                                  if(image_x < 0 || image_x >= selection.width())
+                                  {
+                                      continue;
+                                  }
+                                  if(image_x / tile_size != tile_x)
+                                  {
+                                      tile_x = image_x / tile_size;
+                                      const auto tile{mask->tile({tile_x, image_y / tile_size})};
+                                      tile_row = tile != nullptr ? tile->row(image_y % tile_size) : nullptr;
+                                  }
                                   row[static_cast<std::size_t>(x)] =
-                                      selection.at(columns[static_cast<std::size_t>(x)], at_y) >= 128;
+                                      tile_row != nullptr && tile_row[(image_x % tile_size) * 2] >= 128 ? 1 : 0;
                               }
                           }};
-    std::vector<bool> current(static_cast<std::size_t>(width) + 1);
-    std::vector<bool> below(static_cast<std::size_t>(width) + 1);
+    std::vector<char> current(static_cast<std::size_t>(width) + 1);
+    std::vector<char> below(static_cast<std::size_t>(width) + 1);
     inside_row(0, current);
     for(int y{}; y < height; ++ y)
     {
@@ -278,13 +305,23 @@ void draw_selection_edge(const Viewport& viewport, const Selection& selection, s
         for(int x{}; x < width; ++ x)
         {
             const auto here{current[static_cast<std::size_t>(x)]};
-            if(here == current[static_cast<std::size_t>(x) + 1] && here == below[static_cast<std::size_t>(x)])
+            if(here != current[static_cast<std::size_t>(x) + 1] || here != below[static_cast<std::size_t>(x)])
             {
-                continue;
+                edge.push_back(y * width + x);
             }
-            pixels[static_cast<std::ptrdiff_t>(y) * width + x] = ((x + y + phase) / 4) % 2 == 0 ? 0x000000u : 0xffffffu;
         }
         std::swap(current, below);
+    }
+    return edge;
+}
+
+void draw_marching_ants(const std::vector<int>& edge, std::uint32_t* pixels, int width, int phase)
+{
+    for(const auto index : edge)
+    {
+        const auto x{index % width};
+        const auto y{index / width};
+        pixels[index] = ((x + y + phase) / 4) % 2 == 0 ? 0x000000u : 0xffffffu;
     }
 }
 

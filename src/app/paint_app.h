@@ -6,6 +6,7 @@
 #include "effects/plugins.h"
 #include "tools/floating.h"
 #include "tools/stroke.h"
+#include "ui/canvas_view.h"
 #include "ui/icons.h"
 
 #include <oui/application.h>
@@ -20,6 +21,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace oui_paint
@@ -32,7 +34,6 @@ class PalettesPanel;
 class MainFrame;
 class ToolOptions;
 class ToolPanel;
-struct ToolEvent;
 
 // OUI Paint as a whole: its window, its open documents in tabs, and the commands that work on them.
 class PaintApp
@@ -74,6 +75,9 @@ class PaintApp
     void tell_saved(const std::filesystem::path& path);
     // What the tool in use does with the pointer on the current document.
     void use_tool(const ToolEvent& event);
+    // Hands a tool what the pointer did, keeping only the last move of a frame for tools that do not trace it.
+    void take_tool_event(const ToolEvent& event);
+    void use_pending_move();
     // Changes the current document's layers as one undoable step called `name`, and draws again what changed.
     void change_layers(std::string name, const std::function<void(Document&)>& change);
     void layer_properties();
@@ -224,6 +228,8 @@ class PaintApp
     std::optional<std::pair<int, int>> m_clone_offset;
     // Where the Pan tool's drag was last, in the view.
     std::optional<Position> m_panning;
+    // A drag's latest move, waiting for the frame to end so the moves before it in the same frame are skipped.
+    std::optional<ToolEvent> m_pending_move;
     // The marching ants move while there is a selection to show.
     olagarro::oui::Timer m_ants;
     int m_ants_phase{0};

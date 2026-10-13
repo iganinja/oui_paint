@@ -109,55 +109,62 @@ void Selection::invert()
 
 template <typename Cover> void Selection::combine(const PixelArea& requested, SelectionMode mode, Cover cover)
 {
-    const auto first{!m_mask.has_value()};
-    if(first)
+    // Outside the shape, a replaced or intersected selection loses what it had: they start from nothing, and an
+    // intersection reads what there was from the old mask.
+    std::optional<Layer> kept;
+    if(!m_mask || mode == SelectionMode::replace || mode == SelectionMode::intersect)
     {
-        m_mask.emplace(PixelFormat::gray_alpha8, "Selection");
-    }
-    if(mode == SelectionMode::replace && !first)
-    {
-        m_mask.emplace(PixelFormat::gray_alpha8, "Selection");
-    }
-    // Outside the shape, a replaced or intersected selection loses what it had.
-    if(mode == SelectionMode::intersect)
-    {
-        const auto kept{*m_mask};
-        m_mask.emplace(PixelFormat::gray_alpha8, "Selection");
-        const auto left{std::max(0, requested.x)};
-        const auto top{std::max(0, requested.y)};
-        const auto right{std::min(m_width, requested.x + requested.width)};
-        const auto bottom{std::min(m_height, requested.y + requested.height)};
-        for(auto y{top}; y < bottom; ++ y)
+        if(m_mask && mode == SelectionMode::intersect)
         {
-            for(auto x{left}; x < right; ++ x)
-            {
-                const auto tile{kept.tile({x / tile_size, y / tile_size})};
-                const std::uint8_t had{tile == nullptr ? std::uint8_t{0}
-                                                       : tile->pixel<GrayAlpha8>(x % tile_size, y % tile_size).value[0]};
-                const auto shape{static_cast<std::uint8_t>(std::lround(std::clamp(cover(x, y), 0.0, 1.0) * 255.0))};
-                const auto value{std::min(had, shape)};
-                if(value != 0)
-                {
-                    set(x, y, value);
-                }
-            }
+            kept = std::move(m_mask);
         }
-        return;
+        m_mask.emplace(PixelFormat::gray_alpha8, "Selection");
     }
+    const auto& read{kept ? *kept : *m_mask};
     const auto left{std::max(0, requested.x)};
     const auto top{std::max(0, requested.y)};
     const auto right{std::min(m_width, requested.x + requested.width)};
     const auto bottom{std::min(m_height, requested.y + requested.height)};
-    for(auto y{top}; y < bottom; ++ y)
+    if(left >= right || top >= bottom)
     {
-        for(auto x{left}; x < right; ++ x)
+        return;
+    }
+    // Tile by tile: each read once, and written only where something changes.
+    for(auto tile_y{top / tile_size}; tile_y <= (bottom - 1) / tile_size; ++ tile_y)
+    {
+        for(auto tile_x{left / tile_size}; tile_x <= (right - 1) / tile_size; ++ tile_x)
         {
-            const auto shape{static_cast<std::uint8_t>(std::lround(std::clamp(cover(x, y), 0.0, 1.0) * 255.0))};
-            const auto had{at(x, y)};
-            const auto value{combined(had, shape, mode)};
-            if(value != had)
+            const TilePoint point{tile_x, tile_y};
+            const auto source{read.tile(point)};
+            Tile* target{};
+            const auto first_x{std::max(left, tile_x * tile_size)};
+            const auto last_x{std::min(right, (tile_x + 1) * tile_size)};
+            const auto first_y{std::max(top, tile_y * tile_size)};
+            const auto last_y{std::min(bottom, (tile_y + 1) * tile_size)};
+            for(auto y{first_y}; y < last_y; ++ y)
             {
-                set(x, y, value);
+                const auto local_y{y - tile_y * tile_size};
+                const auto* const from{source != nullptr ? source->row(local_y) : nullptr};
+                for(auto x{first_x}; x < last_x; ++ x)
+                {
+                    const auto local_x{x - tile_x * tile_size};
+                    const std::uint8_t had{from != nullptr ? from[local_x * 2] : std::uint8_t{0}};
+                    const auto shape{static_cast<std::uint8_t>(std::lround(std::clamp(cover(x, y), 0.0, 1.0) * 255.0))};
+                    const auto value{mode == SelectionMode::intersect ? std::min(had, shape) : combined(had, shape, mode)};
+                    // What a fresh mask holds is nothing; an old one holds `had`.
+                    const auto holds{kept || mode == SelectionMode::replace ? std::uint8_t{0} : had};
+                    if(value == holds)
+                    {
+                        continue;
+                    }
+                    if(target == nullptr)
+                    {
+                        target = &m_mask->writable_tile(point);
+                    }
+                    auto* const pixel{target->row(local_y) + local_x * 2};
+                    pixel[0] = value;
+                    pixel[1] = 255;
+                }
             }
         }
     }

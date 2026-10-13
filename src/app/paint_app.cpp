@@ -37,8 +37,8 @@
 #include <set>
 #include <cmath>
 #include <cstdio>
-#include <cstdio>
 #include <string>
+#include <utility>
 
 using namespace olagarro;
 
@@ -692,7 +692,7 @@ void PaintApp::refresh_titles()
 void PaintApp::add(std::unique_ptr<OpenDocument> document)
 {
     auto view{std::make_unique<CanvasView>(*document)};
-    view->on_tool([this](const ToolEvent& event) { use_tool(event); });
+    view->on_tool([this](const ToolEvent& event) { take_tool_event(event); });
     view->on_keys([this](const oui::Event& event) { return type_key(event); });
     view->on_overlay(
         [this](std::uint32_t* pixels, int width, int height)
@@ -1088,6 +1088,35 @@ bool PaintApp::close(std::size_t index)
     refresh_titles();
     show_layers();
     return true;
+}
+
+void PaintApp::take_tool_event(const ToolEvent& event)
+{
+    // Tools that draw a box or a line from where the drag began only need where the pointer is now: of the moves a
+    // frame brings, the last one is used, so a slow redraw does not fall behind the pointer. Tools that trace the
+    // pointer's path get every move.
+    const auto& tool{m_tool_panel->selected()};
+    const auto traces{tool == "brush" || tool == "pencil" || tool == "eraser" || tool == "clone_stamp" ||
+                      tool == "recolor" || tool == "lasso_select"};
+    if(event.phase == ToolEvent::Phase::move && !traces)
+    {
+        if(!m_pending_move)
+        {
+            m_application.post([this] { use_pending_move(); });
+        }
+        m_pending_move = event;
+        return;
+    }
+    use_pending_move();
+    use_tool(event);
+}
+
+void PaintApp::use_pending_move()
+{
+    if(const auto pending{std::exchange(m_pending_move, std::nullopt)})
+    {
+        use_tool(*pending);
+    }
 }
 
 void PaintApp::use_tool(const ToolEvent& event)

@@ -41,9 +41,10 @@ class DisplayCache
 void render_view(const Viewport& viewport, DisplayCache& cache, int image_width, int image_height,
                  std::uint32_t* pixels, int width, int height, std::uint32_t background);
 
-// The selection's edge over the view render_view drew, as marching ants: dashes of black and white along it that move
-// as `phase` grows.
-void draw_selection_edge(const Viewport& viewport, const Selection& selection, std::uint32_t* pixels, int width,
-                         int height, int phase);
+// Where the selection's edge is in a view `width` by `height` as `viewport` places the image: the view's pixels, as
+// indices row after row, inside the selection with a neighbour to the right or below that is not.
+[[nodiscard]] std::vector<int> selection_edge(const Viewport& viewport, const Selection& selection, int width, int height);
+// The edge drawn as marching ants: dashes of black and white that move as `phase` grows.
+void draw_marching_ants(const std::vector<int>& edge, std::uint32_t* pixels, int width, int phase);
 
 } // namespace oui_paint
