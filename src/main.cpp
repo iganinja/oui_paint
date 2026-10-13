@@ -1,5 +1,7 @@
 // OUI Paint: a raster image editor in the spirit of Paint.NET, in a desktop window.
+#include "ui/icons.h"
 #include "ui/main_frame.h"
+#include "ui/tool_panel.h"
 
 #include <oui/graphics/window_backend.h>
 #include <oui/label.h>
@@ -9,6 +11,7 @@
 #include <exception>
 #include <memory>
 #include <utility>
+#include <vector>
 
 using namespace olagarro;
 
@@ -49,8 +52,28 @@ int main(int argument_count, char* const* const arguments)
     commands.register_command("file.quit", "E&xit", [&application] { application.quit(); });
     commands.bind("file.quit", {U'q', true});
 
+    oui_paint::Icons icons;
     auto frame{std::make_unique<oui_paint::MainFrame>(commands)};
     frame->menu_bar().add_menu("&File", {"file.quit"});
+    frame->set_left(std::make_unique<oui_paint::ToolPanel>(
+        std::vector<oui_paint::ToolButton>{
+            {"rectangle_select", "RegionEdit", "Rectangle Select (S)"},
+            {"move_pixels", "ToolMove", "Move Selected Pixels (M)"},
+            {"ellipse_select", "CircleShape2D", "Ellipse Select (S)"},
+            {"move_selection", "ToolSelect", "Move Selection (M)"},
+            {"zoom", "Zoom", "Zoom (Z)"},
+            {"pan", "ToolPan", "Pan (H)"},
+            {"bucket", "Bucket", "Paint Bucket (F)"},
+            {"gradient", "Gradient", "Gradient (G)"},
+            {"brush", "Edit", "Paintbrush (B)"},
+            {"eraser", "Eraser", "Eraser (E)"},
+            {"pencil", "Edit", "Pencil (P)"},
+            {"color_picker", "ColorPick", "Color Picker (K)"},
+            {"text", "Label", "Text (T)"},
+            {"line", "Line", "Line / Curve (O)"},
+            {"shapes", "Rectangle", "Shapes (O)"},
+        },
+        icons));
     frame->set_center(oui::label(""));
     frame->status_bar().set_left("Ready");
 

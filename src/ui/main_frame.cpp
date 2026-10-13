@@ -24,17 +24,32 @@ oui::StatusBar& MainFrame::status_bar()
     return *m_status_bar;
 }
 
-void MainFrame::set_center(std::unique_ptr<oui::Widget> center)
+void MainFrame::replace_slot(oui::Widget*& slot, std::unique_ptr<oui::Widget> widget)
 {
-    if(m_center != nullptr)
+    if(slot != nullptr)
     {
-        static_cast<void>(remove(*m_center));
+        static_cast<void>(remove(*slot));
     }
-    m_center = center.get();
+    slot = widget.get();
     // First among the children, below the bars.
-    static_cast<void>(add(std::move(center)));
+    static_cast<void>(add(std::move(widget)));
     auto& children{children_mutable()};
     std::rotate(children.begin(), children.end() - 1, children.end());
+}
+
+void MainFrame::set_center(std::unique_ptr<oui::Widget> center)
+{
+    replace_slot(m_center, std::move(center));
+}
+
+void MainFrame::set_left(std::unique_ptr<oui::Widget> left)
+{
+    replace_slot(m_left, std::move(left));
+}
+
+oui::Widget* MainFrame::left()
+{
+    return m_left;
 }
 
 oui::Widget* MainFrame::center()
@@ -54,10 +69,16 @@ void MainFrame::arrange(const oui::Rect& bounds)
     const auto status_height{m_status_bar->measure({bounds.width, bounds.height}).height};
     m_menu_bar->arrange({bounds.x, bounds.y, bounds.width, menu_height});
     m_status_bar->arrange({bounds.x, bounds.y + bounds.height - status_height, bounds.width, status_height});
+    const auto middle_height{std::max(0, bounds.height - menu_height - status_height)};
+    auto left_width{0};
+    if(m_left != nullptr)
+    {
+        left_width = std::min(bounds.width, m_left->measure({bounds.width, middle_height}).width);
+        m_left->arrange({bounds.x, bounds.y + menu_height, left_width, middle_height});
+    }
     if(m_center != nullptr)
     {
-        const auto center_height{std::max(0, bounds.height - menu_height - status_height)};
-        m_center->arrange({bounds.x, bounds.y + menu_height, bounds.width, center_height});
+        m_center->arrange({bounds.x + left_width, bounds.y + menu_height, bounds.width - left_width, middle_height});
     }
 }
 

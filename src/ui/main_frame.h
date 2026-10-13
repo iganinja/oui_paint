@@ -9,8 +9,8 @@
 namespace oui_paint
 {
 
-// The application's window contents: the menu bar along the top, the status bar along the bottom, and whatever is
-// in the middle filling the rest.
+// The application's window contents: the menu bar along the top, the status bar along the bottom, a side panel on the
+// left, as tall as the space between them and as wide as it asks, and whatever is in the middle filling the rest.
 class MainFrame final : public olagarro::oui::Container
 {
   public:
@@ -21,6 +21,8 @@ class MainFrame final : public olagarro::oui::Container
     // What fills the middle; the one there before is dropped.
     void set_center(std::unique_ptr<olagarro::oui::Widget> center);
     [[nodiscard]] olagarro::oui::Widget* center();
+    void set_left(std::unique_ptr<olagarro::oui::Widget> left);
+    [[nodiscard]] olagarro::oui::Widget* left();
 
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override;
     void arrange(const olagarro::oui::Rect& bounds) override;
@@ -28,7 +30,11 @@ class MainFrame final : public olagarro::oui::Container
   private:
     olagarro::oui::MenuBar* m_menu_bar{};
     olagarro::oui::StatusBar* m_status_bar{};
+    // Puts `widget` where `slot` was, below the bars.
+    void replace_slot(olagarro::oui::Widget*& slot, std::unique_ptr<olagarro::oui::Widget> widget);
+
     olagarro::oui::Widget* m_center{};
+    olagarro::oui::Widget* m_left{};
 };
 
 } // namespace oui_paint

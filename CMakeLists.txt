@@ -23,9 +23,19 @@ endif()
 
 # Everything but main(), so the tests reach it too.
 add_library(oui_paint_core STATIC
-    src/ui/main_frame.cpp)
+    src/ui/icons.cpp
+    src/ui/main_frame.cpp
+    src/ui/tool_panel.cpp)
 target_include_directories(oui_paint_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(oui_paint_core PUBLIC olagarro::OUI)
+target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics)
+
+# The icons the program shows, built into it. Only those it uses: add one here when a button or a menu needs it.
+set(OUI_PAINT_ICONS
+    Bucket ColorPick CircleShape2D Edit Eraser Gradient Label Line Rectangle RegionEdit ToolMove ToolPan ToolSelect
+    Zoom)
+list(TRANSFORM OUI_PAINT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
+list(TRANSFORM OUI_PAINT_ICONS APPEND .svg)
+olagarro_embed_files(oui_paint_core FUNCTION embedded_icons FILES ${OUI_PAINT_ICONS})
 
 add_executable(oui_paint src/main.cpp)
 target_link_libraries(oui_paint PRIVATE oui_paint_core olagarro::OUIWindow)
@@ -36,7 +46,9 @@ if(OUI_PAINT_BUILD_TESTS)
     find_package(GTest REQUIRED)
     include(GoogleTest)
     add_executable(oui_paint_tests
-        tests/main_frame_test.cpp)
-    target_link_libraries(oui_paint_tests PRIVATE oui_paint_core olagarro::OUIGraphics GTest::gtest_main)
+        tests/icons_test.cpp
+        tests/main_frame_test.cpp
+        tests/tool_panel_test.cpp)
+    target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)
     gtest_discover_tests(oui_paint_tests)
 endif()
