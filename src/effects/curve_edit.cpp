@@ -69,7 +69,9 @@ bool CurveEdit::press(double x, double y, bool right)
     {
         return false;
     }
-    m_held = static_cast<std::size_t>(std::distance(m_points.begin(), m_points.insert(after, {x, y})));
+    // Inserted first: the vector may move, and with it where it begins.
+    const auto inserted{m_points.insert(after, {x, y})};
+    m_held = static_cast<std::size_t>(std::distance(m_points.begin(), inserted));
     return true;
 }
 
