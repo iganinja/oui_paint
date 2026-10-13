@@ -102,6 +102,11 @@ olagarro_embed_files(oui_paint_core FUNCTION embedded_plugins
 add_executable(oui_paint src/main.cpp)
 target_link_libraries(oui_paint PRIVATE oui_paint_core olagarro::OUIWindow)
 set_target_properties(oui_paint PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+if(WIN32)
+    # A window and nothing else: no console beside it, and every runtime inside, so it needs nothing installed.
+    set_target_properties(oui_paint PROPERTIES WIN32_EXECUTABLE TRUE)
+    target_link_options(oui_paint PRIVATE -static)
+endif()
 
 if(OUI_PAINT_BUILD_TESTS)
     enable_testing()

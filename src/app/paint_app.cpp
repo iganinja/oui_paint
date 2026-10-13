@@ -30,6 +30,7 @@
 #include <oui/window.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <set>
 #include <cmath>
 #include <cstdio>
@@ -92,6 +93,9 @@ SelectionMode selection_mode(const ToolEvent& event)
     }
     return SelectionMode::replace;
 }
+
+// A quarter turn, in radians.
+constexpr auto quarter{3.14159265358979323846 / 2.0};
 
 } // namespace
 
@@ -190,7 +194,6 @@ void PaintApp::register_commands()
     add("edit.paste_new_layer", "Paste into New &Layer", [this] { paste(PasteInto::new_layer); },
         {U'v', true, false, true});
     add("edit.paste_new_image", "Paste into New &Image", [this] { paste(PasteInto::new_image); }, {U'v', true, true});
-    constexpr auto quarter{3.14159265358979323846 / 2.0};
     commands.register_command("edit.flip_selection_horizontal", "Flip Selection &Horizontal",
                               [this]
                               {
@@ -212,22 +215,22 @@ void PaintApp::register_commands()
                                                       });
                               });
     commands.register_command("edit.rotate_selection_clockwise", "Rotate Selection 90° &Clockwise",
-                              [this, quarter]
+                              [this]
                               {
                                   transform_selection("Rotate Selection 90° Clockwise",
-                                                      [quarter](PieceTransform& t) { t.radians += quarter; });
+                                                      [](PieceTransform& t) { t.radians += quarter; });
                               });
     commands.register_command("edit.rotate_selection_counter_clockwise", "Rotate Selection 90° C&ounter-clockwise",
-                              [this, quarter]
+                              [this]
                               {
                                   transform_selection("Rotate Selection 90° Counter-clockwise",
-                                                      [quarter](PieceTransform& t) { t.radians -= quarter; });
+                                                      [](PieceTransform& t) { t.radians -= quarter; });
                               });
     commands.register_command("edit.rotate_selection_180", "Rotate Selection &180°",
-                              [this, quarter]
+                              [this]
                               {
                                   transform_selection("Rotate Selection 180°",
-                                                      [quarter](PieceTransform& t) { t.radians += 2.0 * quarter; });
+                                                      [](PieceTransform& t) { t.radians += 2.0 * quarter; });
                               });
     add("edit.select_all", "Select &All",
         [this] { change_layers("Select All", [](Document& document) { document.selection().select_all(); }); },

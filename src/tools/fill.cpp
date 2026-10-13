@@ -83,7 +83,8 @@ std::vector<std::uint8_t> fill_region(const Document& document, int x, int y, co
     std::vector<std::pair<int, int>> waiting{{x, y}};
     while(!waiting.empty())
     {
-        auto [start, row]{waiting.back()};
+        const auto start{waiting.back().first};
+        const auto row{waiting.back().second};
         waiting.pop_back();
         const auto at{[&](int column) { return static_cast<std::size_t>(row) * width + column; }};
         if(region[at(start)] != 0 || !similar(at(start)))
