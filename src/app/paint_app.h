@@ -16,6 +16,7 @@ namespace oui_paint
 
 class CanvasView;
 class MainFrame;
+class ToolPanel;
 
 // OUI Paint as a whole: its window, its open documents in tabs, and the commands that work on them.
 class PaintApp
@@ -38,6 +39,8 @@ class PaintApp
     bool save(bool ask_for_path);
     // Closes a tab, asking first about unsaved changes; false when the person kept it open.
     bool close(std::size_t index);
+    // Saves every document with unsaved changes, asking for a file for those that have none.
+    void save_all();
     // Closes every tab and quits, unless the person keeps one open.
     void quit();
 
@@ -53,6 +56,7 @@ class PaintApp
     olagarro::oui::Application& m_application;
     Icons m_icons;
     MainFrame* m_frame{};
+    ToolPanel* m_tool_panel{};
     olagarro::oui::TabView* m_tabs{};
     std::vector<std::unique_ptr<OpenDocument>> m_documents;
     NewImage m_last_new_image;

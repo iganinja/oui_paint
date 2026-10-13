@@ -96,13 +96,39 @@ std::optional<Position> CanvasView::in_view(const oui::MouseEvent& mouse) const
 
 bool CanvasView::handle_event(const oui::Event& event)
 {
+    auto& viewport{m_document.viewport()};
+    if(const auto* const key{std::get_if<oui::KeyEvent>(&event)}; key != nullptr && !key->control && !key->alt)
+    {
+        // Page Up and Page Down scroll a view's height, less a little to keep one's place; Home and End go to the
+        // top left and the bottom right corners.
+        const auto page{viewport.view_height() * 0.9};
+        constexpr auto far{1e9};
+        switch(key->key)
+        {
+        case oui::Key::page_up:
+            viewport.scroll_by(0.0, page);
+            break;
+        case oui::Key::page_down:
+            viewport.scroll_by(0.0, -page);
+            break;
+        case oui::Key::home:
+            viewport.scroll_by(far, far);
+            break;
+        case oui::Key::end:
+            viewport.scroll_by(-far, -far);
+            break;
+        default:
+            return false;
+        }
+        changed();
+        return true;
+    }
     const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
     if(mouse == nullptr)
     {
         return false;
     }
     const auto at{in_view(*mouse)};
-    auto& viewport{m_document.viewport()};
     if(mouse->wheel_delta != 0)
     {
         if(mouse->control && at)

@@ -1,5 +1,6 @@
 #include "app/paint_app.h"
 
+#include "app/tools.h"
 #include "codecs/codecs.h"
 #include "ui/canvas_view.h"
 #include "ui/main_frame.h"
@@ -35,25 +36,15 @@ const std::vector<oui::FileFilter>& image_filters()
     return filters;
 }
 
-std::vector<ToolButton> tools()
+std::vector<ToolButton> tool_buttons()
 {
-    return {
-        {"rectangle_select", "RegionEdit", "Rectangle Select (S)"},
-        {"move_pixels", "ToolMove", "Move Selected Pixels (M)"},
-        {"ellipse_select", "CircleShape2D", "Ellipse Select (S)"},
-        {"move_selection", "ToolSelect", "Move Selection (M)"},
-        {"zoom", "Zoom", "Zoom (Z)"},
-        {"pan", "ToolPan", "Pan (H)"},
-        {"bucket", "Bucket", "Paint Bucket (F)"},
-        {"gradient", "Gradient", "Gradient (G)"},
-        {"brush", "Edit", "Paintbrush (B)"},
-        {"eraser", "Eraser", "Eraser (E)"},
-        {"pencil", "Edit", "Pencil (P)"},
-        {"color_picker", "ColorPick", "Color Picker (K)"},
-        {"text", "Label", "Text (T)"},
-        {"line", "Line", "Line / Curve (O)"},
-        {"shapes", "Rectangle", "Shapes (O)"},
-    };
+    std::vector<ToolButton> buttons;
+    for(const auto& tool : all_tools())
+    {
+        const auto key{static_cast<char>(tool.key - U'a' + U'A')};
+        buttons.push_back({tool.id, tool.icon, tool.title + " (" + std::string(1, key) + ")"});
+    }
+    return buttons;
 }
 
 } // namespace
@@ -84,8 +75,61 @@ void PaintApp::register_commands()
     add("file.open", "&Open...", [this] { open_with_dialog(); }, {U'o', true});
     add("file.save", "&Save", [this] { static_cast<void>(save(false)); }, {U's', true});
     add("file.save_as", "Save &As...", [this] { static_cast<void>(save(true)); }, {U's', true, false, true});
+    add("file.save_all", "Save A&ll", [this] { save_all(); }, {U's', true, true});
     add("file.close", "&Close", [this] { static_cast<void>(close(m_tabs->selected_index())); }, {U'w', true});
-    add("file.quit", "E&xit", [this] { quit(); }, {U'q', true});
+    commands.bind("file.close", oui::KeyShortcut{oui::Key::f4, true});
+    commands.register_command("file.quit", "E&xit", [this] { quit(); });
+    commands.bind("file.quit", oui::KeyShortcut{oui::Key::f4, false, true});
+    const auto switch_tab{[this](int step)
+                          {
+                              return [this, step]
+                              {
+                                  const auto count{static_cast<int>(m_documents.size())};
+                                  if(count > 1)
+                                  {
+                                      const auto index{(static_cast<int>(m_tabs->selected_index()) + step + count) %
+                                                       count};
+                                      m_tabs->select(static_cast<std::size_t>(index));
+                                  }
+                              };
+                          }};
+    commands.register_command("window.next_image", "&Next Image", switch_tab(1));
+    commands.bind("window.next_image", oui::KeyShortcut{oui::Key::tab, true});
+    commands.bind("window.next_image", oui::KeyShortcut{oui::Key::page_down, true});
+    commands.register_command("window.previous_image", "&Previous Image", switch_tab(-1));
+    commands.bind("window.previous_image", oui::KeyShortcut{oui::Key::shift_tab, true});
+    commands.bind("window.previous_image", oui::KeyShortcut{oui::Key::page_up, true});
+    for(int number{1}; number <= 9; ++ number)
+    {
+        const auto id{"window.image_" + std::to_string(number)};
+        commands.register_command(id, "Image " + std::to_string(number),
+                                  [this, number]
+                                  {
+                                      if(static_cast<std::size_t>(number) <= m_documents.size())
+                                      {
+                                          m_tabs->select(static_cast<std::size_t>(number - 1));
+                                      }
+                                  });
+        commands.bind(id, {static_cast<char32_t>(U'0' + number), false, true});
+    }
+    // Each tool's letter, and again for the next tool with the same letter.
+    for(const auto& tool : all_tools())
+    {
+        const auto id{std::string{"tool.key_"} + static_cast<char>(tool.key)};
+        if(commands.shortcut(id))
+        {
+            continue;
+        }
+        commands.register_command(id, tool.title,
+                                  [this, key{tool.key}]
+                                  {
+                                      if(const auto next{tool_for_key(key, m_tool_panel->selected())})
+                                      {
+                                          m_tool_panel->set_selected(*next);
+                                      }
+                                  });
+        commands.bind(id, {tool.key});
+    }
     const auto view{[this](void (CanvasView::*action)())
                     {
                         return [this, action]
@@ -110,10 +154,13 @@ void PaintApp::build_window()
     auto frame{std::make_unique<MainFrame>(m_application.commands())};
     m_frame = frame.get();
     m_frame->menu_bar().add_menu("&File", {"file.new", "file.open", oui::menu_separator(), "file.save",
-                                           "file.save_as", oui::menu_separator(), "file.close", "file.quit"});
+                                           "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
+                                           "file.quit"});
     m_frame->menu_bar().add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
                                            "view.actual_size"});
-    m_frame->set_left(std::make_unique<ToolPanel>(tools(), m_icons));
+    auto panel{std::make_unique<ToolPanel>(tool_buttons(), m_icons)};
+    m_tool_panel = panel.get();
+    m_frame->set_left(std::move(panel));
     auto tabs{std::make_unique<oui::TabView>()};
     m_tabs = tabs.get();
     m_tabs->set_highlight_predicate([this](std::size_t index)
@@ -356,6 +403,26 @@ bool PaintApp::close(std::size_t index)
     m_documents.erase(m_documents.begin() + static_cast<std::ptrdiff_t>(index));
     refresh_titles();
     return true;
+}
+
+void PaintApp::save_all()
+{
+    const auto selected{m_tabs->selected_index()};
+    for(std::size_t index{}; index < m_documents.size(); ++ index)
+    {
+        if(m_documents[index]->modified() || !m_documents[index]->path())
+        {
+            m_tabs->select(index);
+            if(!save(false))
+            {
+                break;
+            }
+        }
+    }
+    if(selected < m_documents.size())
+    {
+        m_tabs->select(selected);
+    }
 }
 
 void PaintApp::quit()

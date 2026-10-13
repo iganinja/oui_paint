@@ -31,6 +31,7 @@ add_library(oui_paint_core STATIC
     src/app/new_image.cpp
     src/app/open_document.cpp
     src/app/paint_app.cpp
+    src/app/tools.cpp
     src/codecs/codecs.cpp
     src/codecs/stb_api.cpp
     src/core/document.cpp
@@ -52,10 +53,11 @@ target_include_directories(oui_paint_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/th
 set_source_files_properties(src/codecs/stb_api.cpp PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/W0,-w>")
 
 # The icons the program shows, built into it. Only those it uses: add one here when a button or a menu needs it.
-set(OUI_PAINT_ICONS
-    Bucket ColorPick CircleShape2D Edit Eraser Gradient Label Line Rectangle RegionEdit ToolMove ToolPan ToolSelect
-    Zoom)
-list(TRANSFORM OUI_PAINT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
+set(OUI_PAINT_GODOT_ICONS Bucket ColorPick Edit Eraser Gradient Line RegionEdit ToolMove ToolPan ToolSelect Zoom)
+list(TRANSFORM OUI_PAINT_GODOT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
+set(OUI_PAINT_OWN_ICONS CloneStamp EllipseSelect Lasso MagicWand Paintbrush Recolor Shapes Text)
+list(TRANSFORM OUI_PAINT_OWN_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/oui_paint/)
+set(OUI_PAINT_ICONS ${OUI_PAINT_GODOT_ICONS} ${OUI_PAINT_OWN_ICONS})
 list(TRANSFORM OUI_PAINT_ICONS APPEND .svg)
 olagarro_embed_files(oui_paint_core FUNCTION embedded_icons FILES ${OUI_PAINT_ICONS})
 
@@ -73,7 +75,8 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/icons_test.cpp
         tests/main_frame_test.cpp
         tests/render_test.cpp
-        tests/tool_panel_test.cpp)
+        tests/tool_panel_test.cpp
+        tests/tools_test.cpp)
     target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)
     gtest_discover_tests(oui_paint_tests)
 endif()
