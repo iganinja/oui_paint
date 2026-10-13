@@ -4,6 +4,8 @@
 #include "codecs/codecs.h"
 #include "ui/canvas_view.h"
 #include "ui/color_panel.h"
+#include "ui/layer_properties_dialog.h"
+#include "ui/layers_panel.h"
 #include "ui/main_frame.h"
 #include "ui/new_image_dialog.h"
 #include "ui/tool_options.h"
@@ -122,6 +124,92 @@ void PaintApp::register_commands()
     add("brush.wider", "Brush Width Up", [this] { m_tool_options->change_width(1); }, {U']'});
     add("brush.much_narrower", "Brush Width Down by 5", [this] { m_tool_options->change_width(-5); }, {U'[', true});
     add("brush.much_wider", "Brush Width Up by 5", [this] { m_tool_options->change_width(5); }, {U']', true});
+    const auto active{[this] { return current() != nullptr ? current()->document().active_layer() : 0u; }};
+    add("layers.add", "&Add New Layer",
+        [this]
+        {
+            change_layers("Add New Layer",
+                          [](Document& document)
+                          { document.insert_layer_above("Layer " + std::to_string(document.layers().size() + 1)); });
+        },
+        {U'n', true, false, true});
+    add("layers.delete", "&Delete Layer",
+        [this, active] { change_layers("Delete Layer", [&](Document& document) { document.remove_layer(active()); }); },
+        oui::Shortcut{0, true, false, true, oui::Key::delete_});
+    add("layers.duplicate", "D&uplicate Layer",
+        [this, active]
+        { change_layers("Duplicate Layer", [&](Document& document) { document.duplicate_layer(active()); }); },
+        {U'd', true, false, true});
+    add("layers.merge_down", "&Merge Layer Down",
+        [this, active] { change_layers("Merge Layer Down", [&](Document& document) { document.merge_down(active()); }); },
+        {U'm', true});
+    commands.register_command("layers.move_up", "Move Layer &Up",
+                              [this, active]
+                              {
+                                  change_layers("Move Layer Up",
+                                                [&](Document& document)
+                                                {
+                                                    const auto index{active()};
+                                                    if(index + 1 < document.layers().size())
+                                                    {
+                                                        document.move_layer(index, index + 1);
+                                                    }
+                                                });
+                              });
+    commands.register_command("layers.move_down", "Move Layer D&own",
+                              [this, active]
+                              {
+                                  change_layers("Move Layer Down",
+                                                [&](Document& document)
+                                                {
+                                                    const auto index{active()};
+                                                    if(index > 0)
+                                                    {
+                                                        document.move_layer(index, index - 1);
+                                                    }
+                                                });
+                              });
+    add("layers.toggle_visible", "Show or &Hide Layer",
+        [this, active]
+        {
+            change_layers("Layer Visibility",
+                          [&](Document& document)
+                          {
+                              auto& layer{document.layers()[active()]};
+                              layer.set_visible(!layer.visible());
+                          });
+        },
+        {U',', true});
+    add("layers.properties", "Layer &Properties...", [this] { layer_properties(); },
+        oui::Shortcut{0, false, false, false, oui::Key::f4});
+    const auto select_layer{[this](int step, bool to_end)
+                            {
+                                return [this, step, to_end]
+                                {
+                                    auto* const open{current()};
+                                    if(open == nullptr)
+                                    {
+                                        return;
+                                    }
+                                    auto& document{open->document()};
+                                    const auto last{static_cast<int>(document.layers().size()) - 1};
+                                    const auto index{to_end ? (step > 0 ? last : 0)
+                                                            : std::clamp(static_cast<int>(document.active_layer()) + step,
+                                                                         0, last)};
+                                    document.set_active_layer(static_cast<std::size_t>(index));
+                                };
+                            }};
+    commands.register_command("layers.select_above", "Layer Above", select_layer(1, false));
+    commands.bind("layers.select_above", oui::KeyShortcut{oui::Key::page_up, false, true});
+    commands.register_command("layers.select_below", "Layer Below", select_layer(-1, false));
+    commands.bind("layers.select_below", oui::KeyShortcut{oui::Key::page_down, false, true});
+    commands.register_command("layers.select_top", "Top Layer", select_layer(1, true));
+    commands.bind("layers.select_top", oui::KeyShortcut{oui::Key::page_up, true, true});
+    commands.register_command("layers.select_bottom", "Bottom Layer", select_layer(-1, true));
+    commands.bind("layers.select_bottom", oui::KeyShortcut{oui::Key::page_down, true, true});
+    add("image.flatten", "&Flatten",
+        [this] { change_layers("Flatten", [](Document& document) { document.flatten_layers(); }); },
+        {U'f', true, false, true});
     // Each tool's letter, and again for the next tool with the same letter.
     for(const auto& tool : all_tools())
     {
@@ -167,6 +255,10 @@ void PaintApp::build_window()
                                            "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
                                            "file.quit"});
     m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo"});
+    m_frame->menu_bar().add_menu("&Image", {"image.flatten"});
+    m_frame->menu_bar().add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down",
+                                             oui::menu_separator(), "layers.move_up", "layers.move_down",
+                                             "layers.toggle_visible", oui::menu_separator(), "layers.properties"});
     m_frame->menu_bar().add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
                                            "view.actual_size"});
     auto left{oui::column()};
@@ -175,6 +267,56 @@ void PaintApp::build_window()
     m_color_panel = &left->add(std::make_unique<ColorPanel>());
     m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
     m_frame->set_left(std::move(left));
+    auto layers{std::make_unique<LayersPanel>(m_icons)};
+    m_layers_panel = layers.get();
+    m_layers_panel->on_select(
+        [this](std::size_t index)
+        {
+            if(auto* const open{current()})
+            {
+                open->document().set_active_layer(index);
+            }
+        });
+    m_layers_panel->on_toggle_visible(
+        [this](std::size_t index)
+        {
+            change_layers("Layer Visibility",
+                          [index](Document& document)
+                          {
+                              auto& layer{document.layers()[index]};
+                              layer.set_visible(!layer.visible());
+                          });
+        });
+    m_layers_panel->on_action(
+        [this](LayersPanel::Action action)
+        {
+            const auto run{[this](const char* id) { static_cast<void>(m_application.commands().execute(id)); }};
+            switch(action)
+            {
+            case LayersPanel::Action::add:
+                run("layers.add");
+                break;
+            case LayersPanel::Action::remove:
+                run("layers.delete");
+                break;
+            case LayersPanel::Action::duplicate:
+                run("layers.duplicate");
+                break;
+            case LayersPanel::Action::merge_down:
+                run("layers.merge_down");
+                break;
+            case LayersPanel::Action::move_up:
+                run("layers.move_up");
+                break;
+            case LayersPanel::Action::move_down:
+                run("layers.move_down");
+                break;
+            case LayersPanel::Action::properties:
+                run("layers.properties");
+                break;
+            }
+        });
+    m_frame->set_right(std::move(layers));
     auto options{std::make_unique<ToolOptions>(BrushSettings{})};
     m_tool_options = options.get();
     m_frame->set_top(std::move(options));
@@ -183,6 +325,7 @@ void PaintApp::build_window()
     m_tabs->set_highlight_predicate([this](std::size_t index)
                                     { return index < m_documents.size() && m_documents[index]->modified(); });
     static_cast<void>(m_tabs->on_close_requested([this](std::size_t index) { static_cast<void>(close(index)); }));
+    static_cast<void>(m_tabs->on_selection_changed([this](auto&&...) { show_layers(); }));
     m_frame->set_center(std::move(tabs));
     m_frame->status_bar().set_provider(
         [this]
@@ -245,6 +388,7 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
     m_tabs->select(m_documents.size() - 1);
     m_application.focus(added);
     refresh_titles();
+    show_layers();
 }
 
 void PaintApp::new_image()
@@ -420,6 +564,7 @@ bool PaintApp::close(std::size_t index)
     m_tabs->close_tab(index);
     m_documents.erase(m_documents.begin() + static_cast<std::ptrdiff_t>(index));
     refresh_titles();
+    show_layers();
     return true;
 }
 
@@ -499,6 +644,54 @@ void PaintApp::use_tool(const ToolEvent& event)
     {
         open->refresh(m_stroke->take_changed());
     }
+}
+
+void PaintApp::change_layers(std::string name, const std::function<void(Document&)>& change)
+{
+    auto* const open{current()};
+    if(open == nullptr || m_stroke != nullptr)
+    {
+        return;
+    }
+    auto& document{open->document()};
+    const auto before{LayersState::of(document)};
+    open->history().begin_step(document);
+    change(document);
+    open->history().finish_step(std::move(name), document);
+    open->refresh(changed_tiles(before, LayersState::of(document)));
+    open->set_modified(true);
+    refresh_titles();
+}
+
+void PaintApp::layer_properties()
+{
+    auto* const open{current()};
+    if(open == nullptr)
+    {
+        return;
+    }
+    const auto& layer{open->document().layers()[open->document().active_layer()]};
+    const auto changed{ask_layer_properties(
+        m_application, {layer.name(), layer.visible(), layer.blend_mode(), layer.opacity()})};
+    if(!changed)
+    {
+        return;
+    }
+    change_layers("Layer Properties",
+                  [&changed](Document& document)
+                  {
+                      auto& target{document.layers()[document.active_layer()]};
+                      target.set_name(changed->name);
+                      target.set_visible(changed->visible);
+                      target.set_blend_mode(changed->blend_mode);
+                      target.set_opacity(changed->opacity);
+                  });
+}
+
+void PaintApp::show_layers()
+{
+    auto* const open{current()};
+    m_layers_panel->set_document(open != nullptr ? &open->document() : nullptr);
 }
 
 void PaintApp::undo()

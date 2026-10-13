@@ -9,6 +9,7 @@
 #include <oui/tab_view.h>
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -17,6 +18,7 @@ namespace oui_paint
 
 class CanvasView;
 class ColorPanel;
+class LayersPanel;
 class MainFrame;
 class ToolOptions;
 class ToolPanel;
@@ -52,6 +54,11 @@ class PaintApp
     void register_commands();
     // What the tool in use does with the pointer on the current document.
     void use_tool(const ToolEvent& event);
+    // Changes the current document's layers as one undoable step called `name`, and draws again what changed.
+    void change_layers(std::string name, const std::function<void(Document&)>& change);
+    void layer_properties();
+    // Shows the current document's layers in the panel.
+    void show_layers();
     void undo();
     void redo();
     // Asks for the primary or the secondary colour as hexadecimal.
@@ -68,6 +75,7 @@ class PaintApp
     MainFrame* m_frame{};
     ToolPanel* m_tool_panel{};
     ColorPanel* m_color_panel{};
+    LayersPanel* m_layers_panel{};
     ToolOptions* m_tool_options{};
     std::unique_ptr<Stroke> m_stroke;
     olagarro::oui::TabView* m_tabs{};

@@ -46,6 +46,8 @@ add_library(oui_paint_core STATIC
     src/ui/canvas_view.cpp
     src/ui/color_panel.cpp
     src/ui/icons.cpp
+    src/ui/layer_properties_dialog.cpp
+    src/ui/layers_panel.cpp
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
     src/ui/tool_options.cpp
@@ -57,9 +59,11 @@ target_include_directories(oui_paint_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/th
 set_source_files_properties(src/codecs/stb_api.cpp PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/W0,-w>")
 
 # The icons the program shows, built into it. Only those it uses: add one here when a button or a menu needs it.
-set(OUI_PAINT_GODOT_ICONS Bucket ColorPick Edit Eraser Gradient Line RegionEdit ToolMove ToolPan ToolSelect Zoom)
+set(OUI_PAINT_GODOT_ICONS
+    Add Bucket ColorPick Duplicate Edit Eraser Gradient GuiVisibilityHidden GuiVisibilityVisible Line MoveDown MoveUp
+    RegionEdit Remove ToolMove ToolPan ToolSelect Tools Zoom)
 list(TRANSFORM OUI_PAINT_GODOT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
-set(OUI_PAINT_OWN_ICONS CloneStamp EllipseSelect Lasso MagicWand Paintbrush Recolor Shapes Text)
+set(OUI_PAINT_OWN_ICONS CloneStamp EllipseSelect Lasso MagicWand MergeDown Paintbrush Recolor Shapes Text)
 list(TRANSFORM OUI_PAINT_OWN_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/oui_paint/)
 set(OUI_PAINT_ICONS ${OUI_PAINT_GODOT_ICONS} ${OUI_PAINT_OWN_ICONS})
 list(TRANSFORM OUI_PAINT_ICONS APPEND .svg)

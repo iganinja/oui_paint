@@ -22,6 +22,8 @@ class MainFrame final : public olagarro::oui::Container
     void set_center(std::unique_ptr<olagarro::oui::Widget> center);
     [[nodiscard]] olagarro::oui::Widget* center();
     void set_left(std::unique_ptr<olagarro::oui::Widget> left);
+    // A panel on the right, as tall as the space between the bars and as wide as it asks: the layers.
+    void set_right(std::unique_ptr<olagarro::oui::Widget> right);
     // A bar under the menu bar, as tall as it asks, across the window: the tool's options.
     void set_top(std::unique_ptr<olagarro::oui::Widget> top);
     [[nodiscard]] olagarro::oui::Widget* left();
@@ -38,6 +40,7 @@ class MainFrame final : public olagarro::oui::Container
     olagarro::oui::Widget* m_center{};
     olagarro::oui::Widget* m_left{};
     olagarro::oui::Widget* m_top{};
+    olagarro::oui::Widget* m_right{};
 };
 
 } // namespace oui_paint

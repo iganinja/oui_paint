@@ -47,6 +47,11 @@ void MainFrame::set_left(std::unique_ptr<oui::Widget> left)
     replace_slot(m_left, std::move(left));
 }
 
+void MainFrame::set_right(std::unique_ptr<oui::Widget> right)
+{
+    replace_slot(m_right, std::move(right));
+}
+
 void MainFrame::set_top(std::unique_ptr<oui::Widget> top)
 {
     replace_slot(m_top, std::move(top));
@@ -88,9 +93,16 @@ void MainFrame::arrange(const oui::Rect& bounds)
         left_width = std::min(bounds.width, m_left->measure({bounds.width, middle_height}).width);
         m_left->arrange({bounds.x, middle_top, left_width, middle_height});
     }
+    auto right_width{0};
+    if(m_right != nullptr)
+    {
+        right_width = std::min(bounds.width - left_width, m_right->measure({bounds.width, middle_height}).width);
+        m_right->arrange({bounds.x + bounds.width - right_width, middle_top, right_width, middle_height});
+    }
     if(m_center != nullptr)
     {
-        m_center->arrange({bounds.x + left_width, middle_top, bounds.width - left_width, middle_height});
+        m_center->arrange(
+            {bounds.x + left_width, middle_top, bounds.width - left_width - right_width, middle_height});
     }
 }
 
