@@ -35,6 +35,7 @@ add_library(oui_paint_core STATIC
     src/codecs/codecs.cpp
     src/codecs/stb_api.cpp
     src/core/document.cpp
+    src/core/history.cpp
     src/core/image.cpp
     src/core/layer.cpp
     src/core/pixel_format.cpp
@@ -72,6 +73,7 @@ if(OUI_PAINT_BUILD_TESTS)
     add_executable(oui_paint_tests
         tests/codecs_test.cpp
         tests/core_test.cpp
+        tests/history_test.cpp
         tests/icons_test.cpp
         tests/main_frame_test.cpp
         tests/render_test.cpp
