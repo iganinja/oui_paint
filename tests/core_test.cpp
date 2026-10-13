@@ -175,3 +175,50 @@ TEST(Document, CroppingToAnEllipseLeavesItsCornersSeeThrough)
     EXPECT_EQ(flat.pixel<Rgba8>(0, 0).alpha(), 0);
     EXPECT_EQ(flat.pixel<Rgba8>(20, 10).value, (std::array<std::uint8_t, 4>{40, 40, 0, 255}));
 }
+
+TEST(Document, TurningTheImageTurnsItsSelectionWithIt)
+{
+    Document document{30, 10, PixelFormat::rgba8};
+    Image dot{PixelFormat::rgba8, 1, 1};
+    dot.set_pixel(0, 0, Rgba8{{255, 0, 0, 255}});
+    document.add_layer("Background").write(dot, 29, 0);
+    document.selection().add_rectangle({29, 0, 1, 1}, SelectionMode::replace);
+    document.rotate(1);
+    ASSERT_EQ(document.width(), 10);
+    ASSERT_EQ(document.height(), 30);
+    // Clockwise, the top right corner goes to the bottom right.
+    EXPECT_EQ(document.flatten().pixel<Rgba8>(9, 29).value[0], 255);
+    EXPECT_EQ(document.selection().at(9, 29), 255);
+    EXPECT_EQ(document.selection().at(0, 0), 0);
+}
+
+TEST(Document, ANewCanvasSizePlacesTheImageByItsAnchor)
+{
+    Document document{4, 4, PixelFormat::rgba8};
+    Image solid{PixelFormat::rgba8, 4, 4};
+    for(int y{}; y < 4; ++ y)
+    {
+        for(int x{}; x < 4; ++ x)
+        {
+            solid.set_pixel(x, y, Rgba8{{10, 20, 30, 255}});
+        }
+    }
+    document.add_layer("Background").write(solid, 0, 0);
+    document.resize_canvas(10, 8, {1, 0});
+    const auto flat{document.flatten()};
+    EXPECT_EQ(flat.pixel<Rgba8>(6, 2).alpha(), 255) << "to the right, in the middle";
+    EXPECT_EQ(flat.pixel<Rgba8>(5, 2).alpha(), 0);
+    EXPECT_EQ(flat.pixel<Rgba8>(9, 5).alpha(), 255);
+    EXPECT_EQ(flat.pixel<Rgba8>(9, 6).alpha(), 0);
+}
+
+TEST(Document, RotateZoomTurnsALayerRoundTheMiddle)
+{
+    Document document{20, 20, PixelFormat::rgba8};
+    Image dot{PixelFormat::rgba8, 1, 1};
+    dot.set_pixel(0, 0, Rgba8{{255, 0, 0, 255}});
+    document.add_layer("Layer").write(dot, 15, 10);
+    document.rotate_zoom_layer(0, 90.0, 1.0, 0.0, 0.0, Resampling::nearest);
+    // A quarter turn clockwise round (10, 10): five to the right goes five down.
+    EXPECT_EQ(document.flatten().pixel<Rgba8>(9, 15).value[0], 255);
+}

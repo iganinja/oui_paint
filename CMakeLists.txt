@@ -49,6 +49,7 @@ add_library(oui_paint_core STATIC
     src/core/pixel_format.cpp
     src/core/selection.cpp
     src/core/tile.cpp
+    src/core/transform.cpp
     src/render/display_cache.cpp
     src/render/viewport.cpp
     src/tools/color_math.cpp
@@ -110,7 +111,8 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/stroke_test.cpp
         tests/text_test.cpp
         tests/tool_panel_test.cpp
-        tests/tools_test.cpp)
+        tests/tools_test.cpp
+        tests/transform_test.cpp)
     target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)
     gtest_discover_tests(oui_paint_tests)
 endif()

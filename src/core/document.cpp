@@ -195,6 +195,108 @@ void Document::crop_to_selection()
     set_size(area.width, area.height);
 }
 
+template <typename Change> void Document::remake(int width, int height, Change change)
+{
+    for(auto& layer : m_layers)
+    {
+        Layer made{m_format, layer.name()};
+        made.set_visible(layer.visible());
+        made.set_opacity(layer.opacity());
+        made.set_blend_mode(layer.blend_mode());
+        made.write(change(layer.read(0, 0, m_width, m_height)), 0, 0);
+        layer = std::move(made);
+    }
+    std::optional<Layer> mask;
+    if(const auto& old{m_selection.mask()})
+    {
+        mask.emplace(PixelFormat::gray_alpha8, "Selection");
+        // The selection's grey is how much each pixel is selected; its alpha says nothing, so it is made solid
+        // everywhere, and resampling mixes the grey alone.
+        auto read{old->read(0, 0, m_width, m_height)};
+        for(int y{}; y < read.height; ++ y)
+        {
+            for(int x{}; x < read.width; ++ x)
+            {
+                read.set_pixel(x, y, GrayAlpha8{{read.pixel<GrayAlpha8>(x, y).value[0], 255}});
+            }
+        }
+        auto image{change(read)};
+        mask->write(image, 0, 0);
+    }
+    set_size(width, height);
+    m_selection.set_mask(std::move(mask));
+}
+
+void Document::flip(bool horizontal)
+{
+    remake(m_width, m_height, [horizontal](const Image& image) { return flipped(image, horizontal); });
+}
+
+void Document::rotate(int quarter_turns)
+{
+    const auto sideways{((quarter_turns % 4) + 4) % 2 == 1};
+    remake(sideways ? m_height : m_width, sideways ? m_width : m_height,
+           [quarter_turns](const Image& image) { return rotated(image, quarter_turns); });
+}
+
+void Document::resize(int width, int height, Resampling resampling)
+{
+    remake(width, height, [=](const Image& image) { return resized(image, width, height, resampling); });
+}
+
+void Document::resize_canvas(int width, int height, Anchor anchor)
+{
+    const auto dx{(anchor.horizontal + 1) * (width - m_width) / 2};
+    const auto dy{(anchor.vertical + 1) * (height - m_height) / 2};
+    remake(width, height,
+           [=](const Image& image)
+           {
+               return transformed(image, Affine::translation(-dx, -dy), width, height, Resampling::nearest);
+           });
+}
+
+void Document::flip_layer(std::size_t index, bool horizontal)
+{
+    if(index >= m_layers.size())
+    {
+        return;
+    }
+    auto& layer{m_layers[index]};
+    const auto image{flipped(layer.read(0, 0, m_width, m_height), horizontal)};
+    Layer made{m_format, layer.name()};
+    made.set_visible(layer.visible());
+    made.set_opacity(layer.opacity());
+    made.set_blend_mode(layer.blend_mode());
+    made.write(image, 0, 0);
+    layer = std::move(made);
+}
+
+void Document::rotate_zoom_layer(std::size_t index, double degrees, double zoom, double pan_x, double pan_y,
+                                 Resampling resampling)
+{
+    if(index >= m_layers.size() || zoom <= 0.0)
+    {
+        return;
+    }
+    auto& layer{m_layers[index]};
+    const auto center_x{m_width / 2.0};
+    const auto center_y{m_height / 2.0};
+    constexpr auto pi{3.14159265358979323846};
+    // From the layer to where it goes: round the middle, bigger, moved; the image is sampled going back.
+    const auto forward{Affine::translation(center_x + pan_x, center_y + pan_y)
+                           .after(Affine::scale(zoom, zoom))
+                           .after(Affine::rotation(degrees * pi / 180.0))
+                           .after(Affine::translation(-center_x, -center_y))};
+    const auto image{transformed(layer.read(0, 0, m_width, m_height), forward.inverse(), m_width, m_height,
+                                 resampling)};
+    Layer made{m_format, layer.name()};
+    made.set_visible(layer.visible());
+    made.set_opacity(layer.opacity());
+    made.set_blend_mode(layer.blend_mode());
+    made.write(image, 0, 0);
+    layer = std::move(made);
+}
+
 Image Document::flatten() const
 {
     Image result{m_format, m_width, m_height};

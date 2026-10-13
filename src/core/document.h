@@ -3,12 +3,21 @@
 #include "core/image.h"
 #include "core/layer.h"
 #include "core/selection.h"
+#include "core/transform.h"
 
 #include <string>
 #include <vector>
 
 namespace oui_paint
 {
+
+// Where the image stays when the canvas grows or shrinks: one of nine places, as Paint.NET's anchor buttons.
+struct Anchor
+{
+    // -1 left or top, 0 the middle, 1 right or bottom.
+    int horizontal{0};
+    int vertical{0};
+};
 
 // An image being edited: its size, its pixel format, which all its layers share, and its layers from the bottom up.
 class Document
@@ -49,10 +58,26 @@ class Document
     // what it leaves out becomes see-through. Nothing is selected afterwards.
     void crop_to_selection();
 
+    // The whole image, every layer and the selection.
+    void flip(bool horizontal);
+    void rotate(int quarter_turns);
+    void resize(int width, int height, Resampling resampling);
+    // A new canvas size, the image placed by `anchor`; what falls outside is cut off, what is new is see-through.
+    void resize_canvas(int width, int height, Anchor anchor);
+    // One layer alone.
+    void flip_layer(std::size_t index, bool horizontal);
+    // A layer turned by `degrees` clockwise round the image's middle, then made `zoom` times as big and moved by `pan`
+    // pixels, as Paint.NET's Rotate / Zoom does.
+    void rotate_zoom_layer(std::size_t index, double degrees, double zoom, double pan_x, double pan_y,
+                           Resampling resampling);
+
     // What the document looks like: the visible layers mixed from the bottom up, in its format.
     [[nodiscard]] Image flatten() const;
 
   private:
+    // Every layer and the selection's mask made anew by `change`, at a new size.
+    template <typename Change> void remake(int width, int height, Change change);
+
     int m_width;
     int m_height;
     PixelFormat m_format;
