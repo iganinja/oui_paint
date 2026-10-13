@@ -1,5 +1,6 @@
 #include "ui/plugin_workbench.h"
 
+#include "app/plugin_api.h"
 #include "effects/test_card.h"
 #include "ui/canvas_view.h"
 #include "ui/effect_controls.h"
@@ -189,6 +190,17 @@ PluginWorkbench::PluginWorkbench(oui::Application& application, std::string sour
                                }
                            });
     m_error->set_visible(false);
+    // What the code can use, as paint.d.ts declares it, while one writes in it.
+    m_suggester = std::make_unique<oui::Suggester>(
+        m_application,
+        [this]() -> std::optional<oui::Suggester::Context>
+        {
+            if(m_application.focused() != m_code)
+            {
+                return std::nullopt;
+            }
+            return oui::Suggester::Context{m_code, &javascript_words(), &plugin_api(), {m_code->text()}, false};
+        });
     show_image(m_test_card);
     run_now();
 }
@@ -287,6 +299,34 @@ Image PluginWorkbench::chosen_image() const
         }
     }
     return m_test_card;
+}
+
+void PluginWorkbench::after_event(const oui::Event& event)
+{
+    std::optional<char32_t> typed;
+    if(const auto* const text{std::get_if<oui::TextEvent>(&event)}; text != nullptr && !text->control && !text->alt)
+    {
+        typed = text->codepoint;
+    }
+    if(const auto* const key{std::get_if<oui::KeyEvent>(&event)};
+       key != nullptr && key->key == oui::Key::space && !key->control && !key->alt)
+    {
+        typed = U' ';
+    }
+    // Once the event is handled, as what it typed is then in the code.
+    m_application.post(
+        [this, alive{std::weak_ptr<int>{m_alive}}, typed]
+        {
+            if(!alive.expired())
+            {
+                m_suggester->after_event(typed);
+            }
+        });
+}
+
+void PluginWorkbench::suggest()
+{
+    m_suggester->suggest();
 }
 
 void PluginWorkbench::schedule()

@@ -1,5 +1,6 @@
 #include "app/help.h"
 
+#include "app/plugin_api.h"
 #include "app/tools.h"
 
 #include <algorithm>
@@ -95,7 +96,7 @@ std::vector<HelpPage> help_pages(const olagarro::oui::CommandRegistry& commands)
 {
     return {{"Guide", "guide.md", text_of("guide.md")},
             {"Keyboard", "keys.md", keys_markdown(commands)},
-            {"Plugins", "plugins.md", text_of("plugins.md")}};
+            {"Plugins", "plugins.md", with_image_methods(text_of("plugins.md"))}};
 }
 
 std::optional<HelpPlace> help_place(const std::vector<HelpPage>& pages, std::string_view link)

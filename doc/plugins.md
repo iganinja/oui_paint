@@ -11,7 +11,9 @@ load. **New** opens a tab to write one in, and **Edit** opens one; a built-in pl
 own. The code is on the left; on the right, its effect on an image, made again a moment after each change: the test
 card, an image open in another tab, or one loaded from a file (Try on). Under it are the effect's parameters, what the
 plugin prints with `console.log`, and why it fails, with its line, which a click goes to. A run taking over three
-seconds counts as stuck.
+seconds counts as stuck. As you write, it suggests what the code can use: after `image.` the methods of an image,
+after `paint.` what `paint` has, and inside the brackets of a call how it is called and what it does; Ctrl+Space asks
+for the suggestions where the cursor is.
 
 Ctrl+S saves it in the plugins folder, and its effects are in the menus at once. **Reload** loads every plugin again
 after changing them elsewhere.
@@ -47,18 +49,10 @@ An image is a handle to pixels kept in C++; its methods run pieces written in C+
 them costs no copying into JavaScript. Pixels are red, green, blue and alpha from 0 to 1, colour multiplied by alpha,
 whatever the document's depth.
 
-| Method | What it gives |
-|---|---|
-| `width`, `height` | its size |
-| `gaussianBlur(radius)`, `boxBlur(radius)` | blurred |
-| `motionBlur(degrees, distance)` | smeared along a line |
-| `radialBlur(degrees, centerX, centerY)` | smeared round a point |
-| `zoomBlur(amount, centerX, centerY)` | smeared towards a point, `amount` from 0 to 1 |
-| `convolve(matrix, divisor = 1, offset = 0)` | each pixel its neighbours times a square matrix of odd size |
-| `lookup(red, green = red, blue = red)` | each channel through a table of values from 0 to 1, interpolated |
-| `hueSaturation(hue, saturation, lightness)` | hue turned by degrees, saturation and lightness changed by -1 to 1 |
-| `over(below, mode = "Normal", opacity = 1)` | this laid over `below` as a layer blend mode by its name |
-| `rows(change)` | each row given to `change(row, y)` as a Float32Array, changed in place or replaced |
+<!-- image-methods -->
+The methods are declared, with what each does, in [paint.d.ts](../src/plugins/paint.d.ts), which the plugin
+workbench suggests from as you write; the help inside OUI Paint lists them here.
+<!-- /image-methods -->
 
 `paint.clouds(width, height, scale, roughness, seed)` makes fractal noise from black to white.
 

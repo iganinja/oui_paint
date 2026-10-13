@@ -8,6 +8,7 @@
 #include <oui/combo_box.h>
 #include <oui/container.h>
 #include <oui/grid.h>
+#include <oui/suggester.h>
 #include <oui/text_edit.h>
 
 #include <atomic>
@@ -61,6 +62,11 @@ class PluginWorkbench final : public olagarro::oui::Container
     [[nodiscard]] const std::optional<PluginTrial>& last_trial() const { return m_trial; }
     // Runs it now, as it does a moment after a change.
     void run_now();
+    // After each event the application handled: what was typed may open the suggestions of what the code can use,
+    // and the cursor in the brackets of a call shows how it is called.
+    void after_event(const olagarro::oui::Event& event);
+    // Opens the suggestions where the code's cursor is, as Ctrl+Space asks.
+    void suggest();
 
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override;
     void arrange(const olagarro::oui::Rect& bounds) override;
@@ -112,6 +118,7 @@ class PluginWorkbench final : public olagarro::oui::Container
     bool m_again{false};
     // Gone once the workbench is, for what a run posts after.
     std::shared_ptr<int> m_alive{std::make_shared<int>(0)};
+    std::unique_ptr<olagarro::oui::Suggester> m_suggester;
     std::function<void()> m_load_image;
     std::function<void()> m_title_changed;
     bool m_was_modified{false};

@@ -38,6 +38,7 @@ add_library(oui_paint_core STATIC
     src/app/help.cpp
     src/app/new_image.cpp
     src/app/open_document.cpp
+    src/app/plugin_api.cpp
     src/app/paint_app.cpp
     src/app/recent_files.cpp
     src/app/tools.cpp
@@ -107,6 +108,8 @@ olagarro_embed_files(oui_paint_core FUNCTION embedded_icons FILES ${OUI_PAINT_IC
 # The plugins built in, the prelude every plugin runs after first.
 olagarro_embed_files(oui_paint_core FUNCTION embedded_plugins
     FILES src/plugins/prelude.js src/plugins/adjustments.js src/plugins/effects.js)
+# What plugins can use, which the workbench suggests from and the help lists.
+olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_plugin_api FILES src/plugins/paint.d.ts)
 # The help, and OUI Paint's license, which About shows.
 olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_help FILES doc/guide.md doc/plugins.md LICENSE)
 # The licenses of what the program carries, which a copy of it has to carry: in the order help.cpp names them.
@@ -161,6 +164,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/openraster_test.cpp
         tests/palettes_test.cpp
         tests/pieces_test.cpp
+        tests/plugin_api_test.cpp
         tests/plugin_trial_test.cpp
         tests/plugins_test.cpp
         tests/recent_files_test.cpp

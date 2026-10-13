@@ -2816,6 +2816,29 @@ void PaintApp::load_plugins()
                                   });
         commands.bind("effects.repeat", {U'f', true});
         commands.register_command("effects.manage", "&Manage Plugins...", [this] { manage_plugins(); });
+        // Ctrl+Space, as code editors have it: what the plugin's code can use, where its cursor is.
+        commands.register_command("edit.suggest", "Suggest",
+                                  [this]
+                                  {
+                                      if(auto* const workbench{workbench_in_tab(m_tabs->selected_index())})
+                                      {
+                                          workbench->suggest();
+                                      }
+                                  });
+        commands.bind("edit.suggest", oui::KeyShortcut{oui::Key::space, true});
+        // The workbench on show hears what each event did, to suggest as one writes.
+        m_application.set_event_observer(
+            [this](const oui::Event& event)
+            {
+                if(m_tabs == nullptr)
+                {
+                    return;
+                }
+                if(auto* const workbench{workbench_in_tab(m_tabs->selected_index())})
+                {
+                    workbench->after_event(event);
+                }
+            });
     }
     std::vector<oui::MenuItem> effects{"effects.repeat", oui::menu_separator()};
     for(auto& [menu, items] : submenus)
