@@ -29,6 +29,11 @@ void CanvasView::on_pointer(std::function<oui::Pointer(bool held)> pointer)
     m_pointer_for_tool = std::move(pointer);
 }
 
+void CanvasView::on_overlay(std::function<void(std::uint32_t* pixels, int width, int height)> overlay)
+{
+    m_overlay = std::move(overlay);
+}
+
 void CanvasView::on_keys(std::function<bool(const oui::Event&)> keys)
 {
     m_keys = std::move(keys);
@@ -103,6 +108,10 @@ void CanvasView::paint(oui::Painter& painter, const oui::Theme&) const
                 m_pixels->width, m_pixels->height, 0x808080u);
     draw_selection_edge(viewport, document.selection(), m_buffer.data(), m_pixels->width, m_pixels->height,
                         m_ants_phase);
+    if(m_overlay)
+    {
+        m_overlay(m_buffer.data(), m_pixels->width, m_pixels->height);
+    }
     painter.draw_image(m_bounds, {m_buffer.data(), m_pixels->width, m_pixels->height, m_pixels->width}, {});
 }
 

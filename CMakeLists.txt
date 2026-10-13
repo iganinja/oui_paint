@@ -54,6 +54,7 @@ add_library(oui_paint_core STATIC
     src/render/viewport.cpp
     src/tools/color_math.cpp
     src/tools/fill.cpp
+    src/tools/floating.cpp
     src/tools/gradient.cpp
     src/tools/shapes.cpp
     src/tools/stroke.cpp
@@ -100,6 +101,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/color_math_test.cpp
         tests/core_test.cpp
         tests/fill_test.cpp
+        tests/floating_test.cpp
         tests/fonts_test.cpp
         tests/gradient_test.cpp
         tests/history_test.cpp

@@ -69,12 +69,44 @@ TEST(Transform, SupersamplingAveragesWhatEachPixelCovers)
 TEST(Transform, SeeThroughPixelsLeaveNoDarkFringeWhenMixed)
 {
     // Red beside clear black: mixed, the colour stays red, only less solid.
-    Image image{PixelFormat::rgba8, 2, 1};
+    Image image{PixelFormat::rgba8, 3, 1};
     image.set_pixel(0, 0, Rgba8{{255, 0, 0, 255}});
-    image.set_pixel(1, 0, Rgba8{{0, 0, 0, 0}});
-    const auto mixed{transformed(image, Affine::translation(0.5, 0), 1, 1, Resampling::bilinear)};
+    image.set_pixel(1, 0, Rgba8{{255, 0, 0, 255}});
+    image.set_pixel(2, 0, Rgba8{{0, 0, 0, 0}});
+    const auto mixed{transformed(image, Affine::translation(1.5, 0), 1, 1, Resampling::bilinear)};
     EXPECT_EQ(mixed.pixel<Rgba8>(0, 0).value[0], 255);
     EXPECT_NEAR(mixed.pixel<Rgba8>(0, 0).alpha(), 128, 1);
+}
+
+TEST(Transform, AnEnlargedImageKeepsItsEdgesSolidAndATurnedOneSoft)
+{
+    Image solid{PixelFormat::rgba8, 4, 4};
+    for(int y{}; y < 4; ++ y)
+    {
+        for(int x{}; x < 4; ++ x)
+        {
+            solid.set_pixel(x, y, Rgba8{{0, 0, 255, 255}});
+        }
+    }
+    const auto bigger{resized(solid, 8, 8, Resampling::bilinear)};
+    EXPECT_EQ(bigger.pixel<Rgba8>(0, 0).alpha(), 255);
+    EXPECT_EQ(bigger.pixel<Rgba8>(7, 7).alpha(), 255);
+    // Turned an eighth of a turn round its middle, in a bigger box: its corners' pixels are partly covered.
+    const auto turned{transformed(solid,
+                                  Affine::translation(2, 2)
+                                      .after(Affine::rotation(-0.785398163))
+                                      .after(Affine::translation(-4, -4)),
+                                  8, 8, Resampling::bilinear)};
+    auto partial{false};
+    for(int y{}; y < 8; ++ y)
+    {
+        for(int x{}; x < 8; ++ x)
+        {
+            const auto alpha{turned.pixel<Rgba8>(x, y).alpha()};
+            partial = partial || (alpha > 0 && alpha < 255);
+        }
+    }
+    EXPECT_TRUE(partial) << "a turned edge is antialiased";
 }
 
 TEST(Transform, AnAffineAndItsInverseUndoEachOther)

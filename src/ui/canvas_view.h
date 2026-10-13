@@ -47,6 +47,8 @@ class CanvasView final : public olagarro::oui::Widget
     // Called after the view changed, by zoom or scrolling, or the pointer moved over it.
     void on_changed(std::function<void()> changed);
     void on_tool(std::function<void(const ToolEvent&)> tool);
+    // Draws over the view after the image and the selection, as the floating piece's handles.
+    void on_overlay(std::function<void(std::uint32_t* pixels, int width, int height)> overlay);
     // While `claiming`, the keys typed go to `keys` before the program's shortcuts, as the Text tool needs.
     void claim_keys(bool claiming) { m_claiming_keys = claiming; }
     void on_keys(std::function<bool(const olagarro::oui::Event&)> keys);
@@ -81,6 +83,7 @@ class CanvasView final : public olagarro::oui::Widget
     std::function<void(const ToolEvent&)> m_tool;
     std::function<olagarro::oui::Pointer(bool)> m_pointer_for_tool;
     std::function<bool(const olagarro::oui::Event&)> m_keys;
+    std::function<void(std::uint32_t*, int, int)> m_overlay;
     bool m_claiming_keys{false};
     // The button a tool is being used with, from its press to its release.
     std::optional<bool> m_tool_button;

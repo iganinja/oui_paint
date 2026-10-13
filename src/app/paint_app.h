@@ -3,6 +3,7 @@
 #include "app/new_image.h"
 #include "app/open_document.h"
 #include "core/selection.h"
+#include "tools/floating.h"
 #include "tools/stroke.h"
 #include "ui/icons.h"
 
@@ -90,6 +91,14 @@ class PaintApp
     // Draws the text being typed, with its cursor while it is being typed.
     void show_typing(bool with_cursor);
     [[nodiscard]] olagarro::oui::Font* text_font();
+    // Lifts what is selected into a floating piece unless one is floating already.
+    void ensure_floating();
+    // Lays the floating piece as its transform says, and draws again what changed.
+    void place_floating();
+    // Turns or mirrors what is selected, as one undoable step.
+    void transform_selection(std::string name, const std::function<void(PieceTransform&)>& change);
+    // The floating piece's eight handles in the view: the corners, then the middles of the edges.
+    [[nodiscard]] std::vector<Position> floating_handles();
     // Puts floating pixels down where they are, and text being typed.
     void settle();
     // Starts or stops the marching ants as the current document has a selection or not.
@@ -128,19 +137,28 @@ class PaintApp
     struct Floating
     {
         OpenDocument* document{};
+        // The layer with the hole the piece left, what it is laid over.
         Layer base;
-        std::optional<Layer> selection;
-        Lifted pixels;
-        int dx{0};
-        int dy{0};
+        FloatingPiece piece;
+        PieceTransform transform;
     };
     std::optional<Floating> m_floating;
-    // A move being dragged: where it was pressed, and the offset it started from.
+    // A move being dragged: how, where it was pressed, and the transform it started from.
     struct Moving
     {
+        enum class Kind
+        {
+            move,
+            rotate,
+            // Pulling one of the eight handles: 0 to 3 the corners from the top left round, 4 to 7 the edges from the
+            // top round.
+            scale,
+            outline,
+        };
+        Kind kind{Kind::move};
         Position from;
-        int dx{0};
-        int dy{0};
+        PieceTransform start;
+        int handle{0};
         std::optional<Layer> selection;
     };
     std::optional<Moving> m_moving;

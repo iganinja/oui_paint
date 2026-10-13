@@ -79,6 +79,14 @@ template <typename PixelType> class Sampler
         return premultiplied(m_image.pixel<PixelType>(x, y));
     }
 
+    // The pixel at a place, the edge's own where the place is past it: what interpolation mixes, so an edge does
+    // not fade into nothing.
+    [[nodiscard]] Premultiplied clamped(int x, int y) const
+    {
+        return premultiplied(
+            m_image.pixel<PixelType>(std::clamp(x, 0, m_image.width - 1), std::clamp(y, 0, m_image.height - 1)));
+    }
+
     // The image at a place, pixels' middles at half pixels.
     [[nodiscard]] Premultiplied sample(double x, double y, Resampling resampling) const
     {
@@ -100,7 +108,7 @@ template <typename PixelType> class Sampler
                 for(int i{}; i < 2; ++ i)
                 {
                     const auto weight{(i == 0 ? 1.0 - tx : tx) * (j == 0 ? 1.0 - ty : ty)};
-                    const auto pixel{at(x0 + i, y0 + j)};
+                    const auto pixel{clamped(x0 + i, y0 + j)};
                     for(int k{}; k < 4; ++ k)
                     {
                         sum[static_cast<std::size_t>(k)] += pixel[static_cast<std::size_t>(k)] * weight;
@@ -114,7 +122,7 @@ template <typename PixelType> class Sampler
             for(int i{-1}; i <= 2; ++ i)
             {
                 const auto weight{cubic(i - tx) * cubic(j - ty)};
-                const auto pixel{at(std::clamp(x0 + i, -1, m_image.width), std::clamp(y0 + j, -1, m_image.height))};
+                const auto pixel{clamped(x0 + i, y0 + j)};
                 for(int k{}; k < 4; ++ k)
                 {
                     sum[static_cast<std::size_t>(k)] += pixel[static_cast<std::size_t>(k)] * weight;
@@ -247,6 +255,9 @@ Image transformed(const Image& source, const Affine& to_source, int width, int h
                  {
                      using PixelType = typename decltype(tag)::Type;
                      const Sampler<PixelType> sampler{source};
+                     // How many of the result's pixels one of the source's is across: what an edge fades over.
+                     const auto source_per_pixel{std::sqrt(std::abs(to_source.a * to_source.e - to_source.b * to_source.d))};
+                     const auto pixels_per_source{source_per_pixel > 0.0 ? 1.0 / source_per_pixel : 1.0};
                      for(int y{}; y < height; ++ y)
                      {
                          for(int x{}; x < width; ++ x)
@@ -254,7 +265,28 @@ Image transformed(const Image& source, const Affine& to_source, int width, int h
                              double source_x{};
                              double source_y{};
                              to_source.apply(x + 0.5, y + 0.5, source_x, source_y);
-                             result.set_pixel(x, y, straight<PixelType>(sampler.sample(source_x, source_y, resampling)));
+                             if(resampling == Resampling::nearest)
+                             {
+                                 result.set_pixel(x, y, straight<PixelType>(sampler.sample(source_x, source_y,
+                                                                                           resampling)));
+                                 continue;
+                             }
+                             // How far inside the source's edge, in the result's pixels: half a pixel either side of
+                             // it fades.
+                             const auto inside{std::min({source_x, source.width - source_x, source_y,
+                                                         source.height - source_y}) *
+                                               pixels_per_source};
+                             const auto coverage{std::clamp(inside + 0.5, 0.0, 1.0)};
+                             if(coverage <= 0.0)
+                             {
+                                 continue;
+                             }
+                             auto value{sampler.sample(source_x, source_y, resampling)};
+                             for(auto& channel : value)
+                             {
+                                 channel *= coverage;
+                             }
+                             result.set_pixel(x, y, straight<PixelType>(value));
                          }
                      }
                  });

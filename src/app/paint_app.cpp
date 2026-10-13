@@ -160,6 +160,45 @@ void PaintApp::register_commands()
     add("edit.paste_new_layer", "Paste into New &Layer", [this] { paste(PasteInto::new_layer); },
         {U'v', true, false, true});
     add("edit.paste_new_image", "Paste into New &Image", [this] { paste(PasteInto::new_image); }, {U'v', true, true});
+    constexpr auto quarter{3.14159265358979323846 / 2.0};
+    commands.register_command("edit.flip_selection_horizontal", "Flip Selection &Horizontal",
+                              [this]
+                              {
+                                  transform_selection("Flip Selection Horizontal",
+                                                      [](PieceTransform& t)
+                                                      {
+                                                          t.radians = -t.radians;
+                                                          t.scale_x = -t.scale_x;
+                                                      });
+                              });
+    commands.register_command("edit.flip_selection_vertical", "Flip Selection &Vertical",
+                              [this]
+                              {
+                                  transform_selection("Flip Selection Vertical",
+                                                      [](PieceTransform& t)
+                                                      {
+                                                          t.radians = -t.radians;
+                                                          t.scale_y = -t.scale_y;
+                                                      });
+                              });
+    commands.register_command("edit.rotate_selection_clockwise", "Rotate Selection 90° &Clockwise",
+                              [this, quarter]
+                              {
+                                  transform_selection("Rotate Selection 90° Clockwise",
+                                                      [quarter](PieceTransform& t) { t.radians += quarter; });
+                              });
+    commands.register_command("edit.rotate_selection_counter_clockwise", "Rotate Selection 90° C&ounter-clockwise",
+                              [this, quarter]
+                              {
+                                  transform_selection("Rotate Selection 90° Counter-clockwise",
+                                                      [quarter](PieceTransform& t) { t.radians -= quarter; });
+                              });
+    commands.register_command("edit.rotate_selection_180", "Rotate Selection &180°",
+                              [this, quarter]
+                              {
+                                  transform_selection("Rotate Selection 180°",
+                                                      [quarter](PieceTransform& t) { t.radians += 2.0 * quarter; });
+                              });
     add("edit.select_all", "Select &All",
         [this] { change_layers("Select All", [](Document& document) { document.selection().select_all(); }); },
         {U'a', true});
@@ -415,7 +454,10 @@ void PaintApp::build_window()
                                            "edit.copy_merged", "edit.paste", "edit.paste_new_layer",
                                            "edit.paste_new_image", oui::menu_separator(), "edit.erase_selection",
                                            "edit.fill_selection", oui::menu_separator(), "edit.select_all",
-                                           "edit.deselect", "edit.invert_selection"});
+                                           "edit.deselect", "edit.invert_selection", oui::menu_separator(),
+                                           "edit.flip_selection_horizontal", "edit.flip_selection_vertical",
+                                           "edit.rotate_selection_clockwise", "edit.rotate_selection_counter_clockwise",
+                                           "edit.rotate_selection_180"});
     m_frame->menu_bar().add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size",
                                             oui::menu_separator(), "image.flip_horizontal", "image.flip_vertical",
                                             oui::menu_separator(), "image.rotate_clockwise",
@@ -553,6 +595,34 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
     auto view{std::make_unique<CanvasView>(*document)};
     view->on_tool([this](const ToolEvent& event) { use_tool(event); });
     view->on_keys([this](const oui::Event& event) { return type_key(event); });
+    view->on_overlay(
+        [this](std::uint32_t* pixels, int width, int height)
+        {
+            if(m_tool_panel->selected() != "move_pixels")
+            {
+                return;
+            }
+            // Squares of nine pixels, white with a black edge, where the handles are.
+            for(const auto& handle : floating_handles())
+            {
+                const auto center_x{static_cast<int>(std::lround(handle.x))};
+                const auto center_y{static_cast<int>(std::lround(handle.y))};
+                for(int y{-4}; y <= 4; ++ y)
+                {
+                    for(int x{-4}; x <= 4; ++ x)
+                    {
+                        const auto px{center_x + x};
+                        const auto py{center_y + y};
+                        if(px < 0 || py < 0 || px >= width || py >= height)
+                        {
+                            continue;
+                        }
+                        const auto edge{std::abs(x) == 4 || std::abs(y) == 4};
+                        pixels[static_cast<std::ptrdiff_t>(py) * width + px] = edge ? 0x000000u : 0xffffffu;
+                    }
+                }
+            }
+        });
     view->on_pointer(
         [this](bool held)
         {
@@ -1205,6 +1275,71 @@ void PaintApp::select_shape(const ToolEvent& event, bool ellipse)
     update_ants();
 }
 
+void PaintApp::ensure_floating()
+{
+    auto* const open{current()};
+    if(open == nullptr || (m_floating && m_floating->document == open))
+    {
+        return;
+    }
+    auto& document{open->document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    // Lifts what is selected, leaving a hole: the whole layer when nothing is selected.
+    Floating floating{open, layer, lift_piece(layer, document.selection()), {}};
+    static_cast<void>(erase_selected(floating.base, document.selection()));
+    m_floating = std::move(floating);
+}
+
+void PaintApp::place_floating()
+{
+    auto& open{*m_floating->document};
+    auto& document{open.document()};
+    const auto before{LayersState::of(document)};
+    place_piece(document.layers()[document.active_layer()], m_floating->base, document.selection(),
+                m_floating->piece, m_floating->transform);
+    open.refresh(changed_tiles(before, LayersState::of(document)));
+    update_ants();
+}
+
+void PaintApp::transform_selection(std::string name, const std::function<void(PieceTransform&)>& change)
+{
+    auto* const open{current()};
+    if(open == nullptr || m_stroke != nullptr)
+    {
+        return;
+    }
+    auto& document{open->document()};
+    open->history().begin_step(document);
+    ensure_floating();
+    change(m_floating->transform);
+    place_floating();
+    open->history().finish_step(std::move(name), document);
+    open->set_modified(true);
+    refresh_titles();
+}
+
+std::vector<Position> PaintApp::floating_handles()
+{
+    std::vector<Position> handles;
+    auto* const open{current()};
+    if(!m_floating || m_floating->document != open)
+    {
+        return handles;
+    }
+    const auto corners{piece_corners(m_floating->piece, m_floating->transform)};
+    for(const auto& corner : corners)
+    {
+        handles.push_back(open->viewport().view_at(corner));
+    }
+    for(std::size_t index{}; index < 4; ++ index)
+    {
+        const auto& a{corners[index]};
+        const auto& b{corners[(index + 1) % 4]};
+        handles.push_back(open->viewport().view_at({(a.x + b.x) / 2.0, (a.y + b.y) / 2.0}));
+    }
+    return handles;
+}
+
 void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
 {
     auto* const open{current()};
@@ -1213,58 +1348,138 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
     if(event.phase == ToolEvent::Phase::press)
     {
         open->history().begin_step(document);
-        auto& layer{document.layers()[document.active_layer()]};
         if(outline_only)
         {
             settle();
-            m_moving = Moving{event.at, 0, 0, selection.mask()};
+            m_moving = Moving{Moving::Kind::outline, event.at, {}, 0, selection.mask()};
             return;
         }
-        if(!m_floating || m_floating->document != open)
+        // A handle pressed scales; the right button turns; anything else moves.
+        auto kind{event.secondary ? Moving::Kind::rotate : Moving::Kind::move};
+        auto handle{0};
+        const auto handles{floating_handles()};
+        for(std::size_t index{}; index < handles.size() && !event.secondary; ++ index)
         {
-            // Lifts what is selected, leaving a hole: the whole layer when nothing is selected.
-            Floating floating{open, layer, selection.mask(), lift_selected(layer, selection), 0, 0};
-            static_cast<void>(erase_selected(floating.base, selection));
-            m_floating = std::move(floating);
+            if(std::abs(handles[index].x - event.in_view.x) <= 6.0 && std::abs(handles[index].y - event.in_view.y) <= 6.0)
+            {
+                kind = Moving::Kind::scale;
+                handle = static_cast<int>(index);
+                break;
+            }
         }
-        m_moving = Moving{event.at, m_floating->dx, m_floating->dy, {}};
+        ensure_floating();
+        m_moving = Moving{kind, event.at, m_floating->transform, handle, {}};
         return;
     }
     if(!m_moving)
     {
         return;
     }
-    const auto dx{m_moving->dx + static_cast<int>(std::lround(event.at.x - m_moving->from.x))};
-    const auto dy{m_moving->dy + static_cast<int>(std::lround(event.at.y - m_moving->from.y))};
-    const auto before{LayersState::of(document)};
-    if(outline_only)
+    const auto& start{m_moving->start};
+    if(m_moving->kind == Moving::Kind::outline)
     {
+        const auto before{LayersState::of(document)};
         selection.set_mask(m_moving->selection);
-        selection.offset(dx, dy);
+        selection.offset(static_cast<int>(std::lround(event.at.x - m_moving->from.x)),
+                         static_cast<int>(std::lround(event.at.y - m_moving->from.y)));
+        open->refresh(changed_tiles(before, LayersState::of(document)));
+        update_ants();
     }
     else
     {
-        auto& layer{document.layers()[document.active_layer()]};
-        layer = m_floating->base;
-        static_cast<void>(lay_over(layer, m_floating->pixels.pixels, m_floating->pixels.x + dx,
-                                   m_floating->pixels.y + dy));
-        selection.set_mask(m_floating->selection);
-        selection.offset(dx, dy);
-        m_floating->dx = dx;
-        m_floating->dy = dy;
+        auto& transform{m_floating->transform};
+        const auto& piece{m_floating->piece};
+        const auto center_x{piece.x + piece.pixels.width / 2.0 + start.dx};
+        const auto center_y{piece.y + piece.pixels.height / 2.0 + start.dy};
+        switch(m_moving->kind)
+        {
+        case Moving::Kind::move:
+            // By whole pixels, so a piece moved and nothing else keeps its pixels exactly.
+            transform.dx = start.dx + std::round(event.at.x - m_moving->from.x);
+            transform.dy = start.dy + std::round(event.at.y - m_moving->from.y);
+            break;
+        case Moving::Kind::rotate:
+        {
+            const auto turned{std::atan2(event.at.y - center_y, event.at.x - center_x) -
+                              std::atan2(m_moving->from.y - center_y, m_moving->from.x - center_x)};
+            transform.radians = start.radians + turned;
+            if(event.shift)
+            {
+                constexpr auto step{3.14159265358979323846 / 12.0};
+                transform.radians = std::round(transform.radians / step) * step;
+            }
+            break;
+        }
+        case Moving::Kind::scale:
+        {
+            // In the piece's own frame, unturned: the handle follows the pointer and the one across stays.
+            const auto cosine{std::cos(start.radians)};
+            const auto sine{std::sin(start.radians)};
+            const auto px{event.at.x - center_x};
+            const auto py{event.at.y - center_y};
+            const auto local_x{px * cosine + py * sine};
+            const auto local_y{-px * sine + py * cosine};
+            const auto half_width{piece.pixels.width / 2.0};
+            const auto half_height{piece.pixels.height / 2.0};
+            // Which way the handle is from the middle, -1, 0 or 1 on each axis.
+            constexpr int across[8]{-1, 1, 1, -1, 0, 1, 0, -1};
+            constexpr int down[8]{-1, -1, 1, 1, -1, 0, 1, 0};
+            const auto hx{across[m_moving->handle]};
+            const auto hy{down[m_moving->handle]};
+            auto scale_x{start.scale_x};
+            auto scale_y{start.scale_y};
+            auto middle_x{0.0};
+            auto middle_y{0.0};
+            if(hx != 0)
+            {
+                const auto fixed{-hx * half_width * start.scale_x};
+                scale_x = (local_x - fixed) / (2.0 * hx * half_width);
+                middle_x = (local_x + fixed) / 2.0;
+            }
+            if(hy != 0)
+            {
+                const auto fixed{-hy * half_height * start.scale_y};
+                scale_y = (local_y - fixed) / (2.0 * hy * half_height);
+                middle_y = (local_y + fixed) / 2.0;
+            }
+            if(event.shift && hx != 0 && hy != 0 && start.scale_x != 0.0)
+            {
+                // Its proportions kept, by the larger change.
+                const auto ratio{start.scale_y / start.scale_x};
+                if(std::abs(scale_x / start.scale_x) > std::abs(scale_y / start.scale_y))
+                {
+                    scale_y = scale_x * ratio;
+                }
+                else
+                {
+                    scale_x = scale_y / ratio;
+                }
+                middle_x = (hx * half_width * scale_x - hx * half_width * start.scale_x) / 2.0;
+                middle_y = (hy * half_height * scale_y - hy * half_height * start.scale_y) / 2.0;
+            }
+            transform.scale_x = std::abs(scale_x) < 1e-3 ? 1e-3 : scale_x;
+            transform.scale_y = std::abs(scale_y) < 1e-3 ? 1e-3 : scale_y;
+            // The middle moves with the handle, turned back into the image's frame.
+            transform.dx = start.dx + middle_x * cosine - middle_y * sine;
+            transform.dy = start.dy + middle_x * sine + middle_y * cosine;
+            break;
+        }
+        case Moving::Kind::outline:
+            break;
+        }
+        place_floating();
     }
-    open->refresh(changed_tiles(before, LayersState::of(document)));
     if(event.phase == ToolEvent::Phase::release)
     {
+        const auto outline{m_moving->kind == Moving::Kind::outline};
         m_moving.reset();
-        open->history().finish_step(outline_only ? "Move Selection" : "Move Selected Pixels", document);
-        if(!outline_only)
+        open->history().finish_step(outline ? "Move Selection" : "Move Selected Pixels", document);
+        if(!outline)
         {
             open->set_modified(true);
             refresh_titles();
         }
     }
-    update_ants();
 }
 
 bool PaintApp::copy(bool merged)
@@ -1369,12 +1584,18 @@ void PaintApp::paste(PasteInto into)
         document.insert_layer_above("Layer " + std::to_string(document.layers().size() + 1));
     }
     auto& layer{document.layers()[document.active_layer()]};
-    Floating floating{open, layer, std::nullopt, Lifted{pasted, x, y}, 0, 0};
-    static_cast<void>(lay_over(layer, pasted, x, y));
-    document.selection().add_rectangle({x, y, pasted.width, pasted.height}, SelectionMode::replace);
-    floating.selection = document.selection().mask();
+    // A piece all of it selected, floating over the layer as it was.
+    Image mask{PixelFormat::gray_alpha8, pasted.width, pasted.height};
+    for(int row{}; row < pasted.height; ++ row)
+    {
+        for(int column{}; column < pasted.width; ++ column)
+        {
+            mask.set_pixel(column, row, GrayAlpha8{{255, 255}});
+        }
+    }
+    m_floating = Floating{open, layer, FloatingPiece{pasted, mask, x, y}, {}};
+    place_floating();
     open->history().finish_step(into == PasteInto::new_layer ? "Paste into New Layer" : "Paste", document);
-    m_floating = std::move(floating);
     // What is pasted can be moved straight away.
     m_tool_panel->set_selected("move_pixels");
     m_tool_options->show_for("move_pixels");
