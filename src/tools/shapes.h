@@ -5,6 +5,7 @@
 #include "render/viewport.h"
 #include "tools/stroke.h"
 
+#include <array>
 #include <string_view>
 #include <vector>
 
@@ -46,6 +47,12 @@ struct LineSettings
 std::vector<TilePoint> draw_shape(Layer& layer, const Selection& selection, ShapeKind kind, ShapeStyle style,
                                   Position corner, Position opposite, const Color& outline, const Color& fill,
                                   double width, bool antialias);
+// A line through four points, its ends and two between them, smooth through all four, as Paint.NET's Line / Curve
+// bends when its handles are dragged; `width` pixels wide, with round ends or arrowheads along its ends' direction.
+std::vector<TilePoint> draw_curve(Layer& layer, const Selection& selection, const std::array<Position, 4>& through,
+                                  const Color& color, double width, bool antialias, const LineSettings& settings);
+// The points along such a curve, `per_span` between each two of the four, the ends included.
+[[nodiscard]] std::vector<Position> curve_through(const std::array<Position, 4>& through, int per_span);
 // A straight line `width` pixels wide with round ends, or an arrowhead at either end.
 std::vector<TilePoint> draw_line(Layer& layer, const Selection& selection, Position from, Position to,
                                  const Color& color, double width, bool antialias, const LineSettings& settings);

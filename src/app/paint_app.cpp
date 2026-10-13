@@ -800,12 +800,13 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
     view->on_overlay(
         [this](std::uint32_t* pixels, int width, int height)
         {
-            if(m_tool_panel->selected() != "move_pixels")
+            const auto moving{m_tool_panel->selected() == "move_pixels"};
+            if(!moving && !m_line_edit)
             {
                 return;
             }
             // Squares of nine pixels, white with a black edge, where the handles are.
-            for(const auto& handle : floating_handles())
+            for(const auto& handle : moving ? floating_handles() : line_handles())
             {
                 const auto center_x{static_cast<int>(std::lround(handle.x))};
                 const auto center_y{static_cast<int>(std::lround(handle.y))};
@@ -1197,6 +1198,10 @@ bool PaintApp::close(std::size_t index)
     {
         return true;
     }
+    if(m_line_edit && m_line_edit->document == document)
+    {
+        finish_line();
+    }
     if(document->modified())
     {
         m_tabs->select(index);
@@ -1324,10 +1329,11 @@ void PaintApp::use_tool(const ToolEvent& event)
         move_selected(event, tool == "move_selection");
         return;
     }
-    // The Text tool keeps typing across its own clicks; any other tool puts down what was floating.
+    // The Text tool keeps typing across its own clicks, Line / Curve the line it bends; any other tool puts down what
+    // was floating.
     if(tool != "text")
     {
-        settle();
+        settle(tool == "line");
     }
     if(tool == "rectangle_select" || tool == "ellipse_select")
     {
@@ -1566,6 +1572,35 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
     auto* const open{current()};
     auto& document{open->document()};
     auto& layer{document.layers()[document.active_layer()]};
+    // A line still to bend: a press on one of its points takes it, and dragging it bends the line; a press elsewhere
+    // leaves the line as it is and starts another.
+    if(tool == "line" && m_line_edit && m_line_edit->document == open)
+    {
+        if(event.phase == ToolEvent::Phase::press)
+        {
+            const auto handles{line_handles()};
+            for(std::size_t index{}; index < handles.size(); ++ index)
+            {
+                if(std::abs(handles[index].x - event.in_view.x) <= 6.0 &&
+                   std::abs(handles[index].y - event.in_view.y) <= 6.0)
+                {
+                    m_line_edit->held = index;
+                    return;
+                }
+            }
+            finish_line();
+        }
+        else if(m_line_edit->held)
+        {
+            m_line_edit->points[*m_line_edit->held] = event.at;
+            redraw_line();
+            if(event.phase == ToolEvent::Phase::release)
+            {
+                m_line_edit->held.reset();
+            }
+            return;
+        }
+    }
     if(event.phase == ToolEvent::Phase::press)
     {
         open->history().begin_step(document);
@@ -1629,14 +1664,69 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
                                      brush.width, brush.antialias));
     }
     open->refresh(changed_tiles(before, LayersState::of(document)));
+    if(event.phase == ToolEvent::Phase::release && tool == "line")
+    {
+        // Drawn, it waits to be bent: its handles a third and two thirds along it.
+        const auto third{[&](double part)
+                         { return Position{from.x + (to.x - from.x) * part, from.y + (to.y - from.y) * part}; }};
+        m_line_edit = LineEdit{open,
+                               m_dragging->base,
+                               {from, third(1.0 / 3.0), third(2.0 / 3.0), to},
+                               first,
+                               brush.width,
+                               brush.antialias,
+                               m_tool_options->line(),
+                               std::nullopt};
+        m_dragging.reset();
+        return;
+    }
     if(event.phase == ToolEvent::Phase::release)
     {
         m_dragging.reset();
-        open->history().finish_step(tool == "gradient" ? "Gradient" : tool == "line" ? "Line / Curve" : "Shapes",
-                                    document);
+        open->history().finish_step(tool == "gradient" ? "Gradient" : "Shapes", document);
         open->set_modified(true);
         refresh_titles();
     }
+}
+
+void PaintApp::redraw_line()
+{
+    auto& edit{*m_line_edit};
+    auto& document{edit.document->document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    const auto before{LayersState::of(document)};
+    layer = edit.base;
+    static_cast<void>(
+        draw_curve(layer, document.selection(), edit.points, edit.color, edit.width, edit.antialias, edit.settings));
+    edit.document->refresh(changed_tiles(before, LayersState::of(document)));
+}
+
+void PaintApp::finish_line()
+{
+    if(!m_line_edit)
+    {
+        return;
+    }
+    auto& open{*m_line_edit->document};
+    m_line_edit.reset();
+    open.history().finish_step("Line / Curve", open.document());
+    open.set_modified(true);
+    refresh_titles();
+}
+
+std::vector<Position> PaintApp::line_handles()
+{
+    std::vector<Position> handles;
+    if(!m_line_edit || m_line_edit->document != current())
+    {
+        return handles;
+    }
+    const auto& viewport{m_line_edit->document->viewport()};
+    for(const auto& point : m_line_edit->points)
+    {
+        handles.push_back({viewport.origin().x + point.x * viewport.zoom(), viewport.origin().y + point.y * viewport.zoom()});
+    }
+    return handles;
 }
 
 void PaintApp::select_shape(const ToolEvent& event, bool ellipse)
@@ -2111,6 +2201,13 @@ void PaintApp::show_typing(bool with_cursor)
 
 bool PaintApp::type_key(const oui::Event& event)
 {
+    // Enter leaves a line being bent as it is.
+    if(const auto* const key{std::get_if<oui::KeyEvent>(&event)};
+       m_line_edit && key != nullptr && (key->key == oui::Key::enter || key->key == oui::Key::escape))
+    {
+        finish_line();
+        return true;
+    }
     if(!m_typing)
     {
         return false;
@@ -2160,8 +2257,12 @@ bool PaintApp::type_key(const oui::Event& event)
     return true;
 }
 
-void PaintApp::settle()
+void PaintApp::settle(bool keep_line)
 {
+    if(!keep_line)
+    {
+        finish_line();
+    }
     m_floating.reset();
     if(m_typing)
     {

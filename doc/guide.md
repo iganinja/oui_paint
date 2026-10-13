@@ -64,7 +64,8 @@ Edit > Flip Selection and Rotate Selection flip and turn what is selected in pla
 | Recolor | R | Changes the secondary color into the primary one where it paints; the right button, the other way round |
 | Color Picker | K | Takes the color under the pointer: left for the primary, right for the secondary |
 | Text | T | Types text where clicked |
-| Line / Curve, Shapes | O | Drag from one end or corner to the other; Shift keeps lines to steps of 15 degrees and shapes square or round |
+| Line / Curve | O | Drag from one end to the other, Shift keeping to steps of 15 degrees; then drag its four handles to bend it, and Enter, or a click away from them, leaves it as it is |
+| Shapes | O again | Drag from one corner to the other; Shift keeps them square or round |
 
 [ and ] make the brush narrower and wider; with Ctrl, by 5. X swaps the primary and secondary colors. C chooses which
 of them a click on a palette sets, the one framed in front; a right click sets the other.

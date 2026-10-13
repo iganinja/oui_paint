@@ -81,3 +81,38 @@ TEST(Shapes, AnInkNotOpaqueIsMixedOverWhatIsThere)
     EXPECT_NEAR(pixel.value[2], 127, 1);
     EXPECT_EQ(pixel.alpha(), 255);
 }
+
+TEST(Shapes, ACurveGoesThroughItsEndsAndItsHandles)
+{
+    const std::array<Position, 4> through{Position{10.5, 50.5}, Position{40.5, 20.5}, Position{70.5, 20.5},
+                                          Position{100.5, 50.5}};
+    const auto along{curve_through(through, 8)};
+    ASSERT_EQ(along.size(), 25u) << "eight between each two, the last end too";
+    EXPECT_DOUBLE_EQ(along.front().x, 10.5);
+    EXPECT_DOUBLE_EQ(along[8].x, 40.5) << "through the first handle";
+    EXPECT_DOUBLE_EQ(along[16].y, 20.5) << "and the second";
+    EXPECT_DOUBLE_EQ(along.back().x, 100.5);
+    const Selection everything{120, 80};
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    draw_curve(layer, everything, through, {0, 0, 0, 1}, 3.0, false, {});
+    EXPECT_EQ(alpha_at(layer, 40, 20), 255);
+    EXPECT_EQ(alpha_at(layer, 55, 16), 255) << "between the handles, rounding over them";
+    EXPECT_EQ(alpha_at(layer, 55, 50), 0) << "not along the straight line from end to end";
+}
+
+TEST(Shapes, ACurveWithItsHandlesOnTheLineIsTheStraightLine)
+{
+    const Selection everything{120, 40};
+    Layer straight{PixelFormat::rgba8, "Straight"};
+    draw_line(straight, everything, {10, 20}, {100, 20}, {0, 0, 0, 1}, 4.0, true, {});
+    Layer curve{PixelFormat::rgba8, "Curve"};
+    draw_curve(curve, everything, {Position{10, 20}, Position{40, 20}, Position{70, 20}, Position{100, 20}},
+               {0, 0, 0, 1}, 4.0, true, {});
+    for(int x{5}; x < 110; x += 7)
+    {
+        for(int y{15}; y < 26; ++ y)
+        {
+            EXPECT_NEAR(alpha_at(curve, x, y), alpha_at(straight, x, y), 1) << x << ", " << y;
+        }
+    }
+}

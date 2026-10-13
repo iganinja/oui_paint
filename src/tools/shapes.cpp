@@ -241,6 +241,143 @@ std::vector<TilePoint> draw_shape(Layer& layer, const Selection& selection, Shap
     return {touched.begin(), touched.end()};
 }
 
+std::vector<Position> curve_through(const std::array<Position, 4>& through, int per_span)
+{
+    // Catmull-Rom through the four, with a point mirrored past each end so the curve leaves them heading for the next.
+    const std::array<Position, 6> points{
+        Position{2.0 * through[0].x - through[1].x, 2.0 * through[0].y - through[1].y}, through[0], through[1],
+        through[2], through[3], Position{2.0 * through[3].x - through[2].x, 2.0 * through[3].y - through[2].y}};
+    std::vector<Position> along;
+    for(std::size_t span{1}; span <= 3; ++ span)
+    {
+        const auto& p0{points[span - 1]};
+        const auto& p1{points[span]};
+        const auto& p2{points[span + 1]};
+        const auto& p3{points[span + 2]};
+        for(int step{}; step < per_span || (span == 3 && step == per_span); ++ step)
+        {
+            const auto t{static_cast<double>(step) / per_span};
+            const auto t2{t * t};
+            const auto t3{t2 * t};
+            const auto blend{[&](double a, double b, double c, double d)
+                             {
+                                 return 0.5 * (2.0 * b + (c - a) * t + (2.0 * a - 5.0 * b + 4.0 * c - d) * t2 +
+                                               (3.0 * b - a - 3.0 * c + d) * t3);
+                             }};
+            along.push_back({blend(p0.x, p1.x, p2.x, p3.x), blend(p0.y, p1.y, p2.y, p3.y)});
+        }
+    }
+    return along;
+}
+
+std::vector<TilePoint> draw_curve(Layer& layer, const Selection& selection, const std::array<Position, 4>& through,
+                                  const Color& color, double width, bool antialias, const LineSettings& settings)
+{
+    auto along{curve_through(through, 24)};
+    const auto head{std::max(8.0, width * 3.0)};
+    // An end's direction: from the point a head's length back along the curve, so a bend near it does not tip it.
+    const auto direction{[&](bool at_end)
+                         {
+                             const auto& tip{at_end ? along.back() : along.front()};
+                             Position back{tip};
+                             for(std::size_t index{1}; index < along.size(); ++ index)
+                             {
+                                 const auto& point{at_end ? along[along.size() - 1 - index] : along[index]};
+                                 back = point;
+                                 if(std::hypot(point.x - tip.x, point.y - tip.y) >= head)
+                                 {
+                                     break;
+                                 }
+                             }
+                             const auto length{std::hypot(tip.x - back.x, tip.y - back.y)};
+                             return length > 0.0 ? Position{(tip.x - back.x) / length, (tip.y - back.y) / length}
+                                                 : Position{at_end ? 1.0 : -1.0, 0.0};
+                         }};
+    const auto arrow{[&](Position tip, Position heading) -> std::array<Position, 3>
+                     {
+                         const Position back{tip.x - heading.x * head, tip.y - heading.y * head};
+                         return {tip, Position{back.x - heading.y * head / 2.0, back.y + heading.x * head / 2.0},
+                                 Position{back.x + heading.y * head / 2.0, back.y - heading.x * head / 2.0}};
+                     }};
+    const auto start_head{arrow(along.front(), direction(false))};
+    const auto end_head{arrow(along.back(), direction(true))};
+    // The line stops where an arrowhead begins.
+    const auto trim{[&](bool at_end)
+                    {
+                        const auto tip{at_end ? along.back() : along.front()};
+                        while(along.size() > 2)
+                        {
+                            const auto& next{at_end ? along[along.size() - 2] : along[1]};
+                            if(std::hypot(next.x - tip.x, next.y - tip.y) >= head * 0.8)
+                            {
+                                break;
+                            }
+                            along.erase(at_end ? along.end() - 1 : along.begin());
+                        }
+                    }};
+    if(settings.arrow_at_start)
+    {
+        trim(false);
+    }
+    if(settings.arrow_at_end)
+    {
+        trim(true);
+    }
+    const auto reach{std::max(width, head)};
+    auto left{along.front().x};
+    auto top{along.front().y};
+    auto right{left};
+    auto bottom{top};
+    for(const auto& point : along)
+    {
+        left = std::min(left, point.x);
+        top = std::min(top, point.y);
+        right = std::max(right, point.x);
+        bottom = std::max(bottom, point.y);
+    }
+    for(const auto& tip : {start_head, end_head})
+    {
+        for(const auto& corner : tip)
+        {
+            left = std::min(left, corner.x);
+            top = std::min(top, corner.y);
+            right = std::max(right, corner.x);
+            bottom = std::max(bottom, corner.y);
+        }
+    }
+    std::set<TilePoint> touched;
+    paint(layer, selection, left - reach, top - reach, right + reach, bottom + reach, color, antialias,
+          [&](double x, double y)
+          {
+              auto distance{1e18};
+              for(std::size_t index{1}; index < along.size(); ++ index)
+              {
+                  const auto& a{along[index - 1]};
+                  const auto& b{along[index]};
+                  // Segments whose box, grown by the width, leaves the pixel out cannot be the nearest that counts.
+                  const auto grown{width + 1.0};
+                  if(x < std::min(a.x, b.x) - grown || x > std::max(a.x, b.x) + grown ||
+                     y < std::min(a.y, b.y) - grown || y > std::max(a.y, b.y) + grown)
+                  {
+                      continue;
+                  }
+                  distance = std::min(distance, segment_distance(x, y, a, b));
+              }
+              distance -= width / 2.0;
+              if(settings.arrow_at_start)
+              {
+                  distance = std::min(distance, triangle_distance(x, y, start_head));
+              }
+              if(settings.arrow_at_end)
+              {
+                  distance = std::min(distance, triangle_distance(x, y, end_head));
+              }
+              return inside(distance, antialias);
+          },
+          touched);
+    return {touched.begin(), touched.end()};
+}
+
 std::vector<TilePoint> draw_line(Layer& layer, const Selection& selection, Position from, Position to,
                                  const Color& color, double width, bool antialias, const LineSettings& settings)
 {

@@ -5,6 +5,7 @@
 #include "core/selection.h"
 #include "effects/plugins.h"
 #include "tools/floating.h"
+#include "tools/shapes.h"
 #include "tools/stroke.h"
 #include "ui/canvas_view.h"
 #include "ui/plugins_dialog.h"
@@ -18,6 +19,7 @@
 #include <oui/settings.h>
 #include <oui/tab_view.h>
 
+#include <array>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -123,6 +125,12 @@ class PaintApp
     void drag_draw(const ToolEvent& event, const std::string& tool);
     // Uses the rectangle or ellipse select tool.
     void select_shape(const ToolEvent& event, bool ellipse);
+    // Draws the line being bent as its points are now.
+    void redraw_line();
+    // Ends bending the line: it stays as it is, one step.
+    void finish_line();
+    // Where the line's points are in the view, for its handles.
+    [[nodiscard]] std::vector<Position> line_handles();
     // Copies what is selected of the active layer, or of the whole image when `merged`, as PNG.
     bool copy(bool merged);
     // The image the clipboard holds, in any format OUI Paint reads; none when it holds none.
@@ -150,7 +158,8 @@ class PaintApp
     // The floating piece's eight handles in the view: the corners, then the middles of the edges.
     [[nodiscard]] std::vector<Position> floating_handles();
     // Puts floating pixels down where they are, and text being typed.
-    void settle();
+    // `keep_line`: but the line being bent, which Line / Curve itself goes on with.
+    void settle(bool keep_line = false);
     // Starts or stops the marching ants as the current document has a selection or not.
     void update_ants();
     void undo();
@@ -250,6 +259,20 @@ class PaintApp
         bool secondary{false};
     };
     std::optional<Dragging> m_dragging;
+    // A line just drawn with Line / Curve, still to bend: its four points, its ends and two handles between them, which
+    // drags move, and what it was drawn with. It stays one step, open until it is done with.
+    struct LineEdit
+    {
+        OpenDocument* document{};
+        Layer base;
+        std::array<Position, 4> points;
+        Color color;
+        double width{1.0};
+        bool antialias{true};
+        LineSettings settings;
+        std::optional<std::size_t> held;
+    };
+    std::optional<LineEdit> m_line_edit;
     // Text being typed with the Text tool: where, what, and the layer before it.
     struct Typing
     {
