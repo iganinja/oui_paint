@@ -1745,7 +1745,10 @@ bool PaintApp::copy(bool merged)
     const auto lifted{lift_selected(merged ? source : active, selection)};
     // Other programs take colours, never indices.
     const auto pixels{merged ? lifted.pixels : document.colors_of(lifted.pixels, active.palette_slot())};
-    if(!m_application.clipboard().set_data("image/png", write_image(pixels, FileFormat::png)))
+    // As PNG, which keeps transparency, and as BMP over white for programs that take nothing else.
+    const auto png{write_image(pixels, FileFormat::png)};
+    const auto bmp{write_image(converted(pixels, written_format(FileFormat::bmp, pixels.format)), FileFormat::bmp)};
+    if(!m_application.clipboard().set_data({{"image/png", png}, {"image/bmp", bmp}}))
     {
         show_error("Copy", "The clipboard did not take the image.");
         return false;
