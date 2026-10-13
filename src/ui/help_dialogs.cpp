@@ -22,7 +22,8 @@ namespace
 std::unique_ptr<oui::Window> reading_window(std::string_view title)
 {
     auto window{oui::window(title)};
-    window->set_preferred_size({100, 0});
+    // As wide as it goes whatever the page, or it would change width with the tab shown.
+    window->set_preferred_size({110, 0});
     window->set_maximum_size({110, 1 << 15});
     window->set_height_share(0.9);
     window->set_minimum_size({40, 10});
