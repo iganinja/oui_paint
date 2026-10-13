@@ -7,6 +7,7 @@
 #include "tools/gradient.h"
 #include "tools/shapes.h"
 #include "ui/canvas_view.h"
+#include "ui/color_dialog.h"
 #include "ui/color_panel.h"
 #include "ui/layer_properties_dialog.h"
 #include "ui/layers_panel.h"
@@ -1297,29 +1298,19 @@ void PaintApp::redo()
 
 void PaintApp::edit_color(bool primary)
 {
-    oui::PromptOptions options;
-    options.title = primary ? "Primary Color" : "Secondary Color";
-    options.label = "Color, as #rrggbb or #rrggbbaa:";
-    options.text = to_hex(primary ? m_color_panel->primary() : m_color_panel->secondary());
-    options.validate = [](std::string_view text) -> std::optional<std::string>
+    const auto chosen{ask_color(m_application, primary ? "Primary Color" : "Secondary Color",
+                                primary ? m_color_panel->primary() : m_color_panel->secondary())};
+    if(!chosen)
     {
-        if(!from_hex(text))
-        {
-            return "Write it as #rrggbb, or #rrggbbaa with its alpha.";
-        }
-        return std::nullopt;
-    };
-    if(const auto text{oui::prompt(m_application, options)})
+        return;
+    }
+    if(primary)
     {
-        const auto color{*from_hex(*text)};
-        if(primary)
-        {
-            m_color_panel->set_primary(color);
-        }
-        else
-        {
-            m_color_panel->set_secondary(color);
-        }
+        m_color_panel->set_primary(*chosen);
+    }
+    else
+    {
+        m_color_panel->set_secondary(*chosen);
     }
 }
 

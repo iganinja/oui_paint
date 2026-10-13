@@ -50,11 +50,13 @@ add_library(oui_paint_core STATIC
     src/core/tile.cpp
     src/render/display_cache.cpp
     src/render/viewport.cpp
+    src/tools/color_math.cpp
     src/tools/fill.cpp
     src/tools/gradient.cpp
     src/tools/shapes.cpp
     src/tools/stroke.cpp
     src/ui/canvas_view.cpp
+    src/ui/color_dialog.cpp
     src/ui/color_panel.cpp
     src/ui/icons.cpp
     src/ui/layer_properties_dialog.cpp
@@ -91,6 +93,7 @@ if(OUI_PAINT_BUILD_TESTS)
     include(GoogleTest)
     add_executable(oui_paint_tests
         tests/codecs_test.cpp
+        tests/color_math_test.cpp
         tests/core_test.cpp
         tests/fill_test.cpp
         tests/gradient_test.cpp
