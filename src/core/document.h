@@ -26,6 +26,19 @@ class Document
     [[nodiscard]] std::size_t active_layer() const { return m_active_layer; }
     void set_active_layer(std::size_t index);
     Layer& add_layer(std::string name);
+    // A new see-through layer just above the active one, which it becomes.
+    Layer& insert_layer_above(std::string name);
+    // Takes the layer away; the one under it, or the new bottom one, becomes active. The last layer stays.
+    void remove_layer(std::size_t index);
+    // A copy just above it, sharing its tiles until either is written, which becomes active.
+    void duplicate_layer(std::size_t index);
+    // Moves a layer to another place among them; it stays active if it was.
+    void move_layer(std::size_t from, std::size_t to);
+    // Mixes the layer into the one under it as it shows, by its mode and opacity, and takes it away; the one under it
+    // becomes active. Nothing for the bottom layer.
+    void merge_down(std::size_t index);
+    // All visible layers as one.
+    void flatten_layers();
 
     // What the document looks like: the visible layers mixed from the bottom up, in its format.
     [[nodiscard]] Image flatten() const;

@@ -6,15 +6,34 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace oui_paint
 {
 
-// How a layer's pixels mix with those under it.
+// How a layer's pixels mix with those under it: Paint.NET's modes.
 enum class BlendMode
 {
     normal,
+    multiply,
+    additive,
+    color_burn,
+    color_dodge,
+    reflect,
+    glow,
+    overlay,
+    difference,
+    negation,
+    lighten,
+    darken,
+    screen,
+    xor_,
 };
+
+// Every mode, in the order Paint.NET lists them, and their names.
+[[nodiscard]] const std::vector<BlendMode>& all_blend_modes();
+[[nodiscard]] std::string_view blend_mode_name(BlendMode mode);
 
 // One layer of a document: its pixels in tiles, and how it shows. A tile it does not have is see-through. Tiles are
 // shared until written to: a copy of a layer, as undo keeps, costs the pointers to its tiles, and writing to a tile

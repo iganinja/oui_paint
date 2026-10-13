@@ -1,3 +1,4 @@
+#include "core/blend.h"
 #include "core/document.h"
 
 #include <gtest/gtest.h>
@@ -81,4 +82,74 @@ TEST(Document, VisibleLayersAreMixedFromTheBottomUp)
     const auto flat{document.flatten()};
     EXPECT_EQ(flat.pixel<Rgba8>(0, 0).value, (std::array<std::uint8_t, 4>{128, 128, 128, 255}));
     EXPECT_EQ(flat.pixel<Rgba8>(1, 0).value, (std::array<std::uint8_t, 4>{255, 255, 255, 255}));
+}
+
+TEST(Blend, ModesMixSolidPixelsAsPaintNetDoes)
+{
+    const Rgba8 below{{200, 100, 50, 255}};
+    const Rgba8 above{{100, 100, 200, 255}};
+    EXPECT_EQ(blend(below, above, 1.0, BlendMode::normal).value, above.value);
+    EXPECT_EQ(blend(below, above, 1.0, BlendMode::multiply).value, (std::array<std::uint8_t, 4>{78, 39, 39, 255}));
+    EXPECT_EQ(blend(below, above, 1.0, BlendMode::screen).value, (std::array<std::uint8_t, 4>{222, 161, 211, 255}));
+    EXPECT_EQ(blend(below, above, 1.0, BlendMode::difference).value, (std::array<std::uint8_t, 4>{100, 0, 150, 255}));
+    EXPECT_EQ(blend(below, above, 1.0, BlendMode::lighten).value, (std::array<std::uint8_t, 4>{200, 100, 200, 255}));
+    EXPECT_EQ(blend(below, above, 1.0, BlendMode::xor_).value,
+              (std::array<std::uint8_t, 4>{200 ^ 100, 0, 50 ^ 200, 255}));
+}
+
+TEST(Blend, OverNothingALayerShowsAsItIsWhateverItsMode)
+{
+    const Rgba8 nothing{};
+    const Rgba8 above{{100, 150, 200, 255}};
+    for(const auto mode : all_blend_modes())
+    {
+        EXPECT_EQ(blend(nothing, above, 1.0, mode).value, above.value) << blend_mode_name(mode);
+    }
+}
+
+TEST(Document, LayersAreAddedAboveTheActiveOneAndMovedRemovedAndDuplicated)
+{
+    Document document{4, 4, PixelFormat::rgba8};
+    document.add_layer("A");
+    document.add_layer("B");
+    document.set_active_layer(0);
+    document.insert_layer_above("C");
+    const auto names{[&document]
+                     {
+                         std::string result;
+                         for(const auto& layer : document.layers())
+                         {
+                             result += layer.name() + " ";
+                         }
+                         return result;
+                     }};
+    EXPECT_EQ(names(), "A C B ");
+    EXPECT_EQ(document.active_layer(), 1u);
+    document.duplicate_layer(1);
+    EXPECT_EQ(names(), "A C C copy B ");
+    EXPECT_EQ(document.active_layer(), 2u);
+    document.move_layer(2, 0);
+    EXPECT_EQ(names(), "C copy A C B ");
+    EXPECT_EQ(document.active_layer(), 0u);
+    document.remove_layer(0);
+    EXPECT_EQ(names(), "A C B ");
+    EXPECT_EQ(document.active_layer(), 0u);
+}
+
+TEST(Document, MergingDownMixesTheLayerAsItShows)
+{
+    Document document{1, 1, PixelFormat::rgba8};
+    Image white{PixelFormat::rgba8, 1, 1};
+    white.set_pixel(0, 0, Rgba8{{200, 200, 200, 255}});
+    document.add_layer("Bottom").write(white, 0, 0);
+    Image dark{PixelFormat::rgba8, 1, 1};
+    dark.set_pixel(0, 0, Rgba8{{100, 100, 100, 255}});
+    auto& top{document.add_layer("Top")};
+    top.write(dark, 0, 0);
+    top.set_blend_mode(BlendMode::multiply);
+    const auto expected{document.flatten().bytes};
+    document.merge_down(1);
+    ASSERT_EQ(document.layers().size(), 1u);
+    EXPECT_EQ(document.flatten().bytes, expected);
+    EXPECT_EQ(document.layers()[0].read(0, 0, 1, 1).pixel<Rgba8>(0, 0).value[0], 78);
 }
