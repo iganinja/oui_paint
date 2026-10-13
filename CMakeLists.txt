@@ -67,6 +67,7 @@ add_library(oui_paint_core STATIC
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
     src/ui/tool_options.cpp
+    src/ui/transform_dialogs.cpp
     src/ui/tool_panel.cpp)
 target_include_directories(oui_paint_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics PRIVATE oui_paint_lodepng oui_paint_miniz)

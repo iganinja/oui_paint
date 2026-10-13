@@ -17,6 +17,7 @@
 #include "ui/new_image_dialog.h"
 #include "ui/tool_options.h"
 #include "ui/tool_panel.h"
+#include "ui/transform_dialogs.h"
 
 #include <oui/dialogs.h>
 #include <oui/file_dialog.h>
@@ -282,6 +283,79 @@ void PaintApp::register_commands()
     add("image.crop_to_selection", "Crop to &Selection",
         [this] { change_layers("Crop to Selection", [](Document& document) { document.crop_to_selection(); }); },
         {U'x', true, false, true});
+    add("image.resize", "&Resize...",
+        [this]
+        {
+            auto* const open{current()};
+            if(open == nullptr)
+            {
+                return;
+            }
+            const auto& document{open->document()};
+            if(const auto request{ask_resize(m_application, document.width(), document.height())})
+            {
+                change_layers("Resize Image", [&request](Document& changed)
+                              { changed.resize(request->width, request->height, request->resampling); });
+            }
+        },
+        {U'r', true});
+    add("image.canvas_size", "Canvas &Size...",
+        [this]
+        {
+            auto* const open{current()};
+            if(open == nullptr)
+            {
+                return;
+            }
+            const auto& document{open->document()};
+            if(const auto request{ask_canvas_size(m_application, document.width(), document.height())})
+            {
+                change_layers("Canvas Size", [&request](Document& changed)
+                              { changed.resize_canvas(request->width, request->height, request->anchor); });
+            }
+        },
+        {U'r', true, false, true});
+    commands.register_command("image.flip_horizontal", "Flip &Horizontal",
+                              [this] { change_layers("Flip Horizontal", [](Document& d) { d.flip(true); }); });
+    commands.register_command("image.flip_vertical", "Flip &Vertical",
+                              [this] { change_layers("Flip Vertical", [](Document& d) { d.flip(false); }); });
+    add("image.rotate_clockwise", "Rotate 90° &Clockwise",
+        [this] { change_layers("Rotate 90° Clockwise", [](Document& d) { d.rotate(1); }); }, {U'h', true});
+    add("image.rotate_counter_clockwise", "Rotate 90° C&ounter-clockwise",
+        [this] { change_layers("Rotate 90° Counter-clockwise", [](Document& d) { d.rotate(3); }); },
+        {U'g', true});
+    add("image.rotate_180", "Rotate &180°", [this] { change_layers("Rotate 180°", [](Document& d) { d.rotate(2); }); },
+        {U'j', true});
+    commands.register_command("layers.flip_horizontal", "Flip Layer &Horizontal",
+                              [this, active]
+                              {
+                                  change_layers("Flip Layer Horizontal",
+                                                [&](Document& d) { d.flip_layer(active(), true); });
+                              });
+    commands.register_command("layers.flip_vertical", "Flip Layer &Vertical",
+                              [this, active]
+                              {
+                                  change_layers("Flip Layer Vertical",
+                                                [&](Document& d) { d.flip_layer(active(), false); });
+                              });
+    add("layers.rotate_zoom", "&Rotate / Zoom...",
+        [this, active]
+        {
+            if(current() == nullptr)
+            {
+                return;
+            }
+            if(const auto request{ask_rotate_zoom(m_application)})
+            {
+                change_layers("Rotate / Zoom",
+                              [&](Document& d)
+                              {
+                                  d.rotate_zoom_layer(active(), request->degrees, request->zoom, request->pan_x,
+                                                      request->pan_y, Resampling::bicubic);
+                              });
+            }
+        },
+        {U'z', true, false, true});
     add("image.flatten", "&Flatten",
         [this] { change_layers("Flatten", [](Document& document) { document.flatten_layers(); }); },
         {U'f', true, false, true});
@@ -342,10 +416,16 @@ void PaintApp::build_window()
                                            "edit.paste_new_image", oui::menu_separator(), "edit.erase_selection",
                                            "edit.fill_selection", oui::menu_separator(), "edit.select_all",
                                            "edit.deselect", "edit.invert_selection"});
-    m_frame->menu_bar().add_menu("&Image", {"image.crop_to_selection", "image.flatten"});
+    m_frame->menu_bar().add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size",
+                                            oui::menu_separator(), "image.flip_horizontal", "image.flip_vertical",
+                                            oui::menu_separator(), "image.rotate_clockwise",
+                                            "image.rotate_counter_clockwise", "image.rotate_180",
+                                            oui::menu_separator(), "image.flatten"});
     m_frame->menu_bar().add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down",
                                              oui::menu_separator(), "layers.move_up", "layers.move_down",
-                                             "layers.toggle_visible", oui::menu_separator(), "layers.properties"});
+                                             "layers.toggle_visible", oui::menu_separator(), "layers.flip_horizontal",
+                                             "layers.flip_vertical", "layers.rotate_zoom", oui::menu_separator(),
+                                             "layers.properties"});
     m_frame->menu_bar().add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
                                            "view.actual_size", oui::menu_separator(), "view.interface_bigger",
                                            "view.interface_smaller", "view.interface_reset"});
