@@ -9,6 +9,7 @@
 #include "ui/icons.h"
 
 #include <oui/application.h>
+#include <oui/menu_bar.h>
 #include <oui/graphics/font.h>
 #include <oui/graphics/pixel_backend.h>
 #include <oui/script/system_api.h>
@@ -130,6 +131,10 @@ class PaintApp
     [[nodiscard]] CanvasView* current_view();
     void refresh_titles();
     void show_error(std::string_view title, std::string_view message);
+    // Puts a file first among the recent ones, kept in the settings.
+    void remember(const std::filesystem::path& path);
+    // The Open Recent menu's entries, made each time it opens.
+    [[nodiscard]] std::vector<olagarro::oui::MenuItem> recent_items();
     // Writes `document` to `path` in the format its extension names; false, having said why, when it did not.
     bool write(OpenDocument& document, const std::filesystem::path& path);
 

@@ -38,6 +38,7 @@ add_library(oui_paint_core STATIC
     src/app/new_image.cpp
     src/app/open_document.cpp
     src/app/paint_app.cpp
+    src/app/recent_files.cpp
     src/app/tools.cpp
     src/codecs/codecs.cpp
     src/codecs/openraster.cpp
@@ -133,6 +134,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/palettes_test.cpp
         tests/pieces_test.cpp
         tests/plugins_test.cpp
+        tests/recent_files_test.cpp
         tests/render_test.cpp
         tests/selection_test.cpp
         tests/shapes_test.cpp

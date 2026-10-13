@@ -2,6 +2,7 @@
 
 #include "app/file_filters.h"
 #include "app/fonts.h"
+#include "app/recent_files.h"
 #include "app/tools.h"
 #include "codecs/codecs.h"
 #include "codecs/openraster.h"
@@ -473,7 +474,9 @@ void PaintApp::build_window()
 {
     auto frame{std::make_unique<MainFrame>(m_application.commands())};
     m_frame = frame.get();
-    m_frame->menu_bar().add_menu("&File", {"file.new", "file.open", oui::menu_separator(), "file.save",
+    m_frame->menu_bar().add_menu("&File", {"file.new", "file.open",
+                                           oui::menu_submenu("Open &Recent", [this] { return recent_items(); }),
+                                           oui::menu_separator(), "file.save",
                                            "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
                                            "file.quit"});
     m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy",
@@ -759,6 +762,49 @@ void PaintApp::new_image()
     add(std::move(document));
 }
 
+void PaintApp::remember(const std::filesystem::path& path)
+{
+    m_settings.set_list_value("recent_files", with_recent(m_settings.list_value("recent_files"), oui::utf8_of(path)));
+    static_cast<void>(m_settings.save());
+}
+
+std::vector<oui::MenuItem> PaintApp::recent_items()
+{
+    std::vector<oui::MenuItem> items;
+    const auto recent{m_settings.list_value("recent_files")};
+    for(std::size_t index{}; index < recent.size(); ++ index)
+    {
+        const auto& path{recent[index]};
+        // A number to pick it by, then its name and the folder it is in.
+        const auto file{oui::path_from_utf8(path)};
+        const auto* const home{std::getenv("HOME") != nullptr ? std::getenv("HOME") : std::getenv("USERPROFILE")};
+        const auto title{"&" + std::to_string((index + 1) % 10) + "  " + oui::utf8_of(file.filename()) + "   " +
+                         short_folder(oui::utf8_of(file.parent_path()),
+                                      home != nullptr ? oui::utf8_of(oui::path_from_utf8(home)) : std::string{})};
+        items.push_back(oui::menu_action(title,
+                                         [this, path]
+                                         {
+                                             const auto file{oui::path_from_utf8(path)};
+                                             std::error_code ignored;
+                                             if(!std::filesystem::exists(file, ignored))
+                                             {
+                                                 show_error("Open Recent", path + " is not there any more.");
+                                                 auto kept{m_settings.list_value("recent_files")};
+                                                 kept.erase(std::remove(kept.begin(), kept.end(), path), kept.end());
+                                                 m_settings.set_list_value("recent_files", kept);
+                                                 static_cast<void>(m_settings.save());
+                                                 return;
+                                             }
+                                             static_cast<void>(open(file));
+                                         }));
+    }
+    if(items.empty())
+    {
+        items.push_back(oui::menu_action("(none yet)", [] {}, false));
+    }
+    return items;
+}
+
 void PaintApp::show_error(std::string_view title, std::string_view message)
 {
     static_cast<void>(oui::message_box(m_application, title, message));
@@ -783,6 +829,7 @@ bool PaintApp::open(const std::filesystem::path& path)
         }
         auto document{std::make_unique<OpenDocument>(std::move(*layered))};
         document->set_path(path);
+        remember(path);
         m_last_folder = path.parent_path();
         add(std::move(document));
         return true;
@@ -829,6 +876,7 @@ bool PaintApp::open(const std::filesystem::path& path)
             }
             auto document{std::make_unique<OpenDocument>(std::move(*indexed))};
             document->set_path(path);
+            remember(path);
             m_last_folder = path.parent_path();
             add(std::move(document));
             return true;
@@ -842,6 +890,7 @@ bool PaintApp::open(const std::filesystem::path& path)
     }
     auto document{std::make_unique<OpenDocument>(Document::from_image(*image))};
     document->set_path(path);
+    remember(path);
     m_last_folder = path.parent_path();
     add(std::move(document));
     return true;
@@ -888,6 +937,7 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
         document.set_modified(false);
         m_last_folder = path.parent_path();
         refresh_titles();
+        remember(path);
         tell_saved(path);
         return true;
     }
@@ -938,6 +988,7 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
         document.set_modified(false);
         m_last_folder = path.parent_path();
         refresh_titles();
+        remember(path);
         tell_saved(path);
         return true;
     }
@@ -973,6 +1024,7 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
     document.set_modified(false);
     m_last_folder = path.parent_path();
     refresh_titles();
+    remember(path);
     tell_saved(path);
     return true;
 }
