@@ -76,6 +76,12 @@ void CanvasView::zoom_to_fit()
     changed();
 }
 
+void CanvasView::zoom_to(int x, int y, int width, int height)
+{
+    m_document.viewport().zoom_to(x, y, width, height);
+    changed();
+}
+
 void CanvasView::actual_size()
 {
     m_document.viewport().set_zoom(1.0, middle());
@@ -205,14 +211,23 @@ bool CanvasView::handle_event(const oui::Event& event)
     if(mouse->middle && mouse->pressed && mouse->pixel)
     {
         m_panning_from = *mouse->pixel;
+        m_panning_with_key = false;
         return true;
     }
-    if(mouse->middle && mouse->released)
+    // Space held as the left button goes down pans too, as in Paint.NET, until the button comes up.
+    if(mouse->pressed && !mouse->middle && !mouse->right && !m_tool_button && mouse->pixel && m_pan_key && m_pan_key())
+    {
+        m_panning_from = *mouse->pixel;
+        m_panning_with_key = true;
+        return true;
+    }
+    if((mouse->middle || m_panning_with_key) && mouse->released && m_panning_from)
     {
         m_panning_from.reset();
+        m_panning_with_key = false;
         return true;
     }
-    if(mouse->middle_dragging && m_panning_from && mouse->pixel)
+    if((mouse->middle_dragging || (m_panning_with_key && mouse->dragging)) && m_panning_from && mouse->pixel)
     {
         viewport.scroll_by(mouse->pixel->x - m_panning_from->x, mouse->pixel->y - m_panning_from->y);
         m_panning_from = *mouse->pixel;
@@ -275,6 +290,10 @@ oui::Pointer CanvasView::pointer_at(oui::Point) const
     if(m_panning_from)
     {
         return oui::Pointer::grabbing;
+    }
+    if(m_pan_key && m_pan_key())
+    {
+        return oui::Pointer::hand;
     }
     return m_pointer_for_tool ? m_pointer_for_tool(m_tool_button.has_value()) : oui::Pointer::crosshair;
 }

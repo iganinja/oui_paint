@@ -12,7 +12,8 @@ namespace oui_paint
 {
 
 // The primary and secondary colours, as two squares one over the other, and a palette under them: a click on a
-// palette colour makes it the primary one, a right click the secondary one, and a click on a square asks for it.
+// palette colour makes it the colour being edited, the primary unless C chose the secondary, a right click the other,
+// and a click on a square asks for it. The colour being edited shows in front, framed.
 class ColorPanel final : public olagarro::oui::Widget
 {
   public:
@@ -25,6 +26,9 @@ class ColorPanel final : public olagarro::oui::Widget
     void set_primary(const Color& color) { m_primary = color; }
     void set_secondary(const Color& color) { m_secondary = color; }
     void swap();
+    // Whether a click on the palette sets the secondary colour, as C toggles it.
+    [[nodiscard]] bool editing_secondary() const { return m_editing_secondary; }
+    void toggle_editing() { m_editing_secondary = !m_editing_secondary; }
     // Called with true for the primary square, false for the secondary, when it is clicked.
     void on_edit(std::function<void(bool primary)> edit);
     // Called after a palette colour was clicked: true for the secondary.
@@ -44,6 +48,7 @@ class ColorPanel final : public olagarro::oui::Widget
     Color m_primary{0.0, 0.0, 0.0, 1.0};
     Color m_secondary{1.0, 1.0, 1.0, 1.0};
     std::vector<Color> m_palette;
+    bool m_editing_secondary{false};
     std::function<void(bool)> m_edit;
     std::function<void(bool)> m_picked;
 };

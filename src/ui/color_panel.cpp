@@ -90,9 +90,14 @@ oui::Size ColorPanel::measure(const oui::Constraints& constraints) const
 void ColorPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
 {
     painter.fill_rect(m_bounds, side_panel_color(theme));
-    // The secondary square behind, down and to the right, the primary in front.
-    painter.fill_rect({m_bounds.x + 1, m_bounds.y + 1, 3, 2}, on_screen(m_secondary));
-    painter.fill_rect({m_bounds.x, m_bounds.y, 3, 2}, on_screen(m_primary));
+    // The primary square at the top left, the secondary down and to the right; the one being edited in front, framed.
+    const oui::Rect primary{m_bounds.x, m_bounds.y, 3, 2};
+    const oui::Rect secondary{m_bounds.x + 1, m_bounds.y + 1, 3, 2};
+    const auto& front{m_editing_secondary ? secondary : primary};
+    painter.fill_rect(m_editing_secondary ? primary : secondary,
+                      on_screen(m_editing_secondary ? m_primary : m_secondary));
+    painter.fill_rect(front, on_screen(m_editing_secondary ? m_secondary : m_primary));
+    painter.draw_field_frame(front, true, theme);
     for(std::size_t index{}; index < m_palette.size(); ++ index)
     {
         const auto x{m_bounds.x + static_cast<int>(index % 2) * 2};
@@ -113,24 +118,22 @@ bool ColorPanel::handle_event(const oui::Event& event)
     {
         if(m_edit)
         {
-            // The primary square is the top left one; what shows of the secondary, below and to its right.
-            m_edit(cell.y < 2 && cell.x < 3);
+            // The square in front is the one clicked where they overlap: the primary at the top left, the secondary
+            // below and to its right.
+            const auto on_primary{cell.y < 2 && cell.x < 3};
+            const auto on_secondary{cell.y >= 1 && cell.x >= 1};
+            m_edit(m_editing_secondary ? !on_secondary : on_primary);
         }
         return true;
     }
     if(const auto color{palette_at(cell)})
     {
-        if(mouse->right)
-        {
-            m_secondary = *color;
-        }
-        else
-        {
-            m_primary = *color;
-        }
+        // The left button sets the colour being edited, the right one the other.
+        const auto secondary{mouse->right != m_editing_secondary};
+        (secondary ? m_secondary : m_primary) = *color;
         if(m_picked)
         {
-            m_picked(mouse->right);
+            m_picked(secondary);
         }
         return true;
     }

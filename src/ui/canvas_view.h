@@ -54,6 +54,8 @@ class CanvasView final : public olagarro::oui::Widget
     void on_keys(std::function<bool(const olagarro::oui::Event&)> keys);
     // What the pointer looks like over the image, as the tool in use asks, told whether a button is held.
     void on_pointer(std::function<olagarro::oui::Pointer(bool held)> pointer);
+    // Whether the key that pans while held, Space, is down: then a drag with the left button pans, whatever the tool.
+    void on_pan_key(std::function<bool()> held) { m_pan_key = std::move(held); }
 
     // Where the marching ants are along the selection's edge; they move as it grows.
     void set_ants_phase(int phase) { m_ants_phase = phase; }
@@ -61,6 +63,8 @@ class CanvasView final : public olagarro::oui::Widget
     void zoom_in();
     void zoom_out();
     void zoom_to_fit();
+    // As big as the area of the image from x, y fits, in the middle.
+    void zoom_to(int x, int y, int width, int height);
     void actual_size();
 
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override;
@@ -89,6 +93,9 @@ class CanvasView final : public olagarro::oui::Widget
     std::optional<bool> m_tool_button;
     std::optional<Position> m_pointer;
     std::optional<olagarro::oui::Point> m_panning_from;
+    // The pan began with Space and the left button, rather than with the middle button.
+    bool m_panning_with_key{false};
+    std::function<bool()> m_pan_key;
     mutable bool m_fitted{false};
     int m_ants_phase{0};
     // Where it was last painted, in the window's pixels, and what it painted.

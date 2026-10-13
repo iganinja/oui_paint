@@ -31,6 +31,9 @@ class Viewport
     void zoom_out(Position anchor);
     // The biggest step at which the whole image fits, never above 100%.
     void zoom_to_fit();
+    // As big as the area of the image from x, y fits in the view, by the zoom steps, with it in the middle as far as the image's
+    // edges allow, as Zoom to Selection shows it.
+    void zoom_to(double x, double y, double width, double height);
     void scroll_by(double dx, double dy);
 
     // Where the image's top left corner is in the view.

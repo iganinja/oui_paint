@@ -169,6 +169,8 @@ void PaintApp::register_commands()
     add("edit.undo", "&Undo", [this] { if(!edit_text(TextAction::undo)) { undo(); } }, {U'z', true});
     add("edit.redo", "&Redo", [this] { if(!edit_text(TextAction::redo)) { redo(); } }, {U'y', true});
     add("colors.swap", "Swap Colors", [this] { m_color_panel->swap(); }, {U'x'});
+    // C, as in Paint.NET: whether a click on a palette sets the primary colour or the secondary one.
+    add("colors.toggle_editing", "Edit the Other Color", [this] { m_color_panel->toggle_editing(); }, {U'c'});
     add("edit.cut", "Cu&t",
         [this]
         {
@@ -491,6 +493,17 @@ void PaintApp::register_commands()
     add("view.zoom_out", "Zoom &Out", view(&CanvasView::zoom_out), {U'-', true});
     add("view.zoom_to_window", "Zoom to &Window", view(&CanvasView::zoom_to_fit), {U'b', true});
     add("view.actual_size", "&Actual Size", view(&CanvasView::actual_size), {U'0', true});
+    // What is selected as big as it fits, or the whole image when nothing is.
+    add("view.zoom_to_selection", "Zoom to &Selection",
+        [this]
+        {
+            if(auto* const canvas{current_view()})
+            {
+                const auto area{canvas->document().document().selection().bounds()};
+                canvas->zoom_to(area.x, area.y, area.width, area.height);
+            }
+        },
+        {U'b', true, false, true});
     // The interface's text, bigger or smaller: Ctrl with plus and minus zoom the image, so Ctrl and Alt with them.
     add("view.interface_bigger", "&Bigger Interface", [this] { static_cast<void>(m_application.zoom(1)); },
         {U'=', true, true});
@@ -534,7 +547,8 @@ void PaintApp::build_window()
                          "layers.move_up", "layers.move_down", "layers.toggle_visible", oui::menu_separator(),
                          "layers.flip_horizontal", "layers.flip_vertical", "layers.rotate_zoom", oui::menu_separator(),
                          "layers.properties"});
-    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.actual_size",
+    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.zoom_to_selection",
+                       "view.actual_size",
                        oui::menu_separator(), "view.layers_panel", oui::menu_separator(), "view.interface_bigger",
                        "view.interface_smaller", "view.interface_reset"});
     auto left{oui::column()};
@@ -599,13 +613,15 @@ void PaintApp::build_window()
     auto palettes{std::make_unique<PalettesPanel>()};
     m_palettes_panel = palettes.get();
     m_palettes_panel->on_pick(
-        [this](int index, bool secondary)
+        [this](int index, bool right)
         {
             auto* const open{current()};
             if(open == nullptr)
             {
                 return;
             }
+            // The left button sets the colour being edited, as C chooses it, the right one the other.
+            const auto secondary{right != m_color_panel->editing_secondary()};
             const auto& document{open->document()};
             const auto shown{document.palettes()->color(document.layers()[document.active_layer()].palette_slot(),
                                                         index)};
@@ -769,6 +785,7 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
     auto view{std::make_unique<CanvasView>(*document)};
     view->on_tool([this](const ToolEvent& event) { take_tool_event(event); });
     view->on_keys([this](const oui::Event& event) { return type_key(event); });
+    view->on_pan_key([this] { return m_window.is_key_held(oui::Key::space); });
     view->on_overlay(
         [this](std::uint32_t* pixels, int width, int height)
         {

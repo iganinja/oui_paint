@@ -173,3 +173,20 @@ TEST(Render, LayersMixForTheScreenByOpacityAndBlendMode)
         EXPECT_EQ(cache.tile({0, 0}, 0)[2], 0xffff0000u) << "multiplied over nothing it shows itself";
     }
 }
+
+TEST(Viewport, ZoomingToAnAreaShowsItAllAsBigAsItFitsInTheMiddle)
+{
+    Viewport viewport;
+    viewport.set_view_size(400, 300);
+    viewport.set_image_size(2000, 1000);
+    viewport.zoom_to(1000, 500, 100, 50);
+    EXPECT_DOUBLE_EQ(viewport.zoom(), 4.0) << "the biggest step 100 x 50 fits in 400 x 300";
+    const auto middle{viewport.image_at({200, 150})};
+    EXPECT_NEAR(middle.x, 1050, 0.5);
+    EXPECT_NEAR(middle.y, 525, 0.5);
+    viewport.zoom_to(0, 0, 1900, 900);
+    EXPECT_LT(viewport.zoom(), 0.25);
+    EXPECT_LE(viewport.image_at({0, 0}).x, 0.0) << "the whole area shows";
+    EXPECT_GE(viewport.image_at({400, 300}).x, 1900.0);
+    EXPECT_GE(viewport.image_at({400, 300}).y, 900.0);
+}

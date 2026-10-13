@@ -70,6 +70,21 @@ void Viewport::zoom_to_fit()
     keep_in_bounds();
 }
 
+void Viewport::zoom_to(double x, double y, double width, double height)
+{
+    auto chosen{zoom_steps[0]};
+    for(const auto step : zoom_steps)
+    {
+        if(width * step <= m_view_width && height * step <= m_view_height)
+        {
+            chosen = step;
+        }
+    }
+    m_zoom = chosen;
+    m_origin = {m_view_width / 2.0 - (x + width / 2.0) * m_zoom, m_view_height / 2.0 - (y + height / 2.0) * m_zoom};
+    keep_in_bounds();
+}
+
 void Viewport::scroll_by(double dx, double dy)
 {
     m_origin.x += dx;

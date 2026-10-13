@@ -23,9 +23,10 @@ and Smaller Interface change the size of everything but the image; the size is k
 | Ctrl+wheel | Zoom around the pointer |
 | Ctrl++, Ctrl+- | Zoom in, zoom out |
 | Ctrl+B | Zoom to fit the window |
+| Ctrl+Shift+B | Zoom to what is selected |
 | Ctrl+0 | Actual size |
 | Wheel, Shift+wheel | Scroll up and down, sideways |
-| Middle button drag, or the Pan tool (H) | Pan |
+| Space+drag, middle button drag, or the Pan tool (H) | Pan |
 
 ## Selections
 
@@ -63,7 +64,8 @@ Edit > Flip Selection and Rotate Selection flip and turn what is selected in pla
 | Text | T | Types text where clicked |
 | Line / Curve, Shapes | O | Drag from one end or corner to the other; Shift keeps lines to steps of 15 degrees and shapes square or round |
 
-[ and ] make the brush narrower and wider; with Ctrl, by 5. X swaps the primary and secondary colors.
+[ and ] make the brush narrower and wider; with Ctrl, by 5. X swaps the primary and secondary colors. C chooses which
+of them a click on a palette sets, the one framed in front; a right click sets the other.
 
 ## Layers
 

@@ -150,6 +150,7 @@ if(OUI_PAINT_BUILD_TESTS)
     include(GoogleTest)
     add_executable(oui_paint_tests
         tests/codecs_test.cpp
+        tests/color_panel_test.cpp
         tests/color_math_test.cpp
         tests/core_test.cpp
         tests/file_filters_test.cpp
