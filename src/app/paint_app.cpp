@@ -64,6 +64,29 @@ std::vector<ToolButton> tool_buttons()
     return buttons;
 }
 
+// Paint.NET's modifiers for selecting: Ctrl adds, Alt takes away, Alt with the right button intersects, Ctrl with it
+// inverts.
+SelectionMode selection_mode(const ToolEvent& event)
+{
+    if(event.secondary && event.alt)
+    {
+        return SelectionMode::intersect;
+    }
+    if(event.secondary && event.control)
+    {
+        return SelectionMode::invert;
+    }
+    if(event.control)
+    {
+        return SelectionMode::add;
+    }
+    if(event.alt)
+    {
+        return SelectionMode::subtract;
+    }
+    return SelectionMode::replace;
+}
+
 } // namespace
 
 PaintApp::PaintApp(oui::Application& application, oui::PixelBackend& window, oui::Settings& settings)
@@ -945,6 +968,47 @@ void PaintApp::use_tool(const ToolEvent& event)
         select_shape(event, tool == "ellipse_select");
         return;
     }
+    if(tool == "lasso_select")
+    {
+        auto& selection{document.selection()};
+        if(event.phase == ToolEvent::Phase::press)
+        {
+            open->history().begin_step(document);
+            m_selecting = Selecting{event.at, selection_mode(event), selection.mask()};
+            m_lasso = {event.at};
+            return;
+        }
+        if(!m_selecting)
+        {
+            return;
+        }
+        m_lasso.push_back(event.at);
+        selection.set_mask(m_selecting->before);
+        selection.add_polygon(m_lasso, m_selecting->mode);
+        if(event.phase == ToolEvent::Phase::release)
+        {
+            m_selecting.reset();
+            m_lasso.clear();
+            open->history().finish_step("Lasso Select", document);
+        }
+        update_ants();
+        return;
+    }
+    if(tool == "magic_wand")
+    {
+        const auto x{static_cast<int>(std::floor(event.at.x))};
+        const auto y{static_cast<int>(std::floor(event.at.y))};
+        if(event.phase != ToolEvent::Phase::press || x < 0 || y < 0 || x >= document.width() ||
+           y >= document.height())
+        {
+            return;
+        }
+        open->history().begin_step(document);
+        document.selection().add_coverage(fill_region(document, x, y, m_tool_options->fill()), selection_mode(event));
+        open->history().finish_step("Magic Wand", document);
+        update_ants();
+        return;
+    }
     if(tool == "bucket")
     {
         const auto x{static_cast<int>(std::floor(event.at.x))};
@@ -1196,24 +1260,7 @@ void PaintApp::select_shape(const ToolEvent& event, bool ellipse)
     auto& selection{document.selection()};
     if(event.phase == ToolEvent::Phase::press)
     {
-        // Paint.NET's modifiers: Ctrl adds, Alt takes away, Alt with the right button intersects, Ctrl with it inverts.
-        auto mode{SelectionMode::replace};
-        if(event.secondary && event.alt)
-        {
-            mode = SelectionMode::intersect;
-        }
-        else if(event.secondary && event.control)
-        {
-            mode = SelectionMode::invert;
-        }
-        else if(event.control)
-        {
-            mode = SelectionMode::add;
-        }
-        else if(event.alt)
-        {
-            mode = SelectionMode::subtract;
-        }
+        const auto mode{selection_mode(event)};
         open->history().begin_step(document);
         m_selecting = Selecting{event.at, mode, selection.mask()};
         return;

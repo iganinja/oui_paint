@@ -195,6 +195,84 @@ void Selection::add_ellipse(double left, double top, double right, double bottom
             });
 }
 
+void Selection::add_polygon(const std::vector<Position>& points, SelectionMode mode)
+{
+    if(points.size() < 3)
+    {
+        if(mode == SelectionMode::replace)
+        {
+            m_mask.emplace(PixelFormat::gray_alpha8, "Selection");
+        }
+        return;
+    }
+    auto left{1e18};
+    auto top{1e18};
+    auto right{-1e18};
+    auto bottom{-1e18};
+    for(const auto& point : points)
+    {
+        left = std::min(left, point.x);
+        top = std::min(top, point.y);
+        right = std::max(right, point.x);
+        bottom = std::max(bottom, point.y);
+    }
+    const PixelArea area{static_cast<int>(std::floor(left)), static_cast<int>(std::floor(top)),
+                         static_cast<int>(std::ceil(right)) - static_cast<int>(std::floor(left)) + 1,
+                         static_cast<int>(std::ceil(bottom)) - static_cast<int>(std::floor(top)) + 1};
+    // Each row's coverage worked out once: four lines through each row of pixels, and along each, the spans inside
+    // with their ends' parts of a pixel counted.
+    constexpr int lines{4};
+    std::vector<double> row(static_cast<std::size_t>(area.width) + 1);
+    std::vector<double> crossings;
+    auto current_row{area.y - 1};
+    const auto fill_row{[&](int y)
+                        {
+                            std::fill(row.begin(), row.end(), 0.0);
+                            for(int line{}; line < lines; ++ line)
+                            {
+                                const auto scan_y{y + (line + 0.5) / lines};
+                                crossings.clear();
+                                for(std::size_t index{}; index < points.size(); ++ index)
+                                {
+                                    const auto& a{points[index]};
+                                    const auto& b{points[(index + 1) % points.size()]};
+                                    if((a.y <= scan_y) != (b.y <= scan_y))
+                                    {
+                                        crossings.push_back(a.x + (scan_y - a.y) / (b.y - a.y) * (b.x - a.x));
+                                    }
+                                }
+                                std::sort(crossings.begin(), crossings.end());
+                                for(std::size_t index{}; index + 1 < crossings.size(); index += 2)
+                                {
+                                    const auto from{crossings[index] - area.x};
+                                    const auto to{crossings[index + 1] - area.x};
+                                    for(auto x{std::max(0, static_cast<int>(std::floor(from)))};
+                                        x < std::min(area.width, static_cast<int>(std::ceil(to))); ++ x)
+                                    {
+                                        const auto covered{std::min<double>(x + 1, to) - std::max<double>(x, from)};
+                                        row[static_cast<std::size_t>(x)] += std::max(0.0, covered) / lines;
+                                    }
+                                }
+                            }
+                        }};
+    combine(area, mode,
+            [&](int x, int y)
+            {
+                if(y != current_row)
+                {
+                    fill_row(y);
+                    current_row = y;
+                }
+                return row[static_cast<std::size_t>(x - area.x)];
+            });
+}
+
+void Selection::add_coverage(const std::vector<std::uint8_t>& coverage, SelectionMode mode)
+{
+    combine({0, 0, m_width, m_height}, mode,
+            [&](int x, int y) { return coverage[static_cast<std::size_t>(y) * m_width + x] / 255.0; });
+}
+
 void Selection::offset(int dx, int dy)
 {
     if(!m_mask || (dx == 0 && dy == 0))

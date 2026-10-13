@@ -1,9 +1,11 @@
 #pragma once
 
 #include "core/layer.h"
+#include "render/viewport.h"
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace oui_paint
 {
@@ -53,6 +55,10 @@ class Selection
     // Combines a rectangle, or the ellipse inside it with an antialiased edge, with what is selected.
     void add_rectangle(const PixelArea& area, SelectionMode mode);
     void add_ellipse(double left, double top, double right, double bottom, SelectionMode mode);
+    // Combines the polygon through `points`, closed, inside by the even-odd rule, with an antialiased edge.
+    void add_polygon(const std::vector<Position>& points, SelectionMode mode);
+    // Combines a coverage for every pixel of the image, row by row, 0 to 255, as a magic wand's region.
+    void add_coverage(const std::vector<std::uint8_t>& coverage, SelectionMode mode);
     // The selection moved by whole pixels.
     void offset(int dx, int dy);
 

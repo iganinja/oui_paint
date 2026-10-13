@@ -62,3 +62,29 @@ TEST(Selection, InvertingAllGivesNothingAndMovingKeepsTheShape)
     EXPECT_EQ(selection.at(11, 21), 255);
     EXPECT_EQ(selection.bounds().x, 10);
 }
+
+TEST(Selection, ALassoSelectsInsideItsOutlineWithASoftEdge)
+{
+    Selection selection{100, 100};
+    // A triangle with a slanting side.
+    selection.add_polygon({{10, 10}, {60, 10}, {10, 60}}, SelectionMode::replace);
+    EXPECT_EQ(selection.at(15, 15), 255);
+    EXPECT_EQ(selection.at(55, 55), 0);
+    auto partial{false};
+    for(int x{20}; x < 50; ++ x)
+    {
+        const auto value{selection.at(x, 69 - x)};
+        partial = partial || (value > 0 && value < 255);
+    }
+    EXPECT_TRUE(partial) << "the slanting side is antialiased";
+}
+
+TEST(Selection, AMagicWandsRegionCombinesLikeAnyShape)
+{
+    Selection selection{4, 1};
+    selection.add_rectangle({0, 0, 2, 1}, SelectionMode::replace);
+    selection.add_coverage({0, 255, 255, 0}, SelectionMode::add);
+    EXPECT_EQ(selection.at(0, 0), 255);
+    EXPECT_EQ(selection.at(2, 0), 255);
+    EXPECT_EQ(selection.at(3, 0), 0);
+}

@@ -132,6 +132,8 @@ class PaintApp
         std::optional<Layer> before;
     };
     std::optional<Selecting> m_selecting;
+    // The points of a lasso being drawn.
+    std::vector<Position> m_lasso;
     // Pixels lifted by Move Selected Pixels, floating until something else is done: the layer with the hole they left,
     // the selection where they were, what they are, and how far they have been moved.
     struct Floating
