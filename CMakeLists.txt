@@ -28,6 +28,9 @@ target_compile_options(oui_paint_lodepng PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/W
 
 # Everything but main(), so the tests reach it too.
 add_library(oui_paint_core STATIC
+    src/app/new_image.cpp
+    src/app/open_document.cpp
+    src/app/paint_app.cpp
     src/codecs/codecs.cpp
     src/codecs/stb_api.cpp
     src/core/document.cpp
@@ -35,8 +38,12 @@ add_library(oui_paint_core STATIC
     src/core/layer.cpp
     src/core/pixel_format.cpp
     src/core/tile.cpp
+    src/render/display_cache.cpp
+    src/render/viewport.cpp
+    src/ui/canvas_view.cpp
     src/ui/icons.cpp
     src/ui/main_frame.cpp
+    src/ui/new_image_dialog.cpp
     src/ui/tool_panel.cpp)
 target_include_directories(oui_paint_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics PRIVATE oui_paint_lodepng)
@@ -65,6 +72,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/core_test.cpp
         tests/icons_test.cpp
         tests/main_frame_test.cpp
+        tests/render_test.cpp
         tests/tool_panel_test.cpp)
     target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)
     gtest_discover_tests(oui_paint_tests)
