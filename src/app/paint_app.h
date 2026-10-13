@@ -95,6 +95,8 @@ class PaintApp
     bool edit_text(TextAction action);
     [[nodiscard]] std::filesystem::path plugins_folder() const;
     void add_menu(std::string_view title, std::vector<olagarro::oui::MenuItem> items);
+    // Shows or hides the layers and palettes on the right, as View > Layers Panel and F7 do.
+    void show_layers_panel(bool shown);
     void manage_plugins();
     // A plugin to write and try in a tab of its own; `file` is where it is saved, none for a new one.
     void open_workbench(std::string source, std::optional<std::filesystem::path> file);

@@ -22,8 +22,10 @@ class MainFrame final : public olagarro::oui::Container
     void set_center(std::unique_ptr<olagarro::oui::Widget> center);
     [[nodiscard]] olagarro::oui::Widget* center();
     void set_left(std::unique_ptr<olagarro::oui::Widget> left);
-    // A panel on the right, as tall as the space between the bars and as wide as it asks: the layers.
+    // A panel on the right, as tall as the space between the bars and as wide as it asks: the layers. Hidden, it takes
+    // no room.
     void set_right(std::unique_ptr<olagarro::oui::Widget> right);
+    [[nodiscard]] olagarro::oui::Widget* right() { return m_right; }
     // A bar under the menu bar, as tall as it asks, across the window: the tool's options.
     void set_top(std::unique_ptr<olagarro::oui::Widget> top);
     [[nodiscard]] olagarro::oui::Widget* left();

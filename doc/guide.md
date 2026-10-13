@@ -9,7 +9,8 @@ tools and keys, 8 and 16 bits per channel, indexed images with palettes, and eff
   letter picks it; pressing it again goes to the next tool sharing it, as S goes through the selection tools.
 - **The tool's options**, such as the brush width, sit in the bar under the menus.
 - **Each open image** has a tab over the canvas. Ctrl+Tab goes to the next one.
-- **Layers** are on the right, and, in an indexed image, its palettes under them.
+- **Layers** are on the right, and, in an indexed image, its palettes under them. F7, or View > Layers Panel,
+  hides and shows them; they stay as they were left the next time.
 - **The status bar** says where the pointer is in the image, its size and kind, and the zoom.
 
 The left button paints with the primary color and the right button with the secondary one. View > Bigger Interface

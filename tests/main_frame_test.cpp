@@ -49,3 +49,21 @@ TEST(MainFrame, TheLeftPanelTakesTheWidthItAsksAndTheCenterTheRest)
     EXPECT_EQ(frame.center()->bounds().x, 4);
     EXPECT_EQ(frame.center()->bounds().width, 76);
 }
+
+TEST(MainFrame, AHiddenRightPanelLeavesItsWidthToTheCenter)
+{
+    oui::CommandRegistry commands;
+    oui_paint::MainFrame frame{commands};
+    frame.set_center(oui::label("middle"));
+    auto right{oui::label("layers")};
+    auto* const panel{right.get()};
+    frame.set_right(std::move(right));
+    frame.arrange({0, 0, 80, 25});
+    EXPECT_EQ(frame.center()->bounds().width, 74);
+    panel->set_visible(false);
+    frame.arrange({0, 0, 80, 25});
+    EXPECT_EQ(frame.center()->bounds().width, 80);
+    panel->set_visible(true);
+    frame.arrange({0, 0, 80, 25});
+    EXPECT_EQ(frame.center()->bounds().width, 74);
+}

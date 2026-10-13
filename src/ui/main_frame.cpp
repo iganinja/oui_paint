@@ -94,10 +94,15 @@ void MainFrame::arrange(const oui::Rect& bounds)
         m_left->arrange({bounds.x, middle_top, left_width, middle_height});
     }
     auto right_width{0};
-    if(m_right != nullptr)
+    // A hidden panel takes no room.
+    if(m_right != nullptr && m_right->is_visible())
     {
         right_width = std::min(bounds.width - left_width, m_right->measure({bounds.width, middle_height}).width);
         m_right->arrange({bounds.x + bounds.width - right_width, middle_top, right_width, middle_height});
+    }
+    else if(m_right != nullptr)
+    {
+        m_right->arrange({bounds.x + bounds.width, middle_top, 0, 0});
     }
     if(m_center != nullptr)
     {

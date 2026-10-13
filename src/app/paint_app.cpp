@@ -343,6 +343,9 @@ void PaintApp::register_commands()
         {U',', true});
     add("layers.properties", "Layer &Properties...", [this] { layer_properties(); },
         oui::Shortcut{0, false, false, false, oui::Key::f4});
+    // F7, as Paint.NET shows and hides its Layers window; kept for the next time.
+    add("view.layers_panel", "&Layers Panel", [this] { show_layers_panel(!m_frame->right()->is_visible()); },
+        oui::Shortcut{0, false, false, false, oui::Key::f7});
     add("help.documentation", "&Documentation", [this] { show_help(m_application, help_pages(m_application.commands())); },
         oui::Shortcut{0, false, false, false, oui::Key::f1});
     commands.register_command("help.about", "&About OUI Paint", [this] { show_about(m_application); });
@@ -504,41 +507,35 @@ void PaintApp::build_window()
 {
     auto frame{std::make_unique<MainFrame>(m_application.commands())};
     m_frame = frame.get();
-    add_menu("&File", {"file.new", "file.open",
-                                           oui::menu_submenu("Open &Recent", [this] { return recent_items(); }),
-                                           oui::menu_separator(), "file.save",
-                                           "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
-                                           "file.quit"});
-    add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy",
-                                           "edit.copy_merged", "edit.paste", "edit.paste_new_layer",
-                                           "edit.paste_new_image", oui::menu_separator(), "edit.erase_selection",
-                                           "edit.fill_selection", oui::menu_separator(), "edit.select_all",
-                                           "edit.deselect", "edit.invert_selection", oui::menu_separator(),
-                                           "edit.flip_selection_horizontal", "edit.flip_selection_vertical",
-                                           "edit.rotate_selection_clockwise", "edit.rotate_selection_counter_clockwise",
-                                           "edit.rotate_selection_180"});
-    add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size",
-                                            oui::menu_separator(), "image.convert_indexed", "image.convert_color",
-                                            oui::menu_submenu("&Palettes",
-                                                              std::vector<oui::MenuItem>{
-                                                                  "palettes.load_setup", "palettes.save_setup",
-                                                                  oui::menu_separator(), "palettes.load_slot",
-                                                                  "palettes.save_slot", oui::menu_separator(),
-                                                                  "palettes.add", "palettes.move_up",
-                                                                  "palettes.move_down", oui::menu_separator(),
-                                                                  "palettes.load_allowed", "palettes.clear_allowed"}),
-                                            oui::menu_separator(), "image.flip_horizontal", "image.flip_vertical",
-                                            oui::menu_separator(), "image.rotate_clockwise",
-                                            "image.rotate_counter_clockwise", "image.rotate_180",
-                                            oui::menu_separator(), "image.flatten"});
-    add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down",
-                                             oui::menu_separator(), "layers.move_up", "layers.move_down",
-                                             "layers.toggle_visible", oui::menu_separator(), "layers.flip_horizontal",
-                                             "layers.flip_vertical", "layers.rotate_zoom", oui::menu_separator(),
-                                             "layers.properties"});
-    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
-                                           "view.actual_size", oui::menu_separator(), "view.interface_bigger",
-                                           "view.interface_smaller", "view.interface_reset"});
+    add_menu("&File", {"file.new", "file.open", oui::menu_submenu("Open &Recent", [this] { return recent_items(); }),
+                       oui::menu_separator(), "file.save", "file.save_as", "file.save_all", oui::menu_separator(),
+                       "file.close", "file.quit"});
+    add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy", "edit.copy_merged",
+                       "edit.paste", "edit.paste_new_layer", "edit.paste_new_image", oui::menu_separator(),
+                       "edit.erase_selection", "edit.fill_selection", oui::menu_separator(), "edit.select_all",
+                       "edit.deselect", "edit.invert_selection", oui::menu_separator(),
+                       "edit.flip_selection_horizontal", "edit.flip_selection_vertical",
+                       "edit.rotate_selection_clockwise", "edit.rotate_selection_counter_clockwise",
+                       "edit.rotate_selection_180"});
+    add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size", oui::menu_separator(),
+                        "image.convert_indexed", "image.convert_color",
+                        oui::menu_submenu("&Palettes",
+                                          std::vector<oui::MenuItem>{
+                                              "palettes.load_setup", "palettes.save_setup", oui::menu_separator(),
+                                              "palettes.load_slot", "palettes.save_slot", oui::menu_separator(),
+                                              "palettes.add", "palettes.move_up", "palettes.move_down",
+                                              oui::menu_separator(), "palettes.load_allowed",
+                                              "palettes.clear_allowed"}),
+                        oui::menu_separator(), "image.flip_horizontal", "image.flip_vertical", oui::menu_separator(),
+                        "image.rotate_clockwise", "image.rotate_counter_clockwise", "image.rotate_180",
+                        oui::menu_separator(), "image.flatten"});
+    add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down", oui::menu_separator(),
+                         "layers.move_up", "layers.move_down", "layers.toggle_visible", oui::menu_separator(),
+                         "layers.flip_horizontal", "layers.flip_vertical", "layers.rotate_zoom", oui::menu_separator(),
+                         "layers.properties"});
+    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.actual_size",
+                       oui::menu_separator(), "view.layers_panel", oui::menu_separator(), "view.interface_bigger",
+                       "view.interface_smaller", "view.interface_reset"});
     auto left{oui::column()};
     m_tool_panel = &left->add(std::make_unique<ToolPanel>(tool_buttons(), m_icons));
     m_tool_panel->set_selected("brush");
@@ -654,6 +651,7 @@ void PaintApp::build_window()
                           [slot](Document& document) { document.layers()[document.active_layer()].set_palette_slot(slot); });
         });
     m_frame->set_right(std::make_unique<SideColumn>(std::move(layers), std::move(palettes)));
+    show_layers_panel(m_settings.bool_value("layers_panel", true));
     auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
     m_tool_options = options.get();
     m_frame->set_top(std::move(options));
@@ -2863,6 +2861,14 @@ void PaintApp::load_plugins()
         m_frame->menu_bar().set_menu_items(m_adjustments_menu, std::move(adjustments));
         m_frame->menu_bar().set_menu_items(m_adjustments_menu + 1, std::move(effects));
     }
+}
+
+void PaintApp::show_layers_panel(bool shown)
+{
+    m_frame->right()->set_visible(shown);
+    m_application.commands().set_checked("view.layers_panel", shown);
+    m_settings.set_bool_value("layers_panel", shown);
+    static_cast<void>(m_settings.save());
 }
 
 void PaintApp::add_menu(std::string_view title, std::vector<oui::MenuItem> items)
