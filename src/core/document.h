@@ -42,6 +42,12 @@ class Document
     void merge_down(std::size_t index);
     // All visible layers as one.
     void flatten_layers();
+    // A bigger or smaller canvas with the image where it was, at the top left: pixels past the new edges are kept in
+    // their tiles until written over, as layers keep what moves outside them.
+    void set_size(int width, int height);
+    // The canvas cut down to the selection's bounds, every layer with it; where the selection is not a rectangle,
+    // what it leaves out becomes see-through. Nothing is selected afterwards.
+    void crop_to_selection();
 
     // What the document looks like: the visible layers mixed from the bottom up, in its format.
     [[nodiscard]] Image flatten() const;

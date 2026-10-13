@@ -17,6 +17,7 @@
 #include <oui/layout.h>
 #include <oui/window.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -131,6 +132,26 @@ void PaintApp::register_commands()
     add("edit.undo", "&Undo", [this] { undo(); }, {U'z', true});
     add("edit.redo", "&Redo", [this] { redo(); }, {U'y', true});
     add("colors.swap", "Swap Colors", [this] { m_color_panel->swap(); }, {U'x'});
+    add("edit.cut", "Cu&t",
+        [this]
+        {
+            if(copy(false))
+            {
+                change_layers("Cut",
+                              [](Document& document)
+                              {
+                                  static_cast<void>(erase_selected(document.layers()[document.active_layer()],
+                                                                   document.selection()));
+                              });
+            }
+        },
+        {U'x', true});
+    add("edit.copy", "&Copy", [this] { static_cast<void>(copy(false)); }, {U'c', true});
+    add("edit.copy_merged", "Copy M&erged", [this] { static_cast<void>(copy(true)); }, {U'c', true, false, true});
+    add("edit.paste", "&Paste", [this] { paste(PasteInto::layer); }, {U'v', true});
+    add("edit.paste_new_layer", "Paste into New &Layer", [this] { paste(PasteInto::new_layer); },
+        {U'v', true, false, true});
+    add("edit.paste_new_image", "Paste into New &Image", [this] { paste(PasteInto::new_image); }, {U'v', true, true});
     add("edit.select_all", "Select &All",
         [this] { change_layers("Select All", [](Document& document) { document.selection().select_all(); }); },
         {U'a', true});
@@ -251,6 +272,9 @@ void PaintApp::register_commands()
     commands.bind("layers.select_top", oui::KeyShortcut{oui::Key::page_up, true, true});
     commands.register_command("layers.select_bottom", "Bottom Layer", select_layer(-1, true));
     commands.bind("layers.select_bottom", oui::KeyShortcut{oui::Key::page_down, true, true});
+    add("image.crop_to_selection", "Crop to &Selection",
+        [this] { change_layers("Crop to Selection", [](Document& document) { document.crop_to_selection(); }); },
+        {U'x', true, false, true});
     add("image.flatten", "&Flatten",
         [this] { change_layers("Flatten", [](Document& document) { document.flatten_layers(); }); },
         {U'f', true, false, true});
@@ -307,10 +331,12 @@ void PaintApp::build_window()
     m_frame->menu_bar().add_menu("&File", {"file.new", "file.open", oui::menu_separator(), "file.save",
                                            "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
                                            "file.quit"});
-    m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.erase_selection",
+    m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy",
+                                           "edit.copy_merged", "edit.paste", "edit.paste_new_layer",
+                                           "edit.paste_new_image", oui::menu_separator(), "edit.erase_selection",
                                            "edit.fill_selection", oui::menu_separator(), "edit.select_all",
                                            "edit.deselect", "edit.invert_selection"});
-    m_frame->menu_bar().add_menu("&Image", {"image.flatten"});
+    m_frame->menu_bar().add_menu("&Image", {"image.crop_to_selection", "image.flatten"});
     m_frame->menu_bar().add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down",
                                              oui::menu_separator(), "layers.move_up", "layers.move_down",
                                              "layers.toggle_visible", oui::menu_separator(), "layers.properties"});
@@ -958,6 +984,122 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
             refresh_titles();
         }
     }
+    update_ants();
+}
+
+bool PaintApp::copy(bool merged)
+{
+    auto* const open{current()};
+    if(open == nullptr)
+    {
+        return false;
+    }
+    settle();
+    const auto& document{open->document()};
+    const auto& selection{document.selection()};
+    if(selection.bounds().empty())
+    {
+        return false;
+    }
+    Layer source{document.format(), "Copy"};
+    if(merged)
+    {
+        source.write(document.flatten(), 0, 0);
+    }
+    const auto lifted{lift_selected(merged ? source : document.layers()[document.active_layer()], selection)};
+    if(!m_application.clipboard().set_data("image/png", write_image(lifted.pixels, FileFormat::png)))
+    {
+        show_error("Copy", "The clipboard did not take the image.");
+        return false;
+    }
+    return true;
+}
+
+std::optional<Image> PaintApp::clipboard_image()
+{
+    auto& clipboard{m_application.clipboard()};
+    const auto types{clipboard.types()};
+    for(const auto* const type : {"image/png", "image/bmp", "image/x-bmp", "image/jpeg", "image/gif", "image/x-tga"})
+    {
+        if(std::find(types.begin(), types.end(), type) == types.end())
+        {
+            continue;
+        }
+        if(const auto bytes{clipboard.data(type)})
+        {
+            std::string error;
+            if(auto image{read_image(*bytes, error)})
+            {
+                return image;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+void PaintApp::paste(PasteInto into)
+{
+    settle();
+    auto image{clipboard_image()};
+    if(!image)
+    {
+        show_error("Paste", "The clipboard holds no image.");
+        return;
+    }
+    if(into == PasteInto::new_image || current() == nullptr)
+    {
+        auto document{std::make_unique<OpenDocument>(Document::from_image(*image))};
+        document->set_untitled_number(++ m_untitled_count);
+        add(std::move(document));
+        return;
+    }
+    auto* const open{current()};
+    auto& document{open->document()};
+    const auto pasted{converted(*image, document.format())};
+    auto grow{false};
+    if(pasted.width > document.width() || pasted.height > document.height())
+    {
+        const auto answer{oui::message_box(m_application, "Paste",
+                                           "The image being pasted is bigger than the canvas.\n"
+                                           "Expand the canvas to fit it?",
+                                           {"&Expand Canvas", "&Keep Canvas Size", "Cancel"})};
+        if(!answer || *answer == 2u)
+        {
+            return;
+        }
+        grow = *answer == 0u;
+    }
+    // At the top left of what shows, as Paint.NET pastes, or of the image when the canvas grew.
+    auto x{0};
+    auto y{0};
+    if(!grow)
+    {
+        const auto corner{open->viewport().image_at({0.0, 0.0})};
+        x = std::clamp(static_cast<int>(std::floor(corner.x)), 0, std::max(0, document.width() - pasted.width));
+        y = std::clamp(static_cast<int>(std::floor(corner.y)), 0, std::max(0, document.height() - pasted.height));
+    }
+    const auto before{LayersState::of(document)};
+    open->history().begin_step(document);
+    if(grow)
+    {
+        document.set_size(std::max(document.width(), pasted.width), std::max(document.height(), pasted.height));
+    }
+    if(into == PasteInto::new_layer)
+    {
+        document.insert_layer_above("Layer " + std::to_string(document.layers().size() + 1));
+    }
+    auto& layer{document.layers()[document.active_layer()]};
+    Floating floating{open, layer, std::nullopt, Lifted{pasted, x, y}, 0, 0};
+    static_cast<void>(lay_over(layer, pasted, x, y));
+    document.selection().add_rectangle({x, y, pasted.width, pasted.height}, SelectionMode::replace);
+    floating.selection = document.selection().mask();
+    open->history().finish_step(into == PasteInto::new_layer ? "Paste into New Layer" : "Paste", document);
+    m_floating = std::move(floating);
+    // What is pasted can be moved straight away.
+    m_tool_panel->set_selected("move_pixels");
+    open->refresh(changed_tiles(before, LayersState::of(document)));
+    open->set_modified(true);
+    refresh_titles();
     update_ants();
 }
 

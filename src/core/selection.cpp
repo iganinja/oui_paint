@@ -179,6 +179,11 @@ void Selection::add_ellipse(double left, double top, double right, double bottom
     combine(area, mode,
             [&](int x, int y)
             {
+                // Never past the rectangle it was drawn in.
+                if(x + 0.5 < left || x + 0.5 > right || y + 0.5 < top || y + 0.5 > bottom)
+                {
+                    return 0.0;
+                }
                 // How far inside the edge the pixel's middle is, in pixels, by the ellipse's distance function over its
                 // gradient: a pixel's worth of fade across the edge.
                 const auto dx{(x + 0.5 - center_x) / radius_x};

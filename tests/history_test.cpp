@@ -99,3 +99,19 @@ TEST(History, TheSelectionIsUndoneWithTheRest)
     history.redo(document);
     EXPECT_EQ(document.selection().at(7, 7), 255);
 }
+
+TEST(History, AGrownCanvasShrinksBackOnUndo)
+{
+    Document document{50, 40, PixelFormat::rgba8};
+    document.add_layer("Background");
+    History history;
+    history.begin_step(document);
+    document.set_size(300, 200);
+    history.finish_step("Expand Canvas", document);
+    ASSERT_EQ(history.steps().size(), 1u);
+    history.undo(document);
+    EXPECT_EQ(document.width(), 50);
+    EXPECT_EQ(document.selection().width(), 50);
+    history.redo(document);
+    EXPECT_EQ(document.height(), 200);
+}

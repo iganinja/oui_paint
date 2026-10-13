@@ -145,6 +145,56 @@ void Document::flatten_layers()
     m_active_layer = 0;
 }
 
+void Document::set_size(int width, int height)
+{
+    if(width <= 0 || height <= 0)
+    {
+        throw std::invalid_argument{"An image must be at least a pixel wide and a pixel tall."};
+    }
+    m_width = width;
+    m_height = height;
+    auto mask{m_selection.mask()};
+    m_selection = Selection{width, height};
+    m_selection.set_mask(std::move(mask));
+}
+
+void Document::crop_to_selection()
+{
+    const auto area{m_selection.bounds()};
+    if(area.empty())
+    {
+        return;
+    }
+    for(auto& layer : m_layers)
+    {
+        auto pixels{layer.read(area.x, area.y, area.width, area.height)};
+        visit_format(m_format,
+                     [&](auto tag)
+                     {
+                         using PixelType = typename decltype(tag)::Type;
+                         for(int y{}; y < area.height; ++ y)
+                         {
+                             for(int x{}; x < area.width; ++ x)
+                             {
+                                 auto pixel{pixels.pixel<PixelType>(x, y)};
+                                 auto& alpha{pixel.value[PixelType::channels - 1]};
+                                 alpha = static_cast<typename PixelType::ChannelType>(
+                                     (alpha * m_selection.at(area.x + x, area.y + y) + 127u) / 255u);
+                                 pixels.set_pixel(x, y, pixel);
+                             }
+                         }
+                     });
+        Layer cropped{m_format, layer.name()};
+        cropped.set_visible(layer.visible());
+        cropped.set_opacity(layer.opacity());
+        cropped.set_blend_mode(layer.blend_mode());
+        cropped.write(pixels, 0, 0);
+        layer = std::move(cropped);
+    }
+    m_selection.clear();
+    set_size(area.width, area.height);
+}
+
 Image Document::flatten() const
 {
     Image result{m_format, m_width, m_height};

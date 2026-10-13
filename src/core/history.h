@@ -18,6 +18,8 @@ struct LayersState
     std::size_t active_layer{0};
     // The selection's mask, none when nothing is selected.
     std::optional<Layer> selection;
+    int width{0};
+    int height{0};
 
     [[nodiscard]] static LayersState of(const Document& document);
     void restore_into(Document& document) const;

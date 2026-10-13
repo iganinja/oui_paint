@@ -66,6 +66,17 @@ class PaintApp
     void show_layers();
     // Uses the rectangle or ellipse select tool.
     void select_shape(const ToolEvent& event, bool ellipse);
+    // Copies what is selected of the active layer, or of the whole image when `merged`, as PNG.
+    bool copy(bool merged);
+    // The image the clipboard holds, in any format OUI Paint reads; none when it holds none.
+    [[nodiscard]] std::optional<Image> clipboard_image();
+    enum class PasteInto
+    {
+        layer,
+        new_layer,
+        new_image,
+    };
+    void paste(PasteInto into);
     // Uses Move Selected Pixels, or Move Selection when `outline_only`.
     void move_selected(const ToolEvent& event, bool outline_only);
     // Puts floating pixels down where they are.

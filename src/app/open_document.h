@@ -27,7 +27,7 @@ class OpenDocument
     [[nodiscard]] Viewport& viewport() { return m_viewport; }
     [[nodiscard]] const Viewport& viewport() const { return m_viewport; }
     [[nodiscard]] History& history() { return m_history; }
-    // Draws again the tiles that changed.
+    // Draws again the tiles that changed, and everything when the image's size changed.
     void refresh(const std::vector<TilePoint>& tiles);
 
     // The file, none until it is first saved.
@@ -45,6 +45,9 @@ class OpenDocument
     DisplayCache m_display{m_document};
     Viewport m_viewport;
     History m_history;
+    // The size the view and the display were last given.
+    int m_shown_width{0};
+    int m_shown_height{0};
     std::optional<std::filesystem::path> m_path;
     int m_untitled_number{1};
     bool m_modified{false};

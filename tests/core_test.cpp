@@ -153,3 +153,25 @@ TEST(Document, MergingDownMixesTheLayerAsItShows)
     EXPECT_EQ(document.flatten().bytes, expected);
     EXPECT_EQ(document.layers()[0].read(0, 0, 1, 1).pixel<Rgba8>(0, 0).value[0], 78);
 }
+
+TEST(Document, CroppingToAnEllipseLeavesItsCornersSeeThrough)
+{
+    Document document{100, 100, PixelFormat::rgba8};
+    Image solid{PixelFormat::rgba8, 100, 100};
+    for(int y{}; y < 100; ++ y)
+    {
+        for(int x{}; x < 100; ++ x)
+        {
+            solid.set_pixel(x, y, Rgba8{{static_cast<std::uint8_t>(x), static_cast<std::uint8_t>(y), 0, 255}});
+        }
+    }
+    document.add_layer("Background").write(solid, 0, 0);
+    document.selection().add_ellipse(20, 30, 60, 50, SelectionMode::replace);
+    document.crop_to_selection();
+    EXPECT_EQ(document.width(), 40);
+    EXPECT_EQ(document.height(), 20);
+    EXPECT_FALSE(document.selection().active());
+    const auto flat{document.flatten()};
+    EXPECT_EQ(flat.pixel<Rgba8>(0, 0).alpha(), 0);
+    EXPECT_EQ(flat.pixel<Rgba8>(20, 10).value, (std::array<std::uint8_t, 4>{40, 40, 0, 255}));
+}
