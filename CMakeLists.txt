@@ -46,6 +46,7 @@ add_library(oui_paint_core STATIC
     src/core/image.cpp
     src/core/layer.cpp
     src/core/pixel_format.cpp
+    src/core/selection.cpp
     src/core/tile.cpp
     src/render/display_cache.cpp
     src/render/viewport.cpp
@@ -93,6 +94,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
         tests/render_test.cpp
+        tests/selection_test.cpp
         tests/stroke_test.cpp
         tests/tool_panel_test.cpp
         tests/tools_test.cpp)
