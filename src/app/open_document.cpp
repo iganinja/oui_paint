@@ -11,13 +11,16 @@ OpenDocument::OpenDocument(Document document) : m_document{std::move(document)}
 {
     m_shown_width = m_document.width();
     m_shown_height = m_document.height();
+    m_shown_palettes = m_document.palettes();
     m_viewport.set_image_size(m_shown_width, m_shown_height);
 }
 
 void OpenDocument::refresh(const std::vector<TilePoint>& tiles)
 {
-    if(m_document.width() != m_shown_width || m_document.height() != m_shown_height)
+    if(m_document.width() != m_shown_width || m_document.height() != m_shown_height ||
+       m_document.palettes() != m_shown_palettes)
     {
+        m_shown_palettes = m_document.palettes();
         m_shown_width = m_document.width();
         m_shown_height = m_document.height();
         m_viewport.set_image_size(m_shown_width, m_shown_height);

@@ -2,6 +2,7 @@
 
 #include "core/image.h"
 #include "core/layer.h"
+#include "core/palette.h"
 #include "core/selection.h"
 #include "core/transform.h"
 
@@ -30,6 +31,16 @@ class Document
     [[nodiscard]] int width() const { return m_width; }
     [[nodiscard]] int height() const { return m_height; }
     [[nodiscard]] PixelFormat format() const { return m_format; }
+
+    // An indexed image keeps an index in each pixel, as grey, and see-through where alpha is 0, of the palette of the
+    // layer's slot. None for an image of colours or greys.
+    [[nodiscard]] bool indexed() const { return m_palettes.has_value(); }
+    [[nodiscard]] const std::optional<PaletteSetup>& palettes() const { return m_palettes; }
+    void set_palettes(std::optional<PaletteSetup> palettes) { m_palettes = std::move(palettes); }
+    // An indexed layer's pixels as the colours its palette gives them, in RGBA of 8 bits; others as they are.
+    [[nodiscard]] Image colors_of(const Image& pixels, int slot) const;
+    // Colours as the nearest indices of palette `slot`, for an indexed image; converted to its format otherwise.
+    [[nodiscard]] Image indices_of(const Image& colors, int slot) const;
 
     [[nodiscard]] Selection& selection() { return m_selection; }
     [[nodiscard]] const Selection& selection() const { return m_selection; }
@@ -71,7 +82,8 @@ class Document
     void rotate_zoom_layer(std::size_t index, double degrees, double zoom, double pan_x, double pan_y,
                            Resampling resampling);
 
-    // What the document looks like: the visible layers mixed from the bottom up, in its format.
+    // What the document looks like: the visible layers mixed from the bottom up, in its format, or in RGBA of 8 bits
+    // for an indexed image.
     [[nodiscard]] Image flatten() const;
 
   private:
@@ -84,6 +96,7 @@ class Document
     std::vector<Layer> m_layers;
     std::size_t m_active_layer{0};
     Selection m_selection;
+    std::optional<PaletteSetup> m_palettes;
 };
 
 } // namespace oui_paint

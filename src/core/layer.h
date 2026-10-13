@@ -55,6 +55,11 @@ class Layer
     void set_opacity(double opacity);
     [[nodiscard]] BlendMode blend_mode() const { return m_blend_mode; }
     void set_blend_mode(BlendMode mode) { m_blend_mode = mode; }
+    // In an indexed image, which palette its indices are of.
+    [[nodiscard]] int palette_slot() const { return m_palette_slot; }
+    void set_palette_slot(int slot) { m_palette_slot = slot; }
+    // A layer with no pixels and the same name, showing and palette as this one.
+    [[nodiscard]] Layer empty_like() const;
 
     // The tile at `point`, none where it is see-through.
     [[nodiscard]] std::shared_ptr<const Tile> tile(TilePoint point) const;
@@ -75,6 +80,7 @@ class Layer
     bool m_visible{true};
     double m_opacity{1.0};
     BlendMode m_blend_mode{BlendMode::normal};
+    int m_palette_slot{0};
     Tiles m_tiles;
 };
 

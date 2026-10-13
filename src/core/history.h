@@ -20,6 +20,7 @@ struct LayersState
     std::optional<Layer> selection;
     int width{0};
     int height{0};
+    std::optional<PaletteSetup> palettes;
 
     [[nodiscard]] static LayersState of(const Document& document);
     void restore_into(Document& document) const;

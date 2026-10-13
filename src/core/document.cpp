@@ -2,6 +2,8 @@
 
 #include "core/blend.h"
 
+#include <cmath>
+
 #include <stdexcept>
 
 namespace oui_paint
@@ -98,6 +100,35 @@ void Document::merge_down(std::size_t index)
     {
         return;
     }
+    if(indexed())
+    {
+        // The two as they show, as colours, back to the nearest of the lower one's palette.
+        const auto& above{m_layers[index]};
+        auto& below{m_layers[index - 1]};
+        auto colors{colors_of(below.read(0, 0, m_width, m_height), below.palette_slot())};
+        if(above.visible() && above.opacity() > 0.0)
+        {
+            const auto over{colors_of(above.read(0, 0, m_width, m_height), above.palette_slot())};
+            for(int y{}; y < m_height; ++ y)
+            {
+                for(int x{}; x < m_width; ++ x)
+                {
+                    const auto pixel{over.pixel<Rgba8>(x, y)};
+                    if(pixel.alpha() != 0)
+                    {
+                        colors.set_pixel(x, y, blend(colors.pixel<Rgba8>(x, y), pixel, above.opacity(),
+                                                     above.blend_mode()));
+                    }
+                }
+            }
+        }
+        auto merged{below.empty_like()};
+        merged.write(indices_of(colors, below.palette_slot()), 0, 0);
+        below = std::move(merged);
+        m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(index));
+        m_active_layer = index - 1;
+        return;
+    }
     const auto& above{m_layers[index]};
     auto& below{m_layers[index - 1]};
     if(above.visible() && above.opacity() > 0.0)
@@ -139,7 +170,8 @@ void Document::flatten_layers()
         return;
     }
     Layer flat{m_format, m_layers.front().name()};
-    flat.write(flatten(), 0, 0);
+    flat.set_palette_slot(m_layers.front().palette_slot());
+    flat.write(indexed() ? indices_of(flatten(), flat.palette_slot()) : flatten(), 0, 0);
     m_layers.clear();
     m_layers.push_back(std::move(flat));
     m_active_layer = 0;
@@ -184,10 +216,7 @@ void Document::crop_to_selection()
                              }
                          }
                      });
-        Layer cropped{m_format, layer.name()};
-        cropped.set_visible(layer.visible());
-        cropped.set_opacity(layer.opacity());
-        cropped.set_blend_mode(layer.blend_mode());
+        auto cropped{layer.empty_like()};
         cropped.write(pixels, 0, 0);
         layer = std::move(cropped);
     }
@@ -199,10 +228,7 @@ template <typename Change> void Document::remake(int width, int height, Change c
 {
     for(auto& layer : m_layers)
     {
-        Layer made{m_format, layer.name()};
-        made.set_visible(layer.visible());
-        made.set_opacity(layer.opacity());
-        made.set_blend_mode(layer.blend_mode());
+        auto made{layer.empty_like()};
         made.write(change(layer.read(0, 0, m_width, m_height)), 0, 0);
         layer = std::move(made);
     }
@@ -263,10 +289,7 @@ void Document::flip_layer(std::size_t index, bool horizontal)
     }
     auto& layer{m_layers[index]};
     const auto image{flipped(layer.read(0, 0, m_width, m_height), horizontal)};
-    Layer made{m_format, layer.name()};
-    made.set_visible(layer.visible());
-    made.set_opacity(layer.opacity());
-    made.set_blend_mode(layer.blend_mode());
+    auto made{layer.empty_like()};
     made.write(image, 0, 0);
     layer = std::move(made);
 }
@@ -289,16 +312,84 @@ void Document::rotate_zoom_layer(std::size_t index, double degrees, double zoom,
                            .after(Affine::translation(-center_x, -center_y))};
     const auto image{transformed(layer.read(0, 0, m_width, m_height), forward.inverse(), m_width, m_height,
                                  resampling)};
-    Layer made{m_format, layer.name()};
-    made.set_visible(layer.visible());
-    made.set_opacity(layer.opacity());
-    made.set_blend_mode(layer.blend_mode());
+    auto made{layer.empty_like()};
     made.write(image, 0, 0);
     layer = std::move(made);
 }
 
+Image Document::colors_of(const Image& pixels, int slot) const
+{
+    if(!indexed())
+    {
+        return pixels;
+    }
+    Image colors{PixelFormat::rgba8, pixels.width, pixels.height};
+    for(int y{}; y < pixels.height; ++ y)
+    {
+        for(int x{}; x < pixels.width; ++ x)
+        {
+            const auto pixel{pixels.pixel<GrayAlpha8>(x, y)};
+            const auto color{pixel.alpha() == 0 ? Color{0, 0, 0, 0} : m_palettes->color(slot, pixel.value[0])};
+            const auto byte{[](double value) { return static_cast<std::uint8_t>(std::lround(value * 255.0)); }};
+            colors.set_pixel(x, y, Rgba8{{byte(color.red), byte(color.green), byte(color.blue), byte(color.alpha)}});
+        }
+    }
+    return colors;
+}
+
+Image Document::indices_of(const Image& colors, int slot) const
+{
+    if(!indexed())
+    {
+        return converted(colors, m_format);
+    }
+    const auto wide{converted(colors, PixelFormat::rgba16)};
+    Image indices{PixelFormat::gray_alpha8, colors.width, colors.height};
+    const auto& palette{m_palettes->palettes.at(static_cast<std::size_t>(slot))};
+    for(int y{}; y < colors.height; ++ y)
+    {
+        for(int x{}; x < colors.width; ++ x)
+        {
+            const auto pixel{wide.pixel<Rgba16>(x, y)};
+            const Color color{pixel.value[0] / 65535.0, pixel.value[1] / 65535.0, pixel.value[2] / 65535.0,
+                              pixel.value[3] / 65535.0};
+            const auto index{m_palettes->nearest(slot, color)};
+            const auto see_through{palette.transparent == index};
+            indices.set_pixel(x, y, GrayAlpha8{{static_cast<std::uint8_t>(index),
+                                                static_cast<std::uint8_t>(see_through ? 0 : 255)}});
+        }
+    }
+    return indices;
+}
+
 Image Document::flatten() const
 {
+    if(indexed())
+    {
+        // Each layer as the colours of its own palette, mixed as colours.
+        Image result{PixelFormat::rgba8, m_width, m_height};
+        for(const auto& layer : m_layers)
+        {
+            if(!layer.visible() || layer.opacity() <= 0.0)
+            {
+                continue;
+            }
+            const auto colors{colors_of(layer.read(0, 0, m_width, m_height), layer.palette_slot())};
+            for(int y{}; y < m_height; ++ y)
+            {
+                for(int x{}; x < m_width; ++ x)
+                {
+                    const auto above{colors.pixel<Rgba8>(x, y)};
+                    if(above.alpha() != 0)
+                    {
+                        result.set_pixel(x, y, blend(result.pixel<Rgba8>(x, y), above, layer.opacity(),
+                                                     layer.blend_mode()));
+                    }
+                }
+            }
+        }
+        return result;
+    }
     Image result{m_format, m_width, m_height};
     visit_format(m_format,
                  [&](auto tag)

@@ -94,6 +94,48 @@ const std::vector<std::uint32_t>& DisplayCache::tile(TilePoint point, int level)
 std::vector<std::uint32_t> DisplayCache::mixed(TilePoint point) const
 {
     std::vector<std::uint32_t> result(static_cast<std::size_t>(tile_size) * tile_size);
+    if(const auto& palettes{m_document.palettes()})
+    {
+        // Each layer's indices as its palette's colours, mixed as colours.
+        std::vector<Rgba8> sum(result.size());
+        for(const auto& layer : m_document.layers())
+        {
+            const auto source{layer.tile(point)};
+            if(!layer.visible() || layer.opacity() <= 0.0 || source == nullptr)
+            {
+                continue;
+            }
+            // The palette's colours as pixels, worked out once for the tile.
+            std::vector<Rgba8> colors(256);
+            for(int index{}; index < 256; ++ index)
+            {
+                const auto color{palettes->color(layer.palette_slot(), index)};
+                const auto byte{[](double value) { return static_cast<std::uint8_t>(std::lround(value * 255.0)); }};
+                colors[static_cast<std::size_t>(index)] = {
+                    {byte(color.red), byte(color.green), byte(color.blue), byte(color.alpha)}};
+            }
+            for(int y{}; y < tile_size; ++ y)
+            {
+                for(int x{}; x < tile_size; ++ x)
+                {
+                    const auto pixel{source->pixel<GrayAlpha8>(x, y)};
+                    if(pixel.alpha() == 0)
+                    {
+                        continue;
+                    }
+                    const auto& above{colors[pixel.value[0]]};
+                    if(above.alpha() == 0)
+                    {
+                        continue;
+                    }
+                    auto& below{sum[static_cast<std::size_t>(y * tile_size + x)]};
+                    below = blend(below, above, layer.opacity(), layer.blend_mode());
+                }
+            }
+        }
+        std::transform(sum.begin(), sum.end(), result.begin(), [](const Rgba8& pixel) { return to_screen(pixel); });
+        return result;
+    }
     visit_format(m_document.format(),
                  [&](auto tag)
                  {

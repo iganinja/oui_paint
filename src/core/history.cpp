@@ -9,7 +9,7 @@ namespace oui_paint
 LayersState LayersState::of(const Document& document)
 {
     return {document.layers(), document.active_layer(), document.selection().mask(), document.width(),
-            document.height()};
+            document.height(),  document.palettes()};
 }
 
 void LayersState::restore_into(Document& document) const
@@ -20,6 +20,7 @@ void LayersState::restore_into(Document& document) const
     }
     document.layers() = layers;
     document.selection().set_mask(selection);
+    document.set_palettes(palettes);
     if(!layers.empty())
     {
         document.set_active_layer(std::min(active_layer, layers.size() - 1));
@@ -35,6 +36,7 @@ std::vector<TilePoint> changed_tiles(const LayersState& before, const LayersStat
         const auto* const old_layer{index < before.layers.size() ? &before.layers[index] : nullptr};
         const auto* const new_layer{index < after.layers.size() ? &after.layers[index] : nullptr};
         const auto shows_differently{old_layer == nullptr || new_layer == nullptr ||
+                                     old_layer->palette_slot() != new_layer->palette_slot() ||
                                      old_layer->visible() != new_layer->visible() ||
                                      old_layer->opacity() != new_layer->opacity() ||
                                      old_layer->blend_mode() != new_layer->blend_mode()};
@@ -73,7 +75,7 @@ void History::finish_step(std::string name, const Document& document)
     m_open.reset();
     const auto same_selection{before.selection.has_value() == after.selection.has_value() &&
                               (!before.selection || before.selection->tiles() == after.selection->tiles())};
-    if(same_selection && before.width == after.width && before.height == after.height &&
+    if(same_selection && before.palettes == after.palettes && before.width == after.width && before.height == after.height &&
        changed_tiles(before, after).empty() && before.layers.size() == after.layers.size() &&
        before.active_layer == after.active_layer)
     {

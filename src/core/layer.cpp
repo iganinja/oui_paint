@@ -67,6 +67,16 @@ Layer::Layer(PixelFormat format, std::string name) : m_format{format}, m_name{st
 {
 }
 
+Layer Layer::empty_like() const
+{
+    Layer layer{m_format, m_name};
+    layer.m_visible = m_visible;
+    layer.m_opacity = m_opacity;
+    layer.m_blend_mode = m_blend_mode;
+    layer.m_palette_slot = m_palette_slot;
+    return layer;
+}
+
 void Layer::set_opacity(double opacity)
 {
     m_opacity = std::isnan(opacity) ? 1.0 : std::clamp(opacity, 0.0, 1.0);

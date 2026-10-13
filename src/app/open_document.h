@@ -48,6 +48,8 @@ class OpenDocument
     // The size the view and the display were last given.
     int m_shown_width{0};
     int m_shown_height{0};
+    // The palettes the display was last drawn with: a palette changed changes how every tile shows.
+    std::optional<PaletteSetup> m_shown_palettes;
     std::optional<std::filesystem::path> m_path;
     int m_untitled_number{1};
     bool m_modified{false};

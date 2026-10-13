@@ -46,6 +46,7 @@ add_library(oui_paint_core STATIC
     src/core/history.cpp
     src/core/image.cpp
     src/core/layer.cpp
+    src/core/palette.cpp
     src/core/pixel_format.cpp
     src/core/selection.cpp
     src/core/tile.cpp
@@ -112,6 +113,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/gradient_test.cpp
         tests/history_test.cpp
         tests/icons_test.cpp
+        tests/indexed_test.cpp
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
         tests/pieces_test.cpp
