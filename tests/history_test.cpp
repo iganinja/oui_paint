@@ -84,3 +84,18 @@ TEST(History, AStepKeepsOnlyTheTilesItWrote)
     }
     EXPECT_EQ(shared, 15) << "of 16 tiles, the 15 not written are the same in both";
 }
+
+TEST(History, TheSelectionIsUndoneWithTheRest)
+{
+    Document document{50, 50, PixelFormat::gray_alpha8};
+    document.add_layer("Background");
+    History history;
+    history.begin_step(document);
+    document.selection().add_rectangle({5, 5, 10, 10}, SelectionMode::replace);
+    history.finish_step("Rectangle Select", document);
+    ASSERT_EQ(history.steps().size(), 1u) << "a step that only selects is kept";
+    history.undo(document);
+    EXPECT_FALSE(document.selection().active());
+    history.redo(document);
+    EXPECT_EQ(document.selection().at(7, 7), 255);
+}

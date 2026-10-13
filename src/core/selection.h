@@ -37,6 +37,9 @@ class Selection
   public:
     Selection(int width, int height);
 
+    // The image's size.
+    [[nodiscard]] int width() const { return m_width; }
+    [[nodiscard]] int height() const { return m_height; }
     // Whether anything is selected; with nothing, tools work on the whole image.
     [[nodiscard]] bool active() const { return m_mask.has_value(); }
     // How much the pixel is selected, 255 everywhere when nothing is.

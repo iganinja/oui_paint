@@ -27,6 +27,8 @@ int main(int argument_count, char* const* const arguments)
         return 0;
     }
 
+    oui::Settings settings{oui::SettingsLocation::portable, "oui_paint"};
+    static_cast<void>(settings.load());
     std::unique_ptr<oui::DesktopWindow> backend;
     try
     {
@@ -34,6 +36,7 @@ int main(int argument_count, char* const* const arguments)
         window_options.title = "OUI Paint";
         window_options.icon = oui::text_icon("P", {255, 255, 255}, {0, 120, 215});
         backend = oui::window_backend(window_options);
+        backend->set_zoom(settings.int_value("interface_size", oui::PixelBackend::default_zoom()));
     }
     catch(const std::exception& error)
     {
@@ -41,13 +44,14 @@ int main(int argument_count, char* const* const arguments)
         return 2;
     }
 
+    auto& window{*backend};
     oui::Application application{std::move(backend)};
     application.set_theme(oui::classic_theme());
     application.set_title("OUI Paint");
     // Ctrl and the wheel zoom the image, not the interface.
     application.set_wheel_zooms(false);
 
-    oui_paint::PaintApp paint{application};
+    oui_paint::PaintApp paint{application, window, settings};
     for(std::size_t index{}; const auto path{command_line.positional(index)}; ++ index)
     {
         static_cast<void>(paint.open(std::filesystem::path{std::string{*path}}));

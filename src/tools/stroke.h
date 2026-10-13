@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/layer.h"
+#include "core/selection.h"
 #include "render/viewport.h"
 
 #include <array>
@@ -46,7 +47,8 @@ enum class StrokeMode
 class Stroke
 {
   public:
-    Stroke(Layer& layer, int width, int height, Color color, BrushSettings settings, StrokeMode mode);
+    // Paints only where `selection` selects, as much as it selects.
+    Stroke(Layer& layer, const Selection& selection, Color color, BrushSettings settings, StrokeMode mode);
 
     // Draws from the last point to `point`, in the image's pixels, whose centres are at half pixels.
     void line_to(Position point);
@@ -68,6 +70,7 @@ class Stroke
     [[nodiscard]] double coverage(double distance) const;
 
     Layer& m_layer;
+    const Selection& m_selection;
     // The layer as it was when the stroke began, what every pixel is mixed over.
     Layer m_original;
     int m_width;
@@ -79,5 +82,11 @@ class Stroke
     std::map<TilePoint, std::vector<float>> m_coverage;
     std::vector<TilePoint> m_changed;
 };
+
+// Mixes `color` over the layer wherever `selection` selects, as much as it selects, as Backspace does; returns the
+// tiles written.
+std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, const Color& color);
+// Takes away the layer's pixels wherever `selection` selects, as much as it selects, as Delete does.
+std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection);
 
 } // namespace oui_paint

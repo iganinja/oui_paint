@@ -2,10 +2,13 @@
 
 #include "app/new_image.h"
 #include "app/open_document.h"
+#include "core/selection.h"
 #include "tools/stroke.h"
 #include "ui/icons.h"
 
 #include <oui/application.h>
+#include <oui/graphics/pixel_backend.h>
+#include <oui/settings.h>
 #include <oui/tab_view.h>
 
 #include <filesystem>
@@ -28,7 +31,9 @@ struct ToolEvent;
 class PaintApp
 {
   public:
-    explicit PaintApp(olagarro::oui::Application& application);
+    // `settings` keeps what the person chose between sessions, such as the interface's size, which `window` has.
+    PaintApp(olagarro::oui::Application& application, olagarro::oui::PixelBackend& window,
+             olagarro::oui::Settings& settings);
     PaintApp(const PaintApp&) = delete;
     PaintApp& operator=(const PaintApp&) = delete;
 
@@ -59,6 +64,10 @@ class PaintApp
     void layer_properties();
     // Shows the current document's layers in the panel.
     void show_layers();
+    // Uses the rectangle or ellipse select tool.
+    void select_shape(const ToolEvent& event, bool ellipse);
+    // Starts or stops the marching ants as the current document has a selection or not.
+    void update_ants();
     void undo();
     void redo();
     // Asks for the primary or the secondary colour as hexadecimal.
@@ -71,6 +80,8 @@ class PaintApp
     bool write(OpenDocument& document, const std::filesystem::path& path);
 
     olagarro::oui::Application& m_application;
+    olagarro::oui::PixelBackend& m_window;
+    olagarro::oui::Settings& m_settings;
     Icons m_icons;
     MainFrame* m_frame{};
     ToolPanel* m_tool_panel{};
@@ -78,6 +89,17 @@ class PaintApp
     LayersPanel* m_layers_panel{};
     ToolOptions* m_tool_options{};
     std::unique_ptr<Stroke> m_stroke;
+    // A rectangle or ellipse being drawn to select: where it began, how it combines, and the selection before it.
+    struct Selecting
+    {
+        Position from;
+        SelectionMode mode;
+        std::optional<Layer> before;
+    };
+    std::optional<Selecting> m_selecting;
+    // The marching ants move while there is a selection to show.
+    olagarro::oui::Timer m_ants;
+    int m_ants_phase{0};
     olagarro::oui::TabView* m_tabs{};
     std::vector<std::unique_ptr<OpenDocument>> m_documents;
     NewImage m_last_new_image;

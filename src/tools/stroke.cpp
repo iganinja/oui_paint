@@ -52,9 +52,9 @@ template <typename PixelType> [[nodiscard]] PixelType pixel_of(const Color& colo
 
 } // namespace
 
-Stroke::Stroke(Layer& layer, int width, int height, Color color, BrushSettings settings, StrokeMode mode)
-    : m_layer{layer}, m_original{layer}, m_width{width}, m_height{height}, m_color{color}, m_settings{settings},
-      m_mode{mode}
+Stroke::Stroke(Layer& layer, const Selection& selection, Color color, BrushSettings settings, StrokeMode mode)
+    : m_layer{layer}, m_selection{selection}, m_original{layer}, m_width{selection.width()},
+      m_height{selection.height()}, m_color{color}, m_settings{settings}, m_mode{mode}
 {
 }
 
@@ -94,7 +94,8 @@ void Stroke::cover_segment(Position from, Position to)
     {
         for(auto x{left}; x <= right; ++ x)
         {
-            const auto covered{coverage(distance_to_segment({x + 0.5, y + 0.5}, from, to))};
+            const auto covered{coverage(distance_to_segment({x + 0.5, y + 0.5}, from, to)) *
+                               m_selection.at(x, y) / 255.0};
             if(covered <= 0.0)
             {
                 continue;
@@ -161,6 +162,63 @@ void Stroke::apply(TilePoint point, const Area& area)
                          }
                      }
                  });
+}
+
+namespace
+{
+
+template <typename Change> std::vector<TilePoint> change_selected(Layer& layer, const Selection& selection, Change change)
+{
+    const auto area{selection.bounds()};
+    std::set<TilePoint> touched;
+    visit_format(layer.format(),
+                 [&](auto tag)
+                 {
+                     using PixelType = typename decltype(tag)::Type;
+                     for(auto y{area.y}; y < area.y + area.height; ++ y)
+                     {
+                         for(auto x{area.x}; x < area.x + area.width; ++ x)
+                         {
+                             const auto amount{selection.at(x, y) / 255.0};
+                             if(amount <= 0.0)
+                             {
+                                 continue;
+                             }
+                             const TilePoint point{x / tile_size, y / tile_size};
+                             auto& tile{layer.writable_tile(point)};
+                             const auto local_x{x % tile_size};
+                             const auto local_y{y % tile_size};
+                             tile.set_pixel(local_x, local_y,
+                                            change(tile.template pixel<PixelType>(local_x, local_y), amount));
+                             touched.insert(point);
+                         }
+                     }
+                 });
+    return {touched.begin(), touched.end()};
+}
+
+} // namespace
+
+std::vector<TilePoint> fill_selected(Layer& layer, const Selection& selection, const Color& color)
+{
+    return change_selected(layer, selection,
+                           [&color](auto pixel, double amount)
+                           {
+                               using PixelType = decltype(pixel);
+                               return blend(pixel, pixel_of<PixelType>(color), amount, BlendMode::normal);
+                           });
+}
+
+std::vector<TilePoint> erase_selected(Layer& layer, const Selection& selection)
+{
+    return change_selected(layer, selection,
+                           [](auto pixel, double amount)
+                           {
+                               using PixelType = decltype(pixel);
+                               auto& alpha{pixel.value[PixelType::channels - 1]};
+                               alpha = static_cast<typename PixelType::ChannelType>(std::lround(alpha * (1.0 - amount)));
+                               return pixel;
+                           });
 }
 
 std::vector<TilePoint> Stroke::take_changed()

@@ -57,13 +57,21 @@ std::vector<ToolButton> tool_buttons()
 
 } // namespace
 
-PaintApp::PaintApp(oui::Application& application) : m_application{application}
+PaintApp::PaintApp(oui::Application& application, oui::PixelBackend& window, oui::Settings& settings)
+    : m_application{application}, m_window{window}, m_settings{settings}
 {
     std::error_code ignored;
     m_last_folder = std::filesystem::current_path(ignored);
     register_commands();
     build_window();
     m_application.on_close_requested([this] { quit(); });
+    // The interface's size, kept as it was left.
+    m_application.on_zoomed(
+        [this]
+        {
+            m_settings.set_int_value("interface_size", m_window.zoom());
+            static_cast<void>(m_settings.save());
+        });
 }
 
 void PaintApp::register_commands()
@@ -123,6 +131,39 @@ void PaintApp::register_commands()
     add("edit.undo", "&Undo", [this] { undo(); }, {U'z', true});
     add("edit.redo", "&Redo", [this] { redo(); }, {U'y', true});
     add("colors.swap", "Swap Colors", [this] { m_color_panel->swap(); }, {U'x'});
+    add("edit.select_all", "Select &All",
+        [this] { change_layers("Select All", [](Document& document) { document.selection().select_all(); }); },
+        {U'a', true});
+    add("edit.deselect", "&Deselect",
+        [this] { change_layers("Deselect", [](Document& document) { document.selection().clear(); }); }, {U'd', true});
+    add("edit.invert_selection", "&Invert Selection",
+        [this] { change_layers("Invert Selection", [](Document& document) { document.selection().invert(); }); },
+        {U'i', true});
+    commands.register_command("edit.erase_selection", "&Erase Selection",
+                              [this]
+                              {
+                                  change_layers("Erase Selection",
+                                                [](Document& document)
+                                                {
+                                                    static_cast<void>(erase_selected(
+                                                        document.layers()[document.active_layer()],
+                                                        document.selection()));
+                                                });
+                              });
+    commands.bind("edit.erase_selection", oui::KeyShortcut{oui::Key::delete_});
+    commands.register_command("edit.fill_selection", "&Fill Selection",
+                              [this]
+                              {
+                                  const auto color{m_color_panel->primary()};
+                                  change_layers("Fill Selection",
+                                                [&color](Document& document)
+                                                {
+                                                    static_cast<void>(fill_selected(
+                                                        document.layers()[document.active_layer()],
+                                                        document.selection(), color));
+                                                });
+                              });
+    commands.bind("edit.fill_selection", oui::KeyShortcut{oui::Key::backspace});
     add("brush.narrower", "Brush Width Down", [this] { m_tool_options->change_width(-1); }, {U'['});
     add("brush.wider", "Brush Width Up", [this] { m_tool_options->change_width(1); }, {U']'});
     add("brush.much_narrower", "Brush Width Down by 5", [this] { m_tool_options->change_width(-5); }, {U'[', true});
@@ -245,6 +286,14 @@ void PaintApp::register_commands()
     add("view.zoom_out", "Zoom &Out", view(&CanvasView::zoom_out), {U'-', true});
     add("view.zoom_to_window", "Zoom to &Window", view(&CanvasView::zoom_to_fit), {U'b', true});
     add("view.actual_size", "&Actual Size", view(&CanvasView::actual_size), {U'0', true});
+    // The interface's text, bigger or smaller: Ctrl with plus and minus zoom the image, so Ctrl and Alt with them.
+    add("view.interface_bigger", "&Bigger Interface", [this] { static_cast<void>(m_application.zoom(1)); },
+        {U'=', true, true});
+    commands.bind("view.interface_bigger", {U'+', true, true});
+    add("view.interface_smaller", "&Smaller Interface", [this] { static_cast<void>(m_application.zoom(-1)); },
+        {U'-', true, true});
+    add("view.interface_reset", "&Interface Size as It Starts", [this] { static_cast<void>(m_application.zoom(0)); },
+        {U'0', true, true});
     // Ctrl and = zooms in too, as plus is Shift and = on many keyboards.
     commands.register_command("view.zoom_in_equals", "Zoom In", view(&CanvasView::zoom_in));
     commands.bind("view.zoom_in_equals", {U'=', true});
@@ -257,13 +306,16 @@ void PaintApp::build_window()
     m_frame->menu_bar().add_menu("&File", {"file.new", "file.open", oui::menu_separator(), "file.save",
                                            "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
                                            "file.quit"});
-    m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo"});
+    m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.erase_selection",
+                                           "edit.fill_selection", oui::menu_separator(), "edit.select_all",
+                                           "edit.deselect", "edit.invert_selection"});
     m_frame->menu_bar().add_menu("&Image", {"image.flatten"});
     m_frame->menu_bar().add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down",
                                              oui::menu_separator(), "layers.move_up", "layers.move_down",
                                              "layers.toggle_visible", oui::menu_separator(), "layers.properties"});
     m_frame->menu_bar().add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
-                                           "view.actual_size"});
+                                           "view.actual_size", oui::menu_separator(), "view.interface_bigger",
+                                           "view.interface_smaller", "view.interface_reset"});
     auto left{oui::column()};
     m_tool_panel = &left->add(std::make_unique<ToolPanel>(tool_buttons(), m_icons));
     m_tool_panel->set_selected("brush");
@@ -650,6 +702,11 @@ void PaintApp::use_tool(const ToolEvent& event)
         }
         return;
     }
+    if(tool == "rectangle_select" || tool == "ellipse_select")
+    {
+        select_shape(event, tool == "ellipse_select");
+        return;
+    }
     const auto painting{tool == "brush" || tool == "pencil" || tool == "eraser"};
     if(!painting || document.layers().empty())
     {
@@ -666,9 +723,8 @@ void PaintApp::use_tool(const ToolEvent& event)
         }
         const auto color{event.secondary ? m_color_panel->secondary() : m_color_panel->primary()};
         open->history().begin_step(document);
-        m_stroke = std::make_unique<Stroke>(document.layers()[document.active_layer()], document.width(),
-                                            document.height(), color, settings,
-                                            tool == "eraser" ? StrokeMode::erase : StrokeMode::paint);
+        m_stroke = std::make_unique<Stroke>(document.layers()[document.active_layer()], document.selection(), color,
+                                            settings, tool == "eraser" ? StrokeMode::erase : StrokeMode::paint);
         m_stroke->line_to(event.at);
         break;
     }
@@ -712,6 +768,7 @@ void PaintApp::change_layers(std::string name, const std::function<void(Document
     open->refresh(changed_tiles(before, LayersState::of(document)));
     open->set_modified(true);
     refresh_titles();
+    update_ants();
 }
 
 void PaintApp::layer_properties()
@@ -743,6 +800,115 @@ void PaintApp::show_layers()
 {
     auto* const open{current()};
     m_layers_panel->set_document(open != nullptr ? &open->document() : nullptr);
+    update_ants();
+}
+
+void PaintApp::select_shape(const ToolEvent& event, bool ellipse)
+{
+    auto* const open{current()};
+    auto& document{open->document()};
+    auto& selection{document.selection()};
+    if(event.phase == ToolEvent::Phase::press)
+    {
+        // Paint.NET's modifiers: Ctrl adds, Alt takes away, Alt with the right button intersects, Ctrl with it inverts.
+        auto mode{SelectionMode::replace};
+        if(event.secondary && event.alt)
+        {
+            mode = SelectionMode::intersect;
+        }
+        else if(event.secondary && event.control)
+        {
+            mode = SelectionMode::invert;
+        }
+        else if(event.control)
+        {
+            mode = SelectionMode::add;
+        }
+        else if(event.alt)
+        {
+            mode = SelectionMode::subtract;
+        }
+        open->history().begin_step(document);
+        m_selecting = Selecting{event.at, mode, selection.mask()};
+        return;
+    }
+    if(!m_selecting)
+    {
+        return;
+    }
+    // From the pixel the press was on to the one the pointer is on, both whole; with Shift, a square.
+    auto left{std::floor(std::min(m_selecting->from.x, event.at.x))};
+    auto top{std::floor(std::min(m_selecting->from.y, event.at.y))};
+    auto right{std::ceil(std::max(m_selecting->from.x, event.at.x))};
+    auto bottom{std::ceil(std::max(m_selecting->from.y, event.at.y))};
+    if(event.shift)
+    {
+        const auto side{std::max(right - left, bottom - top)};
+        if(event.at.x < m_selecting->from.x)
+        {
+            left = right - side;
+        }
+        else
+        {
+            right = left + side;
+        }
+        if(event.at.y < m_selecting->from.y)
+        {
+            top = bottom - side;
+        }
+        else
+        {
+            bottom = top + side;
+        }
+    }
+    selection.set_mask(m_selecting->before);
+    const auto clicked{right - left <= 1.0 && bottom - top <= 1.0};
+    if(!clicked)
+    {
+        if(ellipse)
+        {
+            selection.add_ellipse(left, top, right, bottom, m_selecting->mode);
+        }
+        else
+        {
+            selection.add_rectangle({static_cast<int>(left), static_cast<int>(top), static_cast<int>(right - left),
+                                     static_cast<int>(bottom - top)},
+                                    m_selecting->mode);
+        }
+    }
+    if(event.phase == ToolEvent::Phase::release)
+    {
+        // A click without dragging selects nothing, as in Paint.NET.
+        if(clicked && m_selecting->mode == SelectionMode::replace)
+        {
+            selection.clear();
+        }
+        m_selecting.reset();
+        open->history().finish_step(ellipse ? "Ellipse Select" : "Rectangle Select", document);
+    }
+    update_ants();
+}
+
+void PaintApp::update_ants()
+{
+    auto* const open{current()};
+    const auto showing{open != nullptr && open->document().selection().active()};
+    if(showing && !m_ants.is_active())
+    {
+        m_ants = m_application.start_timer(std::chrono::milliseconds{150},
+                                           [this]
+                                           {
+                                               m_ants_phase = (m_ants_phase + 1) % 8;
+                                               if(auto* const view{current_view()})
+                                               {
+                                                   view->set_ants_phase(m_ants_phase);
+                                               }
+                                           });
+    }
+    else if(!showing && m_ants.is_active())
+    {
+        m_ants.stop();
+    }
 }
 
 void PaintApp::undo()
@@ -752,6 +918,7 @@ void PaintApp::undo()
         open->refresh(open->history().undo(open->document()));
         open->set_modified(true);
         refresh_titles();
+        update_ants();
     }
 }
 
@@ -762,6 +929,7 @@ void PaintApp::redo()
         open->refresh(open->history().redo(open->document()));
         open->set_modified(true);
         refresh_titles();
+        update_ants();
     }
 }
 

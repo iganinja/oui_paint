@@ -46,6 +46,9 @@ class CanvasView final : public olagarro::oui::Widget
     void on_changed(std::function<void()> changed);
     void on_tool(std::function<void(const ToolEvent&)> tool);
 
+    // Where the marching ants are along the selection's edge; they move as it grows.
+    void set_ants_phase(int phase) { m_ants_phase = phase; }
+
     void zoom_in();
     void zoom_out();
     void zoom_to_fit();
@@ -73,6 +76,7 @@ class CanvasView final : public olagarro::oui::Widget
     std::optional<Position> m_pointer;
     std::optional<olagarro::oui::Point> m_panning_from;
     mutable bool m_fitted{false};
+    int m_ants_phase{0};
     // Where it was last painted, in the window's pixels, and what it painted.
     mutable std::optional<olagarro::oui::Rect> m_pixels;
     mutable std::vector<std::uint32_t> m_buffer;

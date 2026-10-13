@@ -201,4 +201,49 @@ void render_view(const Viewport& viewport, DisplayCache& cache, int image_width,
     }
 }
 
+void draw_selection_edge(const Viewport& viewport, const Selection& selection, std::uint32_t* pixels, int width,
+                         int height, int phase)
+{
+    if(!selection.active())
+    {
+        return;
+    }
+    const auto zoom{viewport.zoom()};
+    const auto origin{viewport.origin()};
+    // Whether the image pixel under each view pixel is selected, a row at a time, and the row under it.
+    const auto image_x{[&](int x) { return static_cast<int>(std::floor((x + 0.5 - origin.x) / zoom)); }};
+    const auto image_y{[&](int y) { return static_cast<int>(std::floor((y + 0.5 - origin.y) / zoom)); }};
+    std::vector<int> columns(static_cast<std::size_t>(width) + 1);
+    for(int x{}; x <= width; ++ x)
+    {
+        columns[static_cast<std::size_t>(x)] = image_x(x);
+    }
+    const auto inside_row{[&](int y, std::vector<bool>& row)
+                          {
+                              const auto at_y{image_y(y)};
+                              for(int x{}; x <= width; ++ x)
+                              {
+                                  row[static_cast<std::size_t>(x)] =
+                                      selection.at(columns[static_cast<std::size_t>(x)], at_y) >= 128;
+                              }
+                          }};
+    std::vector<bool> current(static_cast<std::size_t>(width) + 1);
+    std::vector<bool> below(static_cast<std::size_t>(width) + 1);
+    inside_row(0, current);
+    for(int y{}; y < height; ++ y)
+    {
+        inside_row(y + 1, below);
+        for(int x{}; x < width; ++ x)
+        {
+            const auto here{current[static_cast<std::size_t>(x)]};
+            if(here == current[static_cast<std::size_t>(x) + 1] && here == below[static_cast<std::size_t>(x)])
+            {
+                continue;
+            }
+            pixels[static_cast<std::ptrdiff_t>(y) * width + x] = ((x + y + phase) / 4) % 2 == 0 ? 0x000000u : 0xffffffu;
+        }
+        std::swap(current, below);
+    }
+}
+
 } // namespace oui_paint

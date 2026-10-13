@@ -7,7 +7,8 @@
 namespace oui_paint
 {
 
-Document::Document(int width, int height, PixelFormat format) : m_width{width}, m_height{height}, m_format{format}
+Document::Document(int width, int height, PixelFormat format)
+    : m_width{width}, m_height{height}, m_format{format}, m_selection{width, height}
 {
     if(width <= 0 || height <= 0)
     {

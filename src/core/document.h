@@ -2,6 +2,7 @@
 
 #include "core/image.h"
 #include "core/layer.h"
+#include "core/selection.h"
 
 #include <string>
 #include <vector>
@@ -21,6 +22,8 @@ class Document
     [[nodiscard]] int height() const { return m_height; }
     [[nodiscard]] PixelFormat format() const { return m_format; }
 
+    [[nodiscard]] Selection& selection() { return m_selection; }
+    [[nodiscard]] const Selection& selection() const { return m_selection; }
     [[nodiscard]] std::vector<Layer>& layers() { return m_layers; }
     [[nodiscard]] const std::vector<Layer>& layers() const { return m_layers; }
     [[nodiscard]] std::size_t active_layer() const { return m_active_layer; }
@@ -49,6 +52,7 @@ class Document
     PixelFormat m_format;
     std::vector<Layer> m_layers;
     std::size_t m_active_layer{0};
+    Selection m_selection;
 };
 
 } // namespace oui_paint

@@ -10,12 +10,14 @@
 namespace oui_paint
 {
 
-// What a document's layers were at some moment: the layers themselves, which share their tiles with the document
+// What a document's layers and selection were at some moment: the layers themselves, which share their tiles with the document
 // until it writes to them, so keeping one costs a pointer per tile and only tiles written afterwards stay apart.
 struct LayersState
 {
     std::vector<Layer> layers;
     std::size_t active_layer{0};
+    // The selection's mask, none when nothing is selected.
+    std::optional<Layer> selection;
 
     [[nodiscard]] static LayersState of(const Document& document);
     void restore_into(Document& document) const;

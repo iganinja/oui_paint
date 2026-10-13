@@ -86,6 +86,8 @@ void CanvasView::paint(oui::Painter& painter, const oui::Theme&) const
     const auto& document{m_document.document()};
     render_view(viewport, m_document.display(), document.width(), document.height(), m_buffer.data(),
                 m_pixels->width, m_pixels->height, 0x808080u);
+    draw_selection_edge(viewport, document.selection(), m_buffer.data(), m_pixels->width, m_pixels->height,
+                        m_ants_phase);
     painter.draw_image(m_bounds, {m_buffer.data(), m_pixels->width, m_pixels->height, m_pixels->width}, {});
 }
 

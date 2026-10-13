@@ -22,7 +22,8 @@ TEST(Stroke, AHardBrushPaintsItsWidthAlongTheLineAndNothingBeyond)
     settings.width = 10.0;
     settings.hardness = 1.0;
     settings.antialias = false;
-    Stroke stroke{layer, 100, 100, {1.0, 1.0, 1.0, 1.0}, settings, StrokeMode::paint};
+    const Selection everything{100, 100};
+    Stroke stroke{layer, everything, {1.0, 1.0, 1.0, 1.0}, settings, StrokeMode::paint};
     stroke.line_to({20.5, 50.5});
     stroke.line_to({80.5, 50.5});
     EXPECT_EQ(at(layer, 50, 50).value[0], 65535);
@@ -38,7 +39,8 @@ TEST(Stroke, ASeeThroughColourDoesNotBuildUpWhereTheStrokeCrossesItself)
     BrushSettings settings;
     settings.width = 6.0;
     settings.hardness = 1.0;
-    Stroke stroke{layer, 64, 64, {1.0, 0.0, 0.0, 0.5}, settings, StrokeMode::paint};
+    const Selection everything{64, 64};
+    Stroke stroke{layer, everything, {1.0, 0.0, 0.0, 0.5}, settings, StrokeMode::paint};
     stroke.line_to({10.5, 30.5});
     stroke.line_to({50.5, 30.5});
     stroke.line_to({10.5, 30.5});
@@ -64,11 +66,27 @@ TEST(Stroke, TheEraserTakesAlphaAwayAndOnlyTheTilesWrittenAreTold)
     settings.width = 4.0;
     settings.hardness = 1.0;
     settings.antialias = false;
-    Stroke stroke{layer, 600, 100, {0, 0, 0, 1}, settings, StrokeMode::erase};
+    Stroke stroke{layer, document.selection(), {0, 0, 0, 1}, settings, StrokeMode::erase};
     stroke.line_to({300.5, 20.5});
     stroke.line_to({310.5, 20.5});
     EXPECT_EQ(layer.read(305, 20, 1, 1).pixel<GrayAlpha8>(0, 0).alpha(), 0);
     EXPECT_EQ(layer.read(305, 30, 1, 1).pixel<GrayAlpha8>(0, 0).alpha(), 255);
     EXPECT_EQ(stroke.take_changed(), (std::vector<TilePoint>{{1, 0}}));
     EXPECT_TRUE(stroke.take_changed().empty());
+}
+
+TEST(Stroke, PaintGoesOnlyWhereTheSelectionSelects)
+{
+    Layer layer{PixelFormat::gray_alpha8, "Layer"};
+    Selection selection{100, 100};
+    selection.add_rectangle({0, 0, 50, 100}, SelectionMode::replace);
+    BrushSettings settings;
+    settings.width = 4.0;
+    settings.hardness = 1.0;
+    settings.antialias = false;
+    Stroke stroke{layer, selection, {1, 1, 1, 1}, settings, StrokeMode::paint};
+    stroke.line_to({10.5, 50.5});
+    stroke.line_to({90.5, 50.5});
+    EXPECT_EQ(layer.read(40, 50, 1, 1).pixel<GrayAlpha8>(0, 0).alpha(), 255);
+    EXPECT_EQ(layer.read(60, 50, 1, 1).pixel<GrayAlpha8>(0, 0).alpha(), 0);
 }
