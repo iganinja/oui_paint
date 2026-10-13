@@ -50,6 +50,7 @@ add_library(oui_paint_core STATIC
     src/core/selection.cpp
     src/core/tile.cpp
     src/core/transform.cpp
+    src/effects/pieces.cpp
     src/render/display_cache.cpp
     src/render/viewport.cpp
     src/tools/color_math.cpp
@@ -108,6 +109,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/icons_test.cpp
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
+        tests/pieces_test.cpp
         tests/render_test.cpp
         tests/selection_test.cpp
         tests/shapes_test.cpp
