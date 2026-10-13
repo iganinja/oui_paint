@@ -113,3 +113,38 @@ TEST(Stroke, LiftedPixelsLaidElsewhereKeepTheirSelectedShape)
     EXPECT_EQ(layer.read(3, 3, 1, 1).pixel<Rgba8>(0, 0).alpha(), 0) << "a hole where it was";
     EXPECT_EQ(layer.read(51, 61, 1, 1).pixel<Rgba8>(0, 0).value, (std::array<std::uint8_t, 4>{30, 0, 0, 255}));
 }
+
+TEST(Stroke, TheCloneStampCopiesFromTheSourceAndRecolorReplacesOneColourOnly)
+{
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    Image picture{PixelFormat::rgba8, 40, 20};
+    for(int y{}; y < 20; ++ y)
+    {
+        for(int x{}; x < 40; ++ x)
+        {
+            const auto blue{x < 20};
+            picture.set_pixel(x, y, blue ? Rgba8{{0, 0, 255, 255}} : Rgba8{{255, 255, 0, 255}});
+        }
+    }
+    layer.write(picture, 0, 0);
+    const Selection everything{40, 20};
+    BrushSettings settings;
+    settings.width = 4.0;
+    settings.hardness = 1.0;
+    settings.antialias = false;
+    Stroke clone{layer, everything, {}, settings, StrokeMode::clone, {-20, 0, {}, 0.0}};
+    clone.line_to({30.5, 10.5});
+    EXPECT_EQ(layer.read(30, 10, 1, 1).pixel<Rgba8>(0, 0).value, (std::array<std::uint8_t, 4>{0, 0, 255, 255}))
+        << "the blue from 20 pixels to the left";
+    EXPECT_EQ(layer.read(36, 10, 1, 1).pixel<Rgba8>(0, 0).value[0], 255) << "outside the brush";
+
+    StrokeSource yellow;
+    yellow.match = {1, 1, 0, 1};
+    yellow.tolerance = 0.1;
+    Stroke recolor{layer, everything, {0, 1, 0, 1}, settings, StrokeMode::recolor, yellow};
+    recolor.line_to({18.5, 15.5});
+    recolor.line_to({24.5, 15.5});
+    EXPECT_EQ(layer.read(23, 15, 1, 1).pixel<Rgba8>(0, 0).value, (std::array<std::uint8_t, 4>{0, 255, 0, 255}));
+    EXPECT_EQ(layer.read(18, 15, 1, 1).pixel<Rgba8>(0, 0).value, (std::array<std::uint8_t, 4>{0, 0, 255, 255}))
+        << "blue is not yellow, so it stays";
+}

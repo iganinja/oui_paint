@@ -165,7 +165,7 @@ void ToolOptions::show_for(std::string_view tool)
     m_hardness_group->set_visible(brushing || tool == "clone_stamp" || tool == "recolor");
     m_antialias_group->set_visible(brushing || drawing || tool == "ellipse_select" || tool == "text");
     m_text_group->set_visible(tool == "text");
-    m_fill_group->set_visible(tool == "bucket" || tool == "magic_wand");
+    m_fill_group->set_visible(tool == "bucket" || tool == "magic_wand" || tool == "recolor");
     m_gradient_group->set_visible(tool == "gradient");
     m_line_group->set_visible(tool == "line");
     m_shape_group->set_visible(tool == "shapes");

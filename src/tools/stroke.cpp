@@ -52,9 +52,10 @@ template <typename PixelType> [[nodiscard]] PixelType pixel_of(const Color& colo
 
 } // namespace
 
-Stroke::Stroke(Layer& layer, const Selection& selection, Color color, BrushSettings settings, StrokeMode mode)
+Stroke::Stroke(Layer& layer, const Selection& selection, Color color, BrushSettings settings, StrokeMode mode,
+               StrokeSource source)
     : m_layer{layer}, m_selection{selection}, m_original{layer}, m_width{selection.width()},
-      m_height{selection.height()}, m_color{color}, m_settings{settings}, m_mode{mode}
+      m_height{selection.height()}, m_color{color}, m_settings{settings}, m_mode{mode}, m_source{source}
 {
 }
 
@@ -150,6 +151,48 @@ void Stroke::apply(TilePoint point, const Area& area)
                              if(m_mode == StrokeMode::paint)
                              {
                                  tile.set_pixel(x, y, blend(under, paint, covered, BlendMode::normal));
+                             }
+                             else if(m_mode == StrokeMode::clone)
+                             {
+                                 const auto from_x{point.x * tile_size + x + m_source.dx};
+                                 const auto from_y{point.y * tile_size + y + m_source.dy};
+                                 if(from_x < 0 || from_y < 0 || from_x >= m_width || from_y >= m_height)
+                                 {
+                                     continue;
+                                 }
+                                 const auto source_tile{m_original.tile({from_x / tile_size, from_y / tile_size})};
+                                 const auto copied{source_tile != nullptr
+                                                       ? source_tile->template pixel<PixelType>(from_x % tile_size,
+                                                                                                from_y % tile_size)
+                                                       : PixelType{}};
+                                 tile.set_pixel(x, y, blend(under, copied, covered, BlendMode::normal));
+                             }
+                             else if(m_mode == StrokeMode::recolor)
+                             {
+                                 // As near to the colour replaced as the tolerance allows, by the same measure as a fill.
+                                 const auto full{static_cast<double>(PixelType::full)};
+                                 auto sum{0.0};
+                                 const auto difference{[&](double a, double b) { sum += (a - b) * (a - b); }};
+                                 if constexpr(PixelType::channels == 2)
+                                 {
+                                     const auto& match{m_source.match};
+                                     const auto gray{0.299 * match.red + 0.587 * match.green + 0.114 * match.blue};
+                                     difference(under.value[0] / full, gray);
+                                     difference(under.value[0] / full, gray);
+                                     difference(under.value[0] / full, gray);
+                                     difference(under.value[1] / full, match.alpha);
+                                 }
+                                 else
+                                 {
+                                     difference(under.value[0] / full, m_source.match.red);
+                                     difference(under.value[1] / full, m_source.match.green);
+                                     difference(under.value[2] / full, m_source.match.blue);
+                                     difference(under.value[3] / full, m_source.match.alpha);
+                                 }
+                                 if(std::sqrt(sum) <= m_source.tolerance * 2.0 + 1e-6)
+                                 {
+                                     tile.set_pixel(x, y, blend(under, paint, covered, BlendMode::normal));
+                                 }
                              }
                              else
                              {

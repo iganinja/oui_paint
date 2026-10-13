@@ -164,6 +164,10 @@ class PaintApp
     // Fonts as loaded, by file and size; the bytes must outlive the fonts made of them.
     std::map<std::filesystem::path, std::string> m_font_files;
     std::map<std::pair<std::filesystem::path, int>, std::unique_ptr<olagarro::oui::Font>> m_fonts;
+    // Where the Clone Stamp copies from, set with Ctrl and a click, and how far that is from where it paints, fixed by
+    // its first stroke.
+    std::optional<Position> m_clone_source;
+    std::optional<std::pair<int, int>> m_clone_offset;
     // Where the Pan tool's drag was last, in the view.
     std::optional<Position> m_panning;
     // The marching ants move while there is a selection to show.

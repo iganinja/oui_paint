@@ -39,6 +39,21 @@ enum class StrokeMode
 {
     paint,
     erase,
+    // Copies the layer from `source_offset` away, as the Clone Stamp does.
+    clone,
+    // Paints over the pixels near enough to `match` only, as Recolor does.
+    recolor,
+};
+
+// What a clone or a recolor stroke needs besides a colour.
+struct StrokeSource
+{
+    // Where the pixels a clone copies are, from where it paints.
+    int dx{0};
+    int dy{0};
+    // The colour Recolor replaces, and how far from it a pixel may be, from 0 to 1.
+    Color match;
+    double tolerance{0.5};
 };
 
 // A stroke of a brush being drawn on a layer, from the pointer's first position to its last. Each pixel takes the most
@@ -48,7 +63,8 @@ class Stroke
 {
   public:
     // Paints only where `selection` selects, as much as it selects.
-    Stroke(Layer& layer, const Selection& selection, Color color, BrushSettings settings, StrokeMode mode);
+    Stroke(Layer& layer, const Selection& selection, Color color, BrushSettings settings, StrokeMode mode,
+           StrokeSource source = {});
 
     // Draws from the last point to `point`, in the image's pixels, whose centres are at half pixels.
     void line_to(Position point);
@@ -78,6 +94,7 @@ class Stroke
     Color m_color;
     BrushSettings m_settings;
     StrokeMode m_mode;
+    StrokeSource m_source;
     std::optional<Position> m_last;
     std::map<TilePoint, std::vector<float>> m_coverage;
     std::vector<TilePoint> m_changed;

@@ -834,7 +834,14 @@ void PaintApp::use_tool(const ToolEvent& event)
         show_typing(true);
         return;
     }
-    const auto painting{tool == "brush" || tool == "pencil" || tool == "eraser"};
+    if(tool == "clone_stamp" && event.phase == ToolEvent::Phase::press && event.control)
+    {
+        m_clone_source = event.at;
+        m_clone_offset.reset();
+        return;
+    }
+    const auto painting{tool == "brush" || tool == "pencil" || tool == "eraser" || tool == "clone_stamp" ||
+                        tool == "recolor"};
     if(!painting || document.layers().empty())
     {
         return;
@@ -850,8 +857,34 @@ void PaintApp::use_tool(const ToolEvent& event)
         }
         const auto color{event.secondary ? m_color_panel->secondary() : m_color_panel->primary()};
         open->history().begin_step(document);
+        auto mode{tool == "eraser" ? StrokeMode::erase : StrokeMode::paint};
+        StrokeSource source;
+        if(tool == "clone_stamp")
+        {
+            if(!m_clone_source)
+            {
+                open->history().cancel_step();
+                show_error("Clone Stamp", "Hold Ctrl and click where to copy from first.");
+                return;
+            }
+            if(!m_clone_offset)
+            {
+                m_clone_offset = std::make_pair(static_cast<int>(std::lround(m_clone_source->x - event.at.x)),
+                                                static_cast<int>(std::lround(m_clone_source->y - event.at.y)));
+            }
+            mode = StrokeMode::clone;
+            source.dx = m_clone_offset->first;
+            source.dy = m_clone_offset->second;
+        }
+        else if(tool == "recolor")
+        {
+            // The secondary colour becomes the primary, or the other way round with the right button.
+            mode = StrokeMode::recolor;
+            source.match = event.secondary ? m_color_panel->primary() : m_color_panel->secondary();
+            source.tolerance = m_tool_options->fill().tolerance;
+        }
         m_stroke = std::make_unique<Stroke>(document.layers()[document.active_layer()], document.selection(), color,
-                                            settings, tool == "eraser" ? StrokeMode::erase : StrokeMode::paint);
+                                            settings, mode, source);
         m_stroke->line_to(event.at);
         break;
     }
@@ -867,7 +900,11 @@ void PaintApp::use_tool(const ToolEvent& event)
             m_stroke->line_to(event.at);
             open->refresh(m_stroke->take_changed());
             m_stroke.reset();
-            const auto title{tool == "eraser" ? "Eraser" : tool == "pencil" ? "Pencil" : "Paintbrush"};
+            const auto title{tool == "eraser"        ? "Eraser"
+                             : tool == "pencil"      ? "Pencil"
+                             : tool == "clone_stamp" ? "Clone Stamp"
+                             : tool == "recolor"     ? "Recolor"
+                                                     : "Paintbrush"};
             open->history().finish_step(title, document);
             open->set_modified(true);
             refresh_titles();
