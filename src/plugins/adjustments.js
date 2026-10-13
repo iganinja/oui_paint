@@ -83,19 +83,18 @@ paint.effect({
     name: "Invert Alpha",
     menu: "Adjustments",
     parameters: [],
-    render(image) {
-        return image.rows((row) => {
-            for (let i = 0; i < row.length; i += 4) {
-                const alpha = row[i + 3];
-                const inverted = 1 - alpha;
-                // Colour is kept multiplied by alpha: it is the same colour at the new alpha.
-                const scale = alpha > 0 ? inverted / alpha : 0;
-                row[i] *= scale;
-                row[i + 1] *= scale;
-                row[i + 2] *= scale;
-                row[i + 3] = inverted;
-            }
-        });
+    parallel: true,
+    row(row) {
+        for (let i = 0; i < row.length; i += 4) {
+            const alpha = row[i + 3];
+            const inverted = 1 - alpha;
+            // Colour is kept multiplied by alpha: it is the same colour at the new alpha.
+            const scale = alpha > 0 ? inverted / alpha : 0;
+            row[i] *= scale;
+            row[i + 1] *= scale;
+            row[i + 2] *= scale;
+            row[i + 3] = inverted;
+        }
     },
 });
 

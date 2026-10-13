@@ -102,3 +102,24 @@ TEST(Plugins, HooksHearOfASave)
     EXPECT_NO_THROW(host.saved("/tmp/x.png"));
     EXPECT_THROW(host.saved("/tmp/y.png"), olagarro::oui::script::ScriptError);
 }
+
+TEST(Plugins, AParallelEffectRunsItsRowsOnEveryCoreAndGivesTheSameAsOne)
+{
+    PluginHost host;
+    host.load(R"(
+        paint.effect({
+            name: "Ramp", parallel: true, parameters: [{id: "scale", value: 1}],
+            row(row, y, values) {
+                for(let i = 0; i < row.length; i += 4) { row[i] = (y % 7) / 7 * values.scale; row[i + 1] = i / row.length; }
+            }
+        });)",
+              "parallel.js");
+    const auto& effect{named(host, "Ramp")};
+    EXPECT_TRUE(effect.parallel);
+    const auto result{host.apply(effect, gray(64, 300, 0.5f), {{"scale", 1.0}}, {})};
+    for(int y{}; y < 300; ++ y)
+    {
+        ASSERT_NEAR(result.at(10, y)[0], (y % 7) / 7.0, 1e-6) << "row " << y;
+    }
+    EXPECT_NEAR(result.at(32, 150)[1], 0.5, 1e-6);
+}

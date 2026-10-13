@@ -2,7 +2,10 @@
 
 #include <cmath>
 #include <cstdio>
+#include <algorithm>
+#include <exception>
 #include <stdexcept>
+#include <thread>
 
 using namespace olagarro;
 using oui::script::ScriptError;
@@ -167,6 +170,12 @@ PluginHost::PluginHost()
                         effect.menu = spec.get("menu").is_undefined() ? std::string{"Other"}
                                                                       : spec.get("menu").to_string();
                         effect.index = m_effects.size();
+                        effect.by_rows = spec.get("row").is_function();
+                        effect.parallel = effect.by_rows && spec.get("parallel").to_bool();
+                        if(!effect.by_rows && !spec.get("render").is_function())
+                        {
+                            throw ScriptError{effect.name + " has neither render nor row"};
+                        }
                         const auto parameters{spec.get("parameters")};
                         for(std::size_t index{}; index < parameters.length(); ++ index)
                         {
@@ -196,6 +205,10 @@ PluginHost::PluginHost()
                     });
     m_engine.define("__paint.setRunner", [this](const std::vector<Value>& arguments) {
         m_runner = arguments.at(0);
+        return m_engine.undefined();
+    });
+    m_engine.define("__paint.setRowRunner", [this](const std::vector<Value>& arguments) {
+        m_row_runner = arguments.at(0);
         return m_engine.undefined();
     });
     m_engine.define("__paint.setSaved", [this](const std::vector<Value>& arguments) {
@@ -233,6 +246,21 @@ const WorkImage& PluginHost::image(const Value& id) const
 void PluginHost::load(std::string_view source, std::string_view name)
 {
     m_engine.run(source, name);
+    m_sources.emplace_back(source, name);
+}
+
+WorkImage PluginHost::apply_rows(const Effect& effect, const WorkImage& band, int first_row, const std::string& values,
+                                 const EffectContext& context)
+{
+    const auto context_json{"{\"firstRow\":" + json_number(first_row) + ",\"primary\":" + json_color(context.primary) +
+                            ",\"secondary\":" + json_color(context.secondary) + "}"};
+    m_images.clear();
+    const auto id{keep(band)};
+    static_cast<void>(m_row_runner.call({m_engine.number(static_cast<double>(effect.index)), m_engine.number(id),
+                                         m_engine.string(values), m_engine.string(context_json)}));
+    auto made{std::move(m_images.at(id))};
+    m_images.clear();
+    return made;
 }
 
 WorkImage PluginHost::apply(const Effect& effect, const WorkImage& source, const std::map<std::string, double>& values,
@@ -249,6 +277,58 @@ WorkImage PluginHost::apply(const Effect& effect, const WorkImage& source, const
                             json_number(context.selection_x) + ",\"y\":" + json_number(context.selection_y) +
                             ",\"width\":" + json_number(context.selection_width) + ",\"height\":" +
                             json_number(context.selection_height) + "}}"};
+    if(effect.by_rows)
+    {
+        const auto cores{std::max(1u, std::thread::hardware_concurrency())};
+        const auto bands{effect.parallel ? std::min<int>(static_cast<int>(std::min(cores, 16u)), source.height) : 1};
+        if(bands <= 1)
+        {
+            return apply_rows(effect, source, 0, json, context);
+        }
+        // Each band of rows on a thread of its own, with a copy of the plugins of its own, as an engine runs on the
+        // thread that made it.
+        WorkImage result{source.width, source.height};
+        std::vector<std::thread> threads;
+        std::vector<std::exception_ptr> failures(static_cast<std::size_t>(bands));
+        for(int band{}; band < bands; ++ band)
+        {
+            const auto first{source.height * band / bands};
+            const auto last{source.height * (band + 1) / bands};
+            threads.emplace_back(
+                [&, band, first, last]
+                {
+                    try
+                    {
+                        PluginHost worker;
+                        for(const auto& [code, name] : m_sources)
+                        {
+                            worker.load(code, name);
+                        }
+                        WorkImage rows{source.width, last - first};
+                        std::copy(source.at(0, first), source.at(0, first) + rows.pixels.size(), rows.pixels.begin());
+                        const auto made{worker.apply_rows(worker.effects().at(effect.index), rows, first, json,
+                                                          context)};
+                        std::copy(made.pixels.begin(), made.pixels.end(), result.at(0, first));
+                    }
+                    catch(...)
+                    {
+                        failures[static_cast<std::size_t>(band)] = std::current_exception();
+                    }
+                });
+        }
+        for(auto& thread : threads)
+        {
+            thread.join();
+        }
+        for(const auto& failure : failures)
+        {
+            if(failure)
+            {
+                std::rethrow_exception(failure);
+            }
+        }
+        return result;
+    }
     m_images.clear();
     const auto id{keep(source)};
     const auto result{m_runner.call({m_engine.number(static_cast<double>(effect.index)), m_engine.number(id),

@@ -36,6 +36,11 @@ struct Effect
     std::string menu;
     std::vector<EffectParameter> parameters;
     std::size_t index{0};
+    // Made row by row by its `row` function rather than by `render`.
+    bool by_rows{false};
+    // Its rows may be made at once on every core, each core running its own copy of the plugins: `row` reads only the
+    // row it is given and writes only it.
+    bool parallel{false};
 };
 
 // What an effect is told besides its parameters' values.
@@ -70,6 +75,9 @@ class PluginHost
     [[nodiscard]] olagarro::oui::script::ScriptEngine& engine() { return m_engine; }
 
   private:
+    // Runs a row effect's `row` on every row of `band`, whose first row is `first_row` of the image.
+    [[nodiscard]] WorkImage apply_rows(const Effect& effect, const WorkImage& band, int first_row,
+                                       const std::string& values, const EffectContext& context);
     [[nodiscard]] int keep(WorkImage image);
     [[nodiscard]] const WorkImage& image(const olagarro::oui::script::Value& id) const;
 
@@ -79,6 +87,9 @@ class PluginHost
     std::map<int, WorkImage> m_images;
     int m_next_id{1};
     olagarro::oui::script::Value m_runner;
+    olagarro::oui::script::Value m_row_runner;
+    // Every plugin loaded, in order, for the copies that make rows on other cores.
+    std::vector<std::pair<std::string, std::string>> m_sources;
     olagarro::oui::script::Value m_saved;
 };
 

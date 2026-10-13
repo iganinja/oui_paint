@@ -61,7 +61,9 @@ class PaintImage {
 }
 
 globalThis.paint = {
-    // Declares an effect: {name, menu, parameters, render(image, values, context)}.
+    // Declares an effect: {name, menu, parameters, render(image, values, context)}, or with row(row, y, values,
+    // context) in place of render, made a row at a time; with parallel: true, those rows are made on every core at
+    // once, each core with its own copy of the plugins, without the `oui` system functions.
     effect(spec) {
         effects.push(spec);
         native.register(spec);
@@ -78,6 +80,18 @@ globalThis.paint = {
 native.setRunner((index, id, values, context) => {
     const result = effects[index].render(new PaintImage(id), JSON.parse(values), JSON.parse(context));
     return result.id;
+});
+native.setRowRunner((index, id, values, context) => {
+    const effect = effects[index];
+    const parsed = JSON.parse(values);
+    const told = JSON.parse(context);
+    const height = native.height(id);
+    for (let y = 0; y < height; y++) {
+        const row = native.row(id, y);
+        const changed = effect.row(row, told.firstRow + y, parsed, told);
+        native.setRow(id, y, changed instanceof Float32Array ? changed : row);
+    }
+    return id;
 });
 native.setSaved((path) => {
     for (const hook of saved) {
