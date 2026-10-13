@@ -1,5 +1,6 @@
 // OUI Paint: a raster image editor in the spirit of Paint.NET, in a desktop window.
 #include "app/paint_app.h"
+#include "app/window_place.h"
 
 #include <oui/file_system.h>
 #include <oui/graphics/window_backend.h>
@@ -36,6 +37,8 @@ int main(int argument_count, char* const* const arguments)
         oui::WindowOptions window_options;
         window_options.title = "OUI Paint";
         window_options.icon = oui::text_icon("P", {255, 255, 255}, {0, 120, 215});
+        // Where it was left, as big as it was.
+        window_options.geometry = oui_paint::window_place_from(settings);
         backend = oui::window_backend(window_options);
         backend->set_zoom(settings.int_value("interface_size", oui::PixelBackend::default_zoom()));
     }
@@ -57,5 +60,8 @@ int main(int argument_count, char* const* const arguments)
     {
         static_cast<void>(paint.open(oui::path_from_utf8(*path)));
     }
-    return application.exec();
+    const auto result{application.exec()};
+    oui_paint::keep_window_place(settings, window.geometry());
+    static_cast<void>(settings.save());
+    return result;
 }

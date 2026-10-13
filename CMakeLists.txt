@@ -42,6 +42,7 @@ add_library(oui_paint_core STATIC
     src/app/paint_app.cpp
     src/app/recent_files.cpp
     src/app/tools.cpp
+    src/app/window_place.cpp
     src/codecs/codecs.cpp
     src/codecs/openraster.cpp
     src/codecs/palettes.cpp
@@ -176,7 +177,8 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/text_test.cpp
         tests/tool_panel_test.cpp
         tests/tools_test.cpp
-        tests/transform_test.cpp)
+        tests/transform_test.cpp
+        tests/window_place_test.cpp)
     target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)
     gtest_discover_tests(oui_paint_tests)
 endif()
