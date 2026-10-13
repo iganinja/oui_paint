@@ -12,6 +12,14 @@ OpenDocument::OpenDocument(Document document) : m_document{std::move(document)}
     m_viewport.set_image_size(m_document.width(), m_document.height());
 }
 
+void OpenDocument::refresh(const std::vector<TilePoint>& tiles)
+{
+    for(const auto& tile : tiles)
+    {
+        m_display.invalidate(tile);
+    }
+}
+
 std::string OpenDocument::title() const
 {
     if(m_path)

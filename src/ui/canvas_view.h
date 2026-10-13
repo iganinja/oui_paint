@@ -12,8 +12,28 @@
 namespace oui_paint
 {
 
+// What the pointer does to the image with the left or the right button, for the tool in use.
+struct ToolEvent
+{
+    enum class Phase
+    {
+        press,
+        move,
+        release,
+    };
+    Phase phase{Phase::press};
+    // In the image's pixels, between whole ones too: (0.5, 0.5) is the middle of the top left pixel.
+    Position at;
+    // The right button, which paints with the secondary colour.
+    bool secondary{false};
+    bool shift{false};
+    bool control{false};
+    bool alt{false};
+};
+
 // A document as it shows in its tab, in pixels: Ctrl and the wheel zoom around the pointer, the wheel scrolls up and
-// down, Shift and the wheel sideways, and the middle button drags it about.
+// down, Shift and the wheel sideways, and the middle button drags it about. The left and right buttons go to the
+// tool in use.
 class CanvasView final : public olagarro::oui::Widget
 {
   public:
@@ -24,6 +44,7 @@ class CanvasView final : public olagarro::oui::Widget
     [[nodiscard]] const std::optional<Position>& pointer() const { return m_pointer; }
     // Called after the view changed, by zoom or scrolling, or the pointer moved over it.
     void on_changed(std::function<void()> changed);
+    void on_tool(std::function<void(const ToolEvent&)> tool);
 
     void zoom_in();
     void zoom_out();
@@ -46,6 +67,9 @@ class CanvasView final : public olagarro::oui::Widget
 
     OpenDocument& m_document;
     std::function<void()> m_changed;
+    std::function<void(const ToolEvent&)> m_tool;
+    // The button a tool is being used with, from its press to its release.
+    std::optional<bool> m_tool_button;
     std::optional<Position> m_pointer;
     std::optional<olagarro::oui::Point> m_panning_from;
     mutable bool m_fitted{false};

@@ -3,12 +3,15 @@
 #include "app/tools.h"
 #include "codecs/codecs.h"
 #include "ui/canvas_view.h"
+#include "ui/color_panel.h"
 #include "ui/main_frame.h"
 #include "ui/new_image_dialog.h"
+#include "ui/tool_options.h"
 #include "ui/tool_panel.h"
 
 #include <oui/dialogs.h>
 #include <oui/file_dialog.h>
+#include <oui/layout.h>
 #include <oui/window.h>
 
 #include <cmath>
@@ -112,6 +115,13 @@ void PaintApp::register_commands()
                                   });
         commands.bind(id, {static_cast<char32_t>(U'0' + number), false, true});
     }
+    add("edit.undo", "&Undo", [this] { undo(); }, {U'z', true});
+    add("edit.redo", "&Redo", [this] { redo(); }, {U'y', true});
+    add("colors.swap", "Swap Colors", [this] { m_color_panel->swap(); }, {U'x'});
+    add("brush.narrower", "Brush Width Down", [this] { m_tool_options->change_width(-1); }, {U'['});
+    add("brush.wider", "Brush Width Up", [this] { m_tool_options->change_width(1); }, {U']'});
+    add("brush.much_narrower", "Brush Width Down by 5", [this] { m_tool_options->change_width(-5); }, {U'[', true});
+    add("brush.much_wider", "Brush Width Up by 5", [this] { m_tool_options->change_width(5); }, {U']', true});
     // Each tool's letter, and again for the next tool with the same letter.
     for(const auto& tool : all_tools())
     {
@@ -156,11 +166,18 @@ void PaintApp::build_window()
     m_frame->menu_bar().add_menu("&File", {"file.new", "file.open", oui::menu_separator(), "file.save",
                                            "file.save_as", "file.save_all", oui::menu_separator(), "file.close",
                                            "file.quit"});
+    m_frame->menu_bar().add_menu("&Edit", {"edit.undo", "edit.redo"});
     m_frame->menu_bar().add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window",
                                            "view.actual_size"});
-    auto panel{std::make_unique<ToolPanel>(tool_buttons(), m_icons)};
-    m_tool_panel = panel.get();
-    m_frame->set_left(std::move(panel));
+    auto left{oui::column()};
+    m_tool_panel = &left->add(std::make_unique<ToolPanel>(tool_buttons(), m_icons));
+    m_tool_panel->set_selected("brush");
+    m_color_panel = &left->add(std::make_unique<ColorPanel>());
+    m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
+    m_frame->set_left(std::move(left));
+    auto options{std::make_unique<ToolOptions>(BrushSettings{})};
+    m_tool_options = options.get();
+    m_frame->set_top(std::move(options));
     auto tabs{std::make_unique<oui::TabView>()};
     m_tabs = tabs.get();
     m_tabs->set_highlight_predicate([this](std::size_t index)
@@ -222,6 +239,7 @@ void PaintApp::refresh_titles()
 void PaintApp::add(std::unique_ptr<OpenDocument> document)
 {
     auto view{std::make_unique<CanvasView>(*document)};
+    view->on_tool([this](const ToolEvent& event) { use_tool(event); });
     m_documents.push_back(std::move(document));
     auto& added{m_tabs->add_tab(m_documents.back()->title(), std::move(view))};
     m_tabs->select(m_documents.size() - 1);
@@ -403,6 +421,132 @@ bool PaintApp::close(std::size_t index)
     m_documents.erase(m_documents.begin() + static_cast<std::ptrdiff_t>(index));
     refresh_titles();
     return true;
+}
+
+void PaintApp::use_tool(const ToolEvent& event)
+{
+    auto* const open{current()};
+    if(open == nullptr)
+    {
+        return;
+    }
+    auto& document{open->document()};
+    const auto& tool{m_tool_panel->selected()};
+    if(tool == "color_picker")
+    {
+        const auto x{static_cast<int>(std::floor(event.at.x))};
+        const auto y{static_cast<int>(std::floor(event.at.y))};
+        if(x < 0 || y < 0 || x >= document.width() || y >= document.height() || event.phase == ToolEvent::Phase::release)
+        {
+            return;
+        }
+        const auto pixel{converted(document.layers()[document.active_layer()].read(x, y, 1, 1), PixelFormat::rgba16)
+                             .pixel<Rgba16>(0, 0)};
+        const Color color{pixel.value[0] / 65535.0, pixel.value[1] / 65535.0, pixel.value[2] / 65535.0,
+                          pixel.value[3] / 65535.0};
+        if(event.secondary)
+        {
+            m_color_panel->set_secondary(color);
+        }
+        else
+        {
+            m_color_panel->set_primary(color);
+        }
+        return;
+    }
+    const auto painting{tool == "brush" || tool == "pencil" || tool == "eraser"};
+    if(!painting || document.layers().empty())
+    {
+        return;
+    }
+    switch(event.phase)
+    {
+    case ToolEvent::Phase::press:
+    {
+        auto settings{m_tool_options->settings()};
+        if(tool == "pencil")
+        {
+            settings = {1.0, 1.0, false};
+        }
+        const auto color{event.secondary ? m_color_panel->secondary() : m_color_panel->primary()};
+        open->history().begin_step(document);
+        m_stroke = std::make_unique<Stroke>(document.layers()[document.active_layer()], document.width(),
+                                            document.height(), color, settings,
+                                            tool == "eraser" ? StrokeMode::erase : StrokeMode::paint);
+        m_stroke->line_to(event.at);
+        break;
+    }
+    case ToolEvent::Phase::move:
+        if(m_stroke != nullptr)
+        {
+            m_stroke->line_to(event.at);
+        }
+        break;
+    case ToolEvent::Phase::release:
+        if(m_stroke != nullptr)
+        {
+            m_stroke->line_to(event.at);
+            open->refresh(m_stroke->take_changed());
+            m_stroke.reset();
+            const auto title{tool == "eraser" ? "Eraser" : tool == "pencil" ? "Pencil" : "Paintbrush"};
+            open->history().finish_step(title, document);
+            open->set_modified(true);
+            refresh_titles();
+        }
+        return;
+    }
+    if(m_stroke != nullptr)
+    {
+        open->refresh(m_stroke->take_changed());
+    }
+}
+
+void PaintApp::undo()
+{
+    if(auto* const open{current()}; open != nullptr && m_stroke == nullptr && open->history().can_undo())
+    {
+        open->refresh(open->history().undo(open->document()));
+        open->set_modified(true);
+        refresh_titles();
+    }
+}
+
+void PaintApp::redo()
+{
+    if(auto* const open{current()}; open != nullptr && m_stroke == nullptr && open->history().can_redo())
+    {
+        open->refresh(open->history().redo(open->document()));
+        open->set_modified(true);
+        refresh_titles();
+    }
+}
+
+void PaintApp::edit_color(bool primary)
+{
+    oui::PromptOptions options;
+    options.title = primary ? "Primary Color" : "Secondary Color";
+    options.label = "Color, as #rrggbb or #rrggbbaa:";
+    options.text = to_hex(primary ? m_color_panel->primary() : m_color_panel->secondary());
+    options.validate = [](std::string_view text) -> std::optional<std::string>
+    {
+        if(!from_hex(text))
+        {
+            return "Write it as #rrggbb, or #rrggbbaa with its alpha.";
+        }
+        return std::nullopt;
+    };
+    if(const auto text{oui::prompt(m_application, options)})
+    {
+        const auto color{*from_hex(*text)};
+        if(primary)
+        {
+            m_color_panel->set_primary(color);
+        }
+        else
+        {
+            m_color_panel->set_secondary(color);
+        }
+    }
 }
 
 void PaintApp::save_all()

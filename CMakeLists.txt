@@ -42,10 +42,13 @@ add_library(oui_paint_core STATIC
     src/core/tile.cpp
     src/render/display_cache.cpp
     src/render/viewport.cpp
+    src/tools/stroke.cpp
     src/ui/canvas_view.cpp
+    src/ui/color_panel.cpp
     src/ui/icons.cpp
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
+    src/ui/tool_options.cpp
     src/ui/tool_panel.cpp)
 target_include_directories(oui_paint_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics PRIVATE oui_paint_lodepng)
@@ -77,6 +80,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/icons_test.cpp
         tests/main_frame_test.cpp
         tests/render_test.cpp
+        tests/stroke_test.cpp
         tests/tool_panel_test.cpp
         tests/tools_test.cpp)
     target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)

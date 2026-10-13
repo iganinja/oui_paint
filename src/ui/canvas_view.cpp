@@ -19,6 +19,11 @@ void CanvasView::on_changed(std::function<void()> changed)
     m_changed = std::move(changed);
 }
 
+void CanvasView::on_tool(std::function<void(const ToolEvent&)> tool)
+{
+    m_tool = std::move(tool);
+}
+
 void CanvasView::changed()
 {
     if(m_changed)
@@ -174,6 +179,34 @@ bool CanvasView::handle_event(const oui::Event& event)
         m_panning_from = *mouse->pixel;
         changed();
         return true;
+    }
+    if(at && m_tool && !mouse->middle)
+    {
+        ToolEvent tool;
+        tool.at = viewport.image_at(*at);
+        tool.shift = mouse->shift;
+        tool.control = mouse->control;
+        tool.alt = mouse->alt;
+        if(mouse->pressed && !m_tool_button)
+        {
+            m_tool_button = mouse->right;
+            tool.phase = ToolEvent::Phase::press;
+            tool.secondary = mouse->right;
+            m_tool(tool);
+        }
+        else if(m_tool_button && (mouse->dragging || mouse->right_dragging))
+        {
+            tool.phase = ToolEvent::Phase::move;
+            tool.secondary = *m_tool_button;
+            m_tool(tool);
+        }
+        else if(m_tool_button && mouse->released && mouse->right == *m_tool_button)
+        {
+            tool.phase = ToolEvent::Phase::release;
+            tool.secondary = *m_tool_button;
+            m_tool_button.reset();
+            m_tool(tool);
+        }
     }
     if(at)
     {

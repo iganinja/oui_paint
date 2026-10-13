@@ -2,6 +2,7 @@
 
 #include "app/new_image.h"
 #include "app/open_document.h"
+#include "tools/stroke.h"
 #include "ui/icons.h"
 
 #include <oui/application.h>
@@ -15,8 +16,11 @@ namespace oui_paint
 {
 
 class CanvasView;
+class ColorPanel;
 class MainFrame;
+class ToolOptions;
 class ToolPanel;
+struct ToolEvent;
 
 // OUI Paint as a whole: its window, its open documents in tabs, and the commands that work on them.
 class PaintApp
@@ -46,6 +50,12 @@ class PaintApp
 
   private:
     void register_commands();
+    // What the tool in use does with the pointer on the current document.
+    void use_tool(const ToolEvent& event);
+    void undo();
+    void redo();
+    // Asks for the primary or the secondary colour as hexadecimal.
+    void edit_color(bool primary);
     void build_window();
     [[nodiscard]] CanvasView* current_view();
     void refresh_titles();
@@ -57,6 +67,9 @@ class PaintApp
     Icons m_icons;
     MainFrame* m_frame{};
     ToolPanel* m_tool_panel{};
+    ColorPanel* m_color_panel{};
+    ToolOptions* m_tool_options{};
+    std::unique_ptr<Stroke> m_stroke;
     olagarro::oui::TabView* m_tabs{};
     std::vector<std::unique_ptr<OpenDocument>> m_documents;
     NewImage m_last_new_image;

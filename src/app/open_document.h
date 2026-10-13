@@ -2,6 +2,7 @@
 
 #include "codecs/codecs.h"
 #include "core/document.h"
+#include "core/history.h"
 #include "render/display_cache.h"
 #include "render/viewport.h"
 
@@ -25,6 +26,9 @@ class OpenDocument
     [[nodiscard]] DisplayCache& display() { return m_display; }
     [[nodiscard]] Viewport& viewport() { return m_viewport; }
     [[nodiscard]] const Viewport& viewport() const { return m_viewport; }
+    [[nodiscard]] History& history() { return m_history; }
+    // Draws again the tiles that changed.
+    void refresh(const std::vector<TilePoint>& tiles);
 
     // The file, none until it is first saved.
     [[nodiscard]] const std::optional<std::filesystem::path>& path() const { return m_path; }
@@ -40,6 +44,7 @@ class OpenDocument
     Document m_document;
     DisplayCache m_display{m_document};
     Viewport m_viewport;
+    History m_history;
     std::optional<std::filesystem::path> m_path;
     int m_untitled_number{1};
     bool m_modified{false};

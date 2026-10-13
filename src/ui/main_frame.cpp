@@ -47,6 +47,11 @@ void MainFrame::set_left(std::unique_ptr<oui::Widget> left)
     replace_slot(m_left, std::move(left));
 }
 
+void MainFrame::set_top(std::unique_ptr<oui::Widget> top)
+{
+    replace_slot(m_top, std::move(top));
+}
+
 oui::Widget* MainFrame::left()
 {
     return m_left;
@@ -69,16 +74,23 @@ void MainFrame::arrange(const oui::Rect& bounds)
     const auto status_height{m_status_bar->measure({bounds.width, bounds.height}).height};
     m_menu_bar->arrange({bounds.x, bounds.y, bounds.width, menu_height});
     m_status_bar->arrange({bounds.x, bounds.y + bounds.height - status_height, bounds.width, status_height});
-    const auto middle_height{std::max(0, bounds.height - menu_height - status_height)};
+    auto top_height{0};
+    if(m_top != nullptr)
+    {
+        top_height = m_top->measure({bounds.width, bounds.height}).height;
+        m_top->arrange({bounds.x, bounds.y + menu_height, bounds.width, top_height});
+    }
+    const auto middle_top{bounds.y + menu_height + top_height};
+    const auto middle_height{std::max(0, bounds.height - menu_height - top_height - status_height)};
     auto left_width{0};
     if(m_left != nullptr)
     {
         left_width = std::min(bounds.width, m_left->measure({bounds.width, middle_height}).width);
-        m_left->arrange({bounds.x, bounds.y + menu_height, left_width, middle_height});
+        m_left->arrange({bounds.x, middle_top, left_width, middle_height});
     }
     if(m_center != nullptr)
     {
-        m_center->arrange({bounds.x + left_width, bounds.y + menu_height, bounds.width - left_width, middle_height});
+        m_center->arrange({bounds.x + left_width, middle_top, bounds.width - left_width, middle_height});
     }
 }
 
