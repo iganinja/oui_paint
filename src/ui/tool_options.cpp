@@ -41,7 +41,8 @@ oui::ComboBox& choice(oui::Row& row, std::string_view label, std::vector<std::st
 
 } // namespace
 
-ToolOptions::ToolOptions(BrushSettings settings) : m_settings{settings}
+ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
+    : m_settings{settings}, m_fonts{std::move(fonts)}
 {
     auto& bar{oui::row(*this)};
     bar.set_gap(oui::Spacing::normal);
@@ -95,6 +96,30 @@ ToolOptions::ToolOptions(BrushSettings settings) : m_settings{settings}
     m_shape_kind = &choice(*m_shape_group, "&Shape:", {"Rectangle", "Rounded Rectangle", "Ellipse"});
     m_shape_style = &choice(*m_shape_group, "St&yle:", {"Outline", "Filled", "Filled with Outline"});
 
+    m_text_group = &group(bar);
+    std::vector<std::string> names;
+    std::size_t chosen{};
+    for(const auto& family : m_fonts)
+    {
+        // A plain sans serif to start with, as Paint.NET starts with its system's.
+        if(family.name == "DejaVu Sans" || family.name == "Noto Sans" || family.name == "Arial")
+        {
+            chosen = names.size();
+        }
+        names.push_back(family.name);
+    }
+    if(names.empty())
+    {
+        names.emplace_back("(no fonts)");
+    }
+    m_font = &choice(*m_text_group, "&Font:", names);
+    m_font->set_selected(chosen);
+    auto& size_label{oui::label("Si&ze:", *m_text_group)};
+    m_font_size = &oui::number_field(*m_text_group);
+    m_font_size->set_range(4, 1000);
+    m_font_size->set_value(32);
+    size_label.set_buddy(m_font_size->text_field());
+
     static_cast<void>(m_width->on_changed(
         [this](double value)
         {
@@ -138,7 +163,8 @@ void ToolOptions::show_for(std::string_view tool)
     const auto drawing{tool == "line" || tool == "shapes"};
     m_width_group->set_visible(brushing || drawing || tool == "clone_stamp" || tool == "recolor");
     m_hardness_group->set_visible(brushing || tool == "clone_stamp" || tool == "recolor");
-    m_antialias_group->set_visible(brushing || drawing || tool == "ellipse_select");
+    m_antialias_group->set_visible(brushing || drawing || tool == "ellipse_select" || tool == "text");
+    m_text_group->set_visible(tool == "text");
     m_fill_group->set_visible(tool == "bucket" || tool == "magic_wand");
     m_gradient_group->set_visible(tool == "gradient");
     m_line_group->set_visible(tool == "line");
@@ -168,6 +194,16 @@ LineSettings ToolOptions::line() const
 ShapeSettings ToolOptions::shape() const
 {
     return {static_cast<ShapeKind>(m_shape_kind->selected()), static_cast<ShapeStyle>(m_shape_style->selected())};
+}
+
+const FontFamily* ToolOptions::font() const
+{
+    return m_fonts.empty() ? nullptr : &m_fonts[m_font->selected()];
+}
+
+double ToolOptions::font_size() const
+{
+    return m_font_size->value();
 }
 
 void ToolOptions::change_width(double step)

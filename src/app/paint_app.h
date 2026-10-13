@@ -7,12 +7,14 @@
 #include "ui/icons.h"
 
 #include <oui/application.h>
+#include <oui/graphics/font.h>
 #include <oui/graphics/pixel_backend.h>
 #include <oui/settings.h>
 #include <oui/tab_view.h>
 
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -83,7 +85,12 @@ class PaintApp
     void paste(PasteInto into);
     // Uses Move Selected Pixels, or Move Selection when `outline_only`.
     void move_selected(const ToolEvent& event, bool outline_only);
-    // Puts floating pixels down where they are.
+    // What the Text tool does with a key: true when it took it.
+    bool type_key(const olagarro::oui::Event& event);
+    // Draws the text being typed, with its cursor while it is being typed.
+    void show_typing(bool with_cursor);
+    [[nodiscard]] olagarro::oui::Font* text_font();
+    // Puts floating pixels down where they are, and text being typed.
     void settle();
     // Starts or stops the marching ants as the current document has a selection or not.
     void update_ants();
@@ -145,6 +152,18 @@ class PaintApp
         bool secondary{false};
     };
     std::optional<Dragging> m_dragging;
+    // Text being typed with the Text tool: where, what, and the layer before it.
+    struct Typing
+    {
+        OpenDocument* document{};
+        Position at;
+        std::string text;
+        Layer base;
+    };
+    std::optional<Typing> m_typing;
+    // Fonts as loaded, by file and size; the bytes must outlive the fonts made of them.
+    std::map<std::filesystem::path, std::string> m_font_files;
+    std::map<std::pair<std::filesystem::path, int>, std::unique_ptr<olagarro::oui::Font>> m_fonts;
     // Where the Pan tool's drag was last, in the view.
     std::optional<Position> m_panning;
     // The marching ants move while there is a selection to show.

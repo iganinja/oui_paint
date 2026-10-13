@@ -29,6 +29,16 @@ void CanvasView::on_pointer(std::function<oui::Pointer(bool held)> pointer)
     m_pointer_for_tool = std::move(pointer);
 }
 
+void CanvasView::on_keys(std::function<bool(const oui::Event&)> keys)
+{
+    m_keys = std::move(keys);
+}
+
+bool CanvasView::claims_key(const oui::Event& key) const
+{
+    return m_claiming_keys && (std::holds_alternative<oui::KeyEvent>(key) || std::holds_alternative<oui::TextEvent>(key));
+}
+
 void CanvasView::changed()
 {
     if(m_changed)
@@ -109,6 +119,11 @@ std::optional<Position> CanvasView::in_view(const oui::MouseEvent& mouse) const
 bool CanvasView::handle_event(const oui::Event& event)
 {
     auto& viewport{m_document.viewport()};
+    if(m_claiming_keys && m_keys &&
+       (std::holds_alternative<oui::KeyEvent>(event) || std::holds_alternative<oui::TextEvent>(event)) && m_keys(event))
+    {
+        return true;
+    }
     if(const auto* const key{std::get_if<oui::KeyEvent>(&event)}; key != nullptr && !key->control && !key->alt)
     {
         // Page Up and Page Down scroll a view's height, less a little to keep one's place; Home and End go to the

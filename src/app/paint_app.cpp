@@ -1,11 +1,13 @@
 #include "app/paint_app.h"
 
+#include "app/fonts.h"
 #include "app/tools.h"
 #include "codecs/codecs.h"
 #include "codecs/openraster.h"
 #include "tools/fill.h"
 #include "tools/gradient.h"
 #include "tools/shapes.h"
+#include "tools/text.h"
 #include "ui/canvas_view.h"
 #include "ui/color_dialog.h"
 #include "ui/color_panel.h"
@@ -19,6 +21,7 @@
 #include <oui/dialogs.h>
 #include <oui/file_dialog.h>
 #include <oui/layout.h>
+#include <oui/utf8.h>
 #include <oui/window.h>
 
 #include <algorithm>
@@ -403,7 +406,7 @@ void PaintApp::build_window()
             }
         });
     m_frame->set_right(std::move(layers));
-    auto options{std::make_unique<ToolOptions>(BrushSettings{})};
+    auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
     m_tool_options = options.get();
     m_frame->set_top(std::move(options));
     auto tabs{std::make_unique<oui::TabView>()};
@@ -469,6 +472,7 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
 {
     auto view{std::make_unique<CanvasView>(*document)};
     view->on_tool([this](const ToolEvent& event) { use_tool(event); });
+    view->on_keys([this](const oui::Event& event) { return type_key(event); });
     view->on_pointer(
         [this](bool held)
         {
@@ -781,7 +785,11 @@ void PaintApp::use_tool(const ToolEvent& event)
         move_selected(event, tool == "move_selection");
         return;
     }
-    settle();
+    // The Text tool keeps typing across its own clicks; any other tool puts down what was floating.
+    if(tool != "text")
+    {
+        settle();
+    }
     if(tool == "rectangle_select" || tool == "ellipse_select")
     {
         select_shape(event, tool == "ellipse_select");
@@ -810,6 +818,20 @@ void PaintApp::use_tool(const ToolEvent& event)
     if(tool == "gradient" || tool == "line" || tool == "shapes")
     {
         drag_draw(event, tool);
+        return;
+    }
+    if(tool == "text" && event.phase == ToolEvent::Phase::press)
+    {
+        // A click puts down what was typed and starts typing anew where it is.
+        settle();
+        open->history().begin_step(document);
+        m_typing = Typing{open, {std::floor(event.at.x), std::floor(event.at.y)}, {},
+                          document.layers()[document.active_layer()]};
+        if(auto* const view{current_view()})
+        {
+            view->claim_keys(true);
+        }
+        show_typing(true);
         return;
     }
     const auto painting{tool == "brush" || tool == "pencil" || tool == "eraser"};
@@ -1245,9 +1267,146 @@ void PaintApp::paste(PasteInto into)
     update_ants();
 }
 
+oui::Font* PaintApp::text_font()
+{
+    const auto* const family{m_tool_options->font()};
+    if(family == nullptr)
+    {
+        return nullptr;
+    }
+    const auto size{static_cast<int>(std::lround(m_tool_options->font_size()))};
+    const auto key{std::make_pair(family->path, size)};
+    if(const auto found{m_fonts.find(key)}; found != m_fonts.end())
+    {
+        return found->second.get();
+    }
+    auto& bytes{m_font_files[family->path]};
+    if(bytes.empty())
+    {
+        std::string error;
+        if(const auto read{read_file(family->path, error)})
+        {
+            bytes = *read;
+        }
+    }
+    try
+    {
+        return m_fonts.emplace(key, oui::truetype_font(bytes, static_cast<float>(size))).first->second.get();
+    }
+    catch(const std::exception&)
+    {
+        return nullptr;
+    }
+}
+
+void PaintApp::show_typing(bool with_cursor)
+{
+    if(!m_typing)
+    {
+        return;
+    }
+    auto& open{*m_typing->document};
+    auto& document{open.document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    const auto before{LayersState::of(document)};
+    layer = m_typing->base;
+    if(auto* const font{text_font()})
+    {
+        const auto& color{m_color_panel->primary()};
+        static_cast<void>(draw_text(layer, document.selection(), *font, m_typing->text, m_typing->at, color,
+                                    m_tool_options->settings().antialias));
+        if(with_cursor)
+        {
+            // A thin line after the last character, as tall as a line of text.
+            const auto last_line{m_typing->text.substr(m_typing->text.rfind('\n') == std::string::npos
+                                                           ? 0
+                                                           : m_typing->text.rfind('\n') + 1)};
+            const auto lines{std::count(m_typing->text.begin(), m_typing->text.end(), '\n')};
+            const auto x{m_typing->at.x + font->measure(last_line) + 1.0};
+            const auto top{m_typing->at.y + static_cast<double>(lines) * font->line_height()};
+            static_cast<void>(draw_line(layer, document.selection(), {x, top}, {x, top + font->line_height()}, color,
+                                        1.0, false, {}));
+        }
+    }
+    open.refresh(changed_tiles(before, LayersState::of(document)));
+}
+
+bool PaintApp::type_key(const oui::Event& event)
+{
+    if(!m_typing)
+    {
+        return false;
+    }
+    auto& text{m_typing->text};
+    if(const auto* const typed{std::get_if<oui::TextEvent>(&event)})
+    {
+        if(typed->control || typed->alt)
+        {
+            return false;
+        }
+        text += oui::encode_utf8(typed->codepoint);
+    }
+    else if(const auto* const key{std::get_if<oui::KeyEvent>(&event)})
+    {
+        switch(key->key)
+        {
+        case oui::Key::enter:
+            text += '\n';
+            break;
+        case oui::Key::space:
+            text += ' ';
+            break;
+        case oui::Key::backspace:
+            // The last character, whatever bytes it takes.
+            while(!text.empty() && (static_cast<unsigned char>(text.back()) & 0xc0u) == 0x80u)
+            {
+                text.pop_back();
+            }
+            if(!text.empty())
+            {
+                text.pop_back();
+            }
+            break;
+        case oui::Key::escape:
+            settle();
+            return true;
+        default:
+            return false;
+        }
+    }
+    else
+    {
+        return false;
+    }
+    show_typing(true);
+    return true;
+}
+
 void PaintApp::settle()
 {
     m_floating.reset();
+    if(m_typing)
+    {
+        // What was typed stays, without its cursor, as one step.
+        show_typing(false);
+        auto& open{*m_typing->document};
+        const auto typed{!m_typing->text.empty()};
+        m_typing.reset();
+        if(typed)
+        {
+            open.history().finish_step("Text", open.document());
+            open.set_modified(true);
+            refresh_titles();
+        }
+        else
+        {
+            open.history().cancel_step();
+        }
+    }
+    if(auto* const view{current_view()})
+    {
+        view->claim_keys(false);
+    }
 }
 
 void PaintApp::update_ants()

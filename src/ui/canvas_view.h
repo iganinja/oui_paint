@@ -47,6 +47,9 @@ class CanvasView final : public olagarro::oui::Widget
     // Called after the view changed, by zoom or scrolling, or the pointer moved over it.
     void on_changed(std::function<void()> changed);
     void on_tool(std::function<void(const ToolEvent&)> tool);
+    // While `claiming`, the keys typed go to `keys` before the program's shortcuts, as the Text tool needs.
+    void claim_keys(bool claiming) { m_claiming_keys = claiming; }
+    void on_keys(std::function<bool(const olagarro::oui::Event&)> keys);
     // What the pointer looks like over the image, as the tool in use asks, told whether a button is held.
     void on_pointer(std::function<olagarro::oui::Pointer(bool held)> pointer);
 
@@ -64,6 +67,7 @@ class CanvasView final : public olagarro::oui::Widget
     [[nodiscard]] bool takes_raw_pointer() const override;
     [[nodiscard]] olagarro::oui::Pointer pointer_at(olagarro::oui::Point point) const override;
     [[nodiscard]] bool is_focusable() const override;
+    [[nodiscard]] bool claims_key(const olagarro::oui::Event& key) const override;
 
   private:
     // The middle of the view, in its pixels.
@@ -76,6 +80,8 @@ class CanvasView final : public olagarro::oui::Widget
     std::function<void()> m_changed;
     std::function<void(const ToolEvent&)> m_tool;
     std::function<olagarro::oui::Pointer(bool)> m_pointer_for_tool;
+    std::function<bool(const olagarro::oui::Event&)> m_keys;
+    bool m_claiming_keys{false};
     // The button a tool is being used with, from its press to its release.
     std::optional<bool> m_tool_button;
     std::optional<Position> m_pointer;

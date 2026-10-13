@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/fonts.h"
 #include "tools/fill.h"
 #include "tools/gradient.h"
 #include "tools/shapes.h"
@@ -28,7 +29,8 @@ namespace oui_paint
 class ToolOptions final : public olagarro::oui::Container
 {
   public:
-    explicit ToolOptions(BrushSettings settings);
+    // `fonts` are those the Text tool offers.
+    ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts);
 
     // Shows the options of the tool called `tool`.
     void show_for(std::string_view tool);
@@ -39,6 +41,9 @@ class ToolOptions final : public olagarro::oui::Container
     [[nodiscard]] bool gradient_transparency() const;
     [[nodiscard]] LineSettings line() const;
     [[nodiscard]] ShapeSettings shape() const;
+    // The Text tool's font, none when there are no fonts, and its size in pixels.
+    [[nodiscard]] const FontFamily* font() const;
+    [[nodiscard]] double font_size() const;
     // Width by `step` pixels, kept from 1 to the widest, as [ and ] do.
     void change_width(double step);
     // Called after a brush option changed.
@@ -59,6 +64,10 @@ class ToolOptions final : public olagarro::oui::Container
     olagarro::oui::Row* m_gradient_group{};
     olagarro::oui::Row* m_line_group{};
     olagarro::oui::Row* m_shape_group{};
+    olagarro::oui::Row* m_text_group{};
+    std::vector<FontFamily> m_fonts;
+    olagarro::oui::ComboBox* m_font{};
+    olagarro::oui::NumberField* m_font_size{};
     olagarro::oui::NumberField* m_width{};
     olagarro::oui::Slider* m_width_slider{};
     olagarro::oui::NumberField* m_hardness{};

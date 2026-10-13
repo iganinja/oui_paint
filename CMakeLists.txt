@@ -33,6 +33,7 @@ target_compile_options(oui_paint_miniz PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/W0,
 
 # Everything but main(), so the tests reach it too.
 add_library(oui_paint_core STATIC
+    src/app/fonts.cpp
     src/app/new_image.cpp
     src/app/open_document.cpp
     src/app/paint_app.cpp
@@ -55,6 +56,7 @@ add_library(oui_paint_core STATIC
     src/tools/gradient.cpp
     src/tools/shapes.cpp
     src/tools/stroke.cpp
+    src/tools/text.cpp
     src/ui/canvas_view.cpp
     src/ui/color_dialog.cpp
     src/ui/color_panel.cpp
@@ -96,6 +98,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/color_math_test.cpp
         tests/core_test.cpp
         tests/fill_test.cpp
+        tests/fonts_test.cpp
         tests/gradient_test.cpp
         tests/history_test.cpp
         tests/icons_test.cpp
@@ -105,6 +108,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/selection_test.cpp
         tests/shapes_test.cpp
         tests/stroke_test.cpp
+        tests/text_test.cpp
         tests/tool_panel_test.cpp
         tests/tools_test.cpp)
     target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)
