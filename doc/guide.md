@@ -1,0 +1,126 @@
+# OUI Paint
+
+A raster image editor in the spirit of Paint.NET: layers, selections that can be moved, turned and scaled, Paint.NET's
+tools and keys, 8 and 16 bits per channel, indexed images with palettes, and effects written as plugins.
+
+## The window
+
+- **Tools** run down the left, with the primary and secondary colors and a palette of colors under them. A tool's
+  letter picks it; pressing it again goes to the next tool sharing it, as S goes through the selection tools.
+- **The tool's options**, such as the brush width, sit in the bar under the menus.
+- **Each open image** has a tab over the canvas. Ctrl+Tab goes to the next one.
+- **Layers** are on the right, and, in an indexed image, its palettes under them.
+- **The status bar** says where the pointer is in the image, its size and kind, and the zoom.
+
+The left button paints with the primary color and the right button with the secondary one. View > Bigger Interface
+and Smaller Interface change the size of everything but the image; the size is kept for the next time.
+
+## Moving around
+
+| Keys or mouse | What it does |
+|---|---|
+| Ctrl+wheel | Zoom around the pointer |
+| Ctrl++, Ctrl+- | Zoom in, zoom out |
+| Ctrl+B | Zoom to fit the window |
+| Ctrl+0 | Actual size |
+| Wheel, Shift+wheel | Scroll up and down, sideways |
+| Middle button drag, or the Pan tool (H) | Pan |
+
+## Selections
+
+Rectangle Select, Lasso Select, Ellipse Select and the Magic Wand choose what the other tools and the effects work
+on. While dragging:
+
+| Mouse | What it does |
+|---|---|
+| Drag | A new selection |
+| Ctrl+drag | Add to the selection |
+| Alt+drag | Take away from it |
+| Alt+right drag | Keep only what both cover |
+| Ctrl+right drag | Invert what it covers |
+| Shift | Keep a rectangle or an ellipse square or round |
+
+Ctrl+A selects everything, Ctrl+D deselects, Ctrl+I inverts. Delete erases what is selected and Backspace
+fills it with the primary color.
+
+**Move Selected Pixels** (M) lifts what is selected so it can be dragged, scaled by its handles and turned by
+dragging with the right button; Shift keeps its proportions while scaling and turns it in steps of 15 degrees. **Move Selection** (M again) moves only the outline.
+Edit > Flip Selection and Rotate Selection flip and turn what is selected in place.
+
+## Painting
+
+| Tool | Key | What it does |
+|---|---|---|
+| Paintbrush | B | Soft or hard by its hardness, smooth edges with antialiasing |
+| Pencil | P | One pixel wide, never smoothed |
+| Eraser | E | Paints transparency |
+| Paint Bucket | F | Fills the area of similar color |
+| Gradient | G | From where the drag starts to where it ends |
+| Clone Stamp | L | Ctrl+click picks where it copies from, then painting copies from there |
+| Recolor | R | Changes the secondary color into the primary one where it paints; the right button, the other way round |
+| Color Picker | K | Takes the color under the pointer: left for the primary, right for the secondary |
+| Text | T | Types text where clicked |
+| Line / Curve, Shapes | O | Drag from one end or corner to the other; Shift keeps lines to steps of 15 degrees and shapes square or round |
+
+[ and ] make the brush narrower and wider; with Ctrl, by 5. X swaps the primary and secondary colors.
+
+## Layers
+
+Each layer has a name, can be shown or hidden, and has an opacity and a blend mode, as Paint.NET's (F4 opens its
+properties). The buttons under the list add, delete, duplicate, merge down and move the layer up and down. Saving
+to a format of one layer, such as PNG, saves the image flattened; the layers stay in the open image, and OpenRaster
+(.ora) keeps them.
+
+## Depth
+
+A new image is 8 or 16 bits per channel, in color or in grayscale. 16 bits keeps fine steps that 8 bits loses, as in
+a heightmap or a smooth gradient; PNG saves 16 bits, JPEG and BMP only 8, and saving asks before losing the
+difference.
+
+## Indexed images and palettes
+
+In an indexed image each pixel does not hold a color: it holds a number, the place of its color in a palette.
+
+- **An image can have several palettes of the same size.** Each layer uses one of them. A new indexed image asks how
+  many palettes and how many colors in each.
+- **The palettes panel**, under the layers, shows each palette as a row of colors. The palette of the layer being
+  worked on is marked with ">"; clicking another palette's number gives it to the layer.
+- **Clicking a color** picks it to paint with, the left button for the primary and the right one for the secondary.
+  Double-clicking it changes the color: every pixel using it changes with it.
+- **The see-through color** is shown with "/". Painting with it erases.
+- **Painting with any other color** uses the palette's nearest color: an indexed image never gets colors outside its
+  palettes, and is never smoothed.
+- **Reordering palettes** (Image > Palettes > Move the Layer's Palette Up or Down) moves them with what uses them,
+  which changes how the image looks when it is saved as an indexed PNG of every palette in order.
+- **Allowed colors** (Image > Palettes > Load Allowed Colors) limits the colors a palette may take to a list, such as
+  what a machine can show; a color chosen outside it becomes the nearest allowed one.
+
+The palettes are saved apart, as a palette setup in JSON (Image > Palettes > Save Palette Setup); one palette can be
+loaded or saved alone as .pal, .gpl or .act, or taken from an image's palette.
+
+Opening a PNG that has a palette asks whether to keep it indexed or open it in colors. Saving an indexed image as PNG
+asks whether to save it indexed, with every palette one after the other, or in colors. Image > Convert to Indexed and
+Convert to Color change an open image from one to the other.
+
+## Files
+
+| Format | Opens | Saves |
+|---|---|---|
+| OpenRaster (.ora) | with its layers | with its layers |
+| PNG | 8 and 16 bits, and with a palette | 8 and 16 bits, and indexed |
+| JPEG, BMP, TGA | yes | yes, at 8 bits |
+| GIF | yes | no |
+| Raw 16-bit heightmap (.r16, .raw) | yes, asking its size | yes |
+
+Copy and paste work with other programs both ways. File > Open Recent lists the last files opened or saved.
+
+## Effects
+
+Adjustments and Effects run on the selection, or on the whole layer when nothing is selected; their dialogs show the
+change as the values move. Ctrl+F repeats the last effect. Every effect is a plugin, and more can be added: see
+[Plugins](plugins.md).
+
+## Settings
+
+OUI Paint keeps its settings in `oui_paint.ini`: beside the program when its folder can be written to, in the user's
+configuration folder when not. The `plugins` folder beside it holds the plugins added.

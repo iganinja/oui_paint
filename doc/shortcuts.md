@@ -39,7 +39,7 @@ Pressing a tool's letter again goes to the next tool that shares it.
 | Ctrl+Shift+S | Save As |
 | Ctrl+Alt+S | Save All |
 | Ctrl+P | Print |
-| Alt+F4 | Exit |
+| Ctrl+Q, Alt+F4 | Exit |
 
 ## Edit
 

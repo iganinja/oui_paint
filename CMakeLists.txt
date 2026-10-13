@@ -35,6 +35,7 @@ target_compile_options(oui_paint_miniz PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/W0,
 add_library(oui_paint_core STATIC
     src/app/file_filters.cpp
     src/app/fonts.cpp
+    src/app/help.cpp
     src/app/new_image.cpp
     src/app/open_document.cpp
     src/app/paint_app.cpp
@@ -71,6 +72,7 @@ add_library(oui_paint_core STATIC
     src/ui/color_dialog.cpp
     src/ui/color_panel.cpp
     src/ui/effect_dialog.cpp
+    src/ui/help_dialogs.cpp
     src/ui/icons.cpp
     src/ui/layer_properties_dialog.cpp
     src/ui/layers_panel.cpp
@@ -100,6 +102,26 @@ olagarro_embed_files(oui_paint_core FUNCTION embedded_icons FILES ${OUI_PAINT_IC
 # The plugins built in, the prelude every plugin runs after first.
 olagarro_embed_files(oui_paint_core FUNCTION embedded_plugins
     FILES src/plugins/prelude.js src/plugins/adjustments.js src/plugins/effects.js)
+# The help, and OUI Paint's license, which About shows.
+olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_help FILES doc/guide.md doc/plugins.md LICENSE)
+# The licenses of what the program carries, which a copy of it has to carry: in the order help.cpp names them.
+set(OUI_PAINT_NOTICES
+    third_party/olagarro/LICENSE
+    third_party/olagarro/third_party/quickjs-ng/LICENSE
+    third_party/olagarro/third_party/nanosvg/LICENSE.txt
+    third_party/stb/LICENSE
+    third_party/lodepng/LICENSE
+    third_party/miniz/LICENSE
+    third_party/olagarro/licenses/SDL3.txt
+    third_party/olagarro/oui/fonts/spleen_license.txt
+    third_party/olagarro/oui/fonts/jersey10_ofl.txt
+    icons/godot/LICENSE.txt)
+if(WIN32)
+    list(APPEND OUI_PAINT_NOTICES third_party/olagarro/licenses/mingw-w64-runtime.txt
+        third_party/olagarro/licenses/winpthreads.txt)
+endif()
+olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_notices FILES ${OUI_PAINT_NOTICES})
+target_compile_definitions(oui_paint_core PRIVATE OUI_PAINT_VERSION="${PROJECT_VERSION}")
 
 add_executable(oui_paint src/main.cpp)
 target_link_libraries(oui_paint PRIVATE oui_paint_core olagarro::OUIWindow)
@@ -126,6 +148,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/floating_test.cpp
         tests/fonts_test.cpp
         tests/gradient_test.cpp
+        tests/help_test.cpp
         tests/history_test.cpp
         tests/icons_test.cpp
         tests/indexed_test.cpp

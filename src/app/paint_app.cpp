@@ -1,6 +1,7 @@
 #include "app/paint_app.h"
 
 #include "app/file_filters.h"
+#include "app/help.h"
 #include "app/fonts.h"
 #include "app/recent_files.h"
 #include "app/tools.h"
@@ -13,6 +14,7 @@
 #include "tools/text.h"
 #include "ui/canvas_view.h"
 #include "ui/color_dialog.h"
+#include "ui/help_dialogs.h"
 #include "ui/color_panel.h"
 #include "ui/effect_dialog.h"
 #include "ui/layer_properties_dialog.h"
@@ -127,6 +129,7 @@ void PaintApp::register_commands()
     add("file.close", "&Close", [this] { static_cast<void>(close(m_tabs->selected_index())); }, {U'w', true});
     commands.bind("file.close", oui::KeyShortcut{oui::Key::f4, true});
     commands.register_command("file.quit", "E&xit", [this] { quit(); });
+    commands.bind("file.quit", {U'q', true});
     commands.bind("file.quit", oui::KeyShortcut{oui::Key::f4, false, true});
     const auto switch_tab{[this](int step)
                           {
@@ -316,6 +319,9 @@ void PaintApp::register_commands()
         {U',', true});
     add("layers.properties", "Layer &Properties...", [this] { layer_properties(); },
         oui::Shortcut{0, false, false, false, oui::Key::f4});
+    add("help.documentation", "&Documentation", [this] { show_help(m_application, help_pages(m_application.commands())); },
+        oui::Shortcut{0, false, false, false, oui::Key::f1});
+    commands.register_command("help.about", "&About OUI Paint", [this] { show_about(m_application); });
     const auto select_layer{[this](int step, bool to_end)
                             {
                                 return [this, step, to_end]
@@ -2522,6 +2528,7 @@ void PaintApp::load_plugins()
     }
     m_frame->menu_bar().add_menu("&Adjustments", std::move(adjustments));
     m_frame->menu_bar().add_menu("Effe&cts", std::move(effects));
+    m_frame->menu_bar().add_menu("&Help", {"help.documentation", oui::menu_separator(), "help.about"});
     if(!failures.empty())
     {
         show_error("Plugins", "These plugins could not be loaded:\n" + failures);

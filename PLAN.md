@@ -204,3 +204,13 @@ and load. Missing ones are drawn in the same style.
    files, indexed and true-color saving.
 8. **More formats:** TIFF, PGM/PPM, 32-bit float if needed.
 9. **Windows:** clipboard, pointers and anything else system-specific.
+10. **Help:** the guide, every key and how to write plugins inside the program (F1); About with the license and the
+    third-party notices.
+11. **Installing and updating:** a Windows installer made with OUI that also updates and uninstalls: it asks GitHub
+    for the latest release, downloads it, checks it is signed by the project's key, and replaces the program with
+    the system's permission; on Linux, through apt when installed as a package, or replacing the program.
+12. **Preferences:** the language, and what else is chosen once rather than per image.
+
+## Wanted
+
+- The numeric fields' arrows one over the other, not side by side (OUI's NumberField).
