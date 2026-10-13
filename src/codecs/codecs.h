@@ -19,6 +19,8 @@ enum class FileFormat
     gif,
     // 16-bit grey values, little-endian, row after row, with no header: a heightmap.
     raw16,
+    // Layers and all: openraster.h reads and writes it.
+    openraster,
 };
 
 // The format a file name's extension says, none for one it does not know.

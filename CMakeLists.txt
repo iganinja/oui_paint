@@ -26,6 +26,11 @@ add_library(oui_paint_lodepng STATIC third_party/lodepng/lodepng.cpp)
 target_include_directories(oui_paint_lodepng PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lodepng)
 target_compile_options(oui_paint_lodepng PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/W0,-w>)
 
+# miniz zips OpenRaster files, used as it comes.
+add_library(oui_paint_miniz STATIC third_party/miniz/miniz.c)
+target_include_directories(oui_paint_miniz PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/miniz)
+target_compile_options(oui_paint_miniz PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/W0,-w>)
+
 # Everything but main(), so the tests reach it too.
 add_library(oui_paint_core STATIC
     src/app/new_image.cpp
@@ -33,7 +38,9 @@ add_library(oui_paint_core STATIC
     src/app/paint_app.cpp
     src/app/tools.cpp
     src/codecs/codecs.cpp
+    src/codecs/openraster.cpp
     src/codecs/stb_api.cpp
+    src/codecs/zip_api.cpp
     src/core/document.cpp
     src/core/history.cpp
     src/core/image.cpp
@@ -53,10 +60,11 @@ add_library(oui_paint_core STATIC
     src/ui/tool_options.cpp
     src/ui/tool_panel.cpp)
 target_include_directories(oui_paint_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics PRIVATE oui_paint_lodepng)
+target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics PRIVATE oui_paint_lodepng oui_paint_miniz)
 target_include_directories(oui_paint_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb)
-# stb is used as it comes, so OUI Paint's warnings stay off it.
-set_source_files_properties(src/codecs/stb_api.cpp PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/W0,-w>")
+# stb and miniz are used as they come, so OUI Paint's warnings stay off the files that hold them.
+set_source_files_properties(src/codecs/stb_api.cpp src/codecs/zip_api.cpp
+    PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/W0,-w>")
 
 # The icons the program shows, built into it. Only those it uses: add one here when a button or a menu needs it.
 set(OUI_PAINT_GODOT_ICONS
@@ -83,6 +91,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/history_test.cpp
         tests/icons_test.cpp
         tests/main_frame_test.cpp
+        tests/openraster_test.cpp
         tests/render_test.cpp
         tests/stroke_test.cpp
         tests/tool_panel_test.cpp

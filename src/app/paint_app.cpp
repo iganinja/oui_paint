@@ -2,6 +2,7 @@
 
 #include "app/tools.h"
 #include "codecs/codecs.h"
+#include "codecs/openraster.h"
 #include "ui/canvas_view.h"
 #include "ui/color_panel.h"
 #include "ui/layer_properties_dialog.h"
@@ -31,7 +32,9 @@ namespace
 const std::vector<oui::FileFilter>& image_filters()
 {
     static const std::vector<oui::FileFilter> filters{
-        {"Images (*.png, *.jpg, *.bmp, *.tga, *.gif, *.r16)", "*.png *.jpg *.jpeg *.bmp *.tga *.gif *.r16 *.raw"},
+        {"Images (*.ora, *.png, *.jpg, *.bmp, *.tga, *.gif, *.r16)",
+         "*.ora *.png *.jpg *.jpeg *.bmp *.tga *.gif *.r16 *.raw"},
+        {"OpenRaster, with layers (*.ora)", "*.ora"},
         {"PNG (*.png)", "*.png"},
         {"JPEG (*.jpg)", "*.jpg *.jpeg"},
         {"BMP (*.bmp)", "*.bmp"},
@@ -419,6 +422,20 @@ bool PaintApp::open(const std::filesystem::path& path)
         show_error("Open", error);
         return false;
     }
+    if(file_format_of(path.string()) == FileFormat::openraster)
+    {
+        auto layered{read_openraster(*bytes, error)};
+        if(!layered)
+        {
+            show_error("Open", path.filename().string() + ": " + error);
+            return false;
+        }
+        auto document{std::make_unique<OpenDocument>(std::move(*layered))};
+        document->set_path(path);
+        m_last_folder = path.parent_path();
+        add(std::move(document));
+        return true;
+    }
     std::optional<Image> image;
     if(file_format_of(path.string()) == FileFormat::raw16)
     {
@@ -482,8 +499,41 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
     if(!format || !can_write(*format))
     {
         show_error("Save", "OUI Paint cannot write " + path.filename().string() +
-                               ": name it .png, .jpg, .bmp, .tga or .r16.");
+                               ": name it .ora, .png, .jpg, .bmp, .tga or .r16.");
         return false;
+    }
+    if(*format == FileFormat::openraster)
+    {
+        std::string error;
+        try
+        {
+            if(!write_file_atomically(path, write_openraster(document.document()), error))
+            {
+                show_error("Save", error);
+                return false;
+            }
+        }
+        catch(const std::exception& failure)
+        {
+            show_error("Save", failure.what());
+            return false;
+        }
+        document.set_path(path);
+        document.set_modified(false);
+        m_last_folder = path.parent_path();
+        refresh_titles();
+        return true;
+    }
+    if(document.document().layers().size() > 1)
+    {
+        const auto answer{oui::message_box(m_application, "Save",
+                                           "This file holds one layer: the image is saved flattened.\n"
+                                           "Its layers stay here, and in an .ora file if it is saved as one.",
+                                           {"&Flatten", "Cancel"})};
+        if(answer != 0u)
+        {
+            return false;
+        }
     }
     const auto pixels{document.document().format()};
     const auto target{written_format(*format, pixels)};
@@ -533,7 +583,8 @@ bool PaintApp::save(bool ask_for_path)
         oui::FileDialogOptions options;
         options.mode = oui::FileDialogMode::save_file;
         options.directory = path ? path->parent_path() : m_last_folder;
-        options.file_name = path ? path->filename().string() : document->title() + ".png";
+        options.file_name = path ? path->filename().string()
+                                 : document->title() + (document->document().layers().size() > 1 ? ".ora" : ".png");
         options.filters = image_filters();
         path = oui::file_dialog(m_application, options);
         if(!path)

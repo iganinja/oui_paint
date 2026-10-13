@@ -133,6 +133,10 @@ std::optional<FileFormat> file_format_of(std::string_view path)
     {
         return FileFormat::raw16;
     }
+    if(extension == "ora")
+    {
+        return FileFormat::openraster;
+    }
     return std::nullopt;
 }
 
@@ -146,6 +150,7 @@ PixelFormat written_format(FileFormat file, PixelFormat pixels)
     switch(file)
     {
     case FileFormat::png:
+    case FileFormat::openraster:
         return pixels;
     case FileFormat::raw16:
         return PixelFormat::gray_alpha16;
@@ -256,9 +261,10 @@ std::string write_image(const Image& image, FileFormat format, int quality)
         return stb_api::encode_tga(pixels.data(), image.width, image.height, channel_count(image.format));
     }
     case FileFormat::gif:
+    case FileFormat::openraster:
         break;
     }
-    throw std::invalid_argument{"GIF files are only read."};
+    throw std::invalid_argument{"GIF files are only read, and OpenRaster goes through openraster.h."};
 }
 
 } // namespace oui_paint
