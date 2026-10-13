@@ -1,5 +1,7 @@
 #include "app/fonts.h"
 
+#include <oui/file_system.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -24,7 +26,7 @@ namespace
 
 [[nodiscard]] bool is_outline_font(const std::filesystem::path& path)
 {
-    const auto extension{lower(path.extension().string())};
+    const auto extension{lower(olagarro::oui::utf8_of(path.extension()))};
     return extension == ".ttf" || extension == ".otf" || extension == ".ttc";
 }
 
@@ -73,7 +75,7 @@ std::vector<FontFamily> parse_font_list(std::string_view listed)
         {
             continue;
         }
-        const std::filesystem::path path{std::string{line.substr(0, path_end)}};
+        const auto path{olagarro::oui::path_from_utf8(line.substr(0, path_end))};
         if(!is_outline_font(path))
         {
             continue;
@@ -132,7 +134,7 @@ std::vector<FontFamily> installed_fonts()
         {
             if(entry->is_regular_file(failure) && is_outline_font(entry->path()))
             {
-                listed += entry->path().string() + ": " + entry->path().stem().string() + "\n";
+                listed += olagarro::oui::utf8_of(entry->path()) + ": " + olagarro::oui::utf8_of(entry->path().stem()) + "\n";
             }
         }
     }

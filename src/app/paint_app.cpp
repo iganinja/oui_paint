@@ -25,6 +25,7 @@
 
 #include <oui/dialogs.h>
 #include <oui/file_dialog.h>
+#include <oui/file_system.h>
 #include <oui/layout.h>
 #include <oui/utf8.h>
 #include <oui/window.h>
@@ -785,12 +786,12 @@ bool PaintApp::open(const std::filesystem::path& path)
         show_error("Open", error);
         return false;
     }
-    if(file_format_of(path.string()) == FileFormat::openraster)
+    if(file_format_of(oui::utf8_of(path)) == FileFormat::openraster)
     {
         auto layered{read_openraster(*bytes, error)};
         if(!layered)
         {
-            show_error("Open", path.filename().string() + ": " + error);
+            show_error("Open", oui::utf8_of(path.filename()) + ": " + error);
             return false;
         }
         auto document{std::make_unique<OpenDocument>(std::move(*layered))};
@@ -800,7 +801,7 @@ bool PaintApp::open(const std::filesystem::path& path)
         return true;
     }
     std::optional<Image> image;
-    if(file_format_of(path.string()) == FileFormat::raw16)
+    if(file_format_of(oui::utf8_of(path)) == FileFormat::raw16)
     {
         const auto guess{guess_raw16_size(bytes->size())};
         oui::PromptOptions options;
@@ -830,13 +831,13 @@ bool PaintApp::open(const std::filesystem::path& path)
     }
     else
     {
-        if(file_format_of(path.string()) == FileFormat::png && is_paletted_png(*bytes))
+        if(file_format_of(oui::utf8_of(path)) == FileFormat::png && is_paletted_png(*bytes))
         {
             // A PNG with a palette opens indexed, its indices as they are.
             auto indexed{read_indexed_png(*bytes, error)};
             if(!indexed)
             {
-                show_error("Open", path.filename().string() + ": " + error);
+                show_error("Open", oui::utf8_of(path.filename()) + ": " + error);
                 return false;
             }
             auto document{std::make_unique<OpenDocument>(std::move(*indexed))};
@@ -849,7 +850,7 @@ bool PaintApp::open(const std::filesystem::path& path)
     }
     if(!image)
     {
-        show_error("Open", path.filename().string() + ": " + error);
+        show_error("Open", oui::utf8_of(path.filename()) + ": " + error);
         return false;
     }
     auto document{std::make_unique<OpenDocument>(Document::from_image(*image))};
@@ -873,10 +874,10 @@ void PaintApp::open_with_dialog()
 
 bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
 {
-    const auto format{file_format_of(path.string())};
+    const auto format{file_format_of(oui::utf8_of(path))};
     if(!format || !can_write(*format))
     {
-        show_error("Save", "OUI Paint cannot write " + path.filename().string() +
+        show_error("Save", "OUI Paint cannot write " + oui::utf8_of(path.filename()) +
                                ": name it .ora, .png, .jpg, .bmp, .tga or .r16.");
         return false;
     }
@@ -993,7 +994,7 @@ void PaintApp::tell_saved(const std::filesystem::path& path)
 {
     try
     {
-        m_plugins->saved(path.string());
+        m_plugins->saved(oui::utf8_of(path));
     }
     catch(const std::exception& failure)
     {
@@ -1014,7 +1015,7 @@ bool PaintApp::save(bool ask_for_path)
         oui::FileDialogOptions options;
         options.mode = oui::FileDialogMode::save_file;
         options.directory = path ? path->parent_path() : m_last_folder;
-        options.file_name = path ? path->filename().string()
+        options.file_name = path ? oui::utf8_of(path->filename())
                                  : document->title() + (document->document().layers().size() > 1 ? ".ora" : ".png");
         options.filters = image_filters();
         path = oui::file_dialog(m_application, options);
@@ -2078,11 +2079,11 @@ void PaintApp::register_palette_commands()
                                std::optional<std::vector<Color>> colors;
                                if(bytes)
                                {
-                                   colors = read_palette_file(path->filename().string(), *bytes, error);
+                                   colors = read_palette_file(oui::utf8_of(path->filename()), *bytes, error);
                                }
                                if(!colors)
                                {
-                                   show_error("Palette", path->filename().string() + ": " + error);
+                                   show_error("Palette", oui::utf8_of(path->filename()) + ": " + error);
                                }
                                return colors;
                            }};
@@ -2108,7 +2109,7 @@ void PaintApp::register_palette_commands()
                                   }
                                   if(!setup)
                                   {
-                                      show_error("Palette Setup", path->filename().string() + ": " + error);
+                                      show_error("Palette Setup", oui::utf8_of(path->filename()) + ": " + error);
                                       return;
                                   }
                                   change_palettes("Load Palette Setup", [&setup](PaletteSetup& changed) { changed = *setup; });
@@ -2166,7 +2167,7 @@ void PaintApp::register_palette_commands()
                                   std::string error;
                                   if(path && !write_file_atomically(
                                                  *path,
-                                                 write_palette_file(path->filename().string(),
+                                                 write_palette_file(oui::utf8_of(path->filename()),
                                                                     document.palettes()->palettes.at(static_cast<std::size_t>(slot)).colors),
                                                  error))
                                   {
@@ -2402,11 +2403,11 @@ void PaintApp::load_plugins()
         {
             try
             {
-                m_plugins->load(*source, file.filename().string());
+                m_plugins->load(*source, oui::utf8_of(file.filename()));
             }
             catch(const std::exception& failure)
             {
-                failures += file.filename().string() + ": " + failure.what() + "\n";
+                failures += oui::utf8_of(file.filename()) + ": " + failure.what() + "\n";
             }
         }
     }

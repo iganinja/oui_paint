@@ -1,5 +1,7 @@
 #include "app/open_document.h"
 
+#include <oui/file_system.h>
+
 #include <fstream>
 #include <iterator>
 #include <system_error>
@@ -37,7 +39,7 @@ std::string OpenDocument::title() const
 {
     if(m_path)
     {
-        return m_path->filename().string();
+        return olagarro::oui::utf8_of(m_path->filename());
     }
     return m_untitled_number == 1 ? std::string{"Untitled"} : "Untitled " + std::to_string(m_untitled_number);
 }
@@ -47,13 +49,13 @@ std::optional<std::string> read_file(const std::filesystem::path& path, std::str
     std::ifstream file{path, std::ios::binary};
     if(!file)
     {
-        error = "cannot open " + path.string();
+        error = "cannot open " + olagarro::oui::utf8_of(path);
         return std::nullopt;
     }
     std::string bytes{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
     if(file.bad())
     {
-        error = "cannot read " + path.string();
+        error = "cannot read " + olagarro::oui::utf8_of(path);
         return std::nullopt;
     }
     return bytes;
@@ -67,14 +69,14 @@ bool write_file_atomically(const std::filesystem::path& path, std::string_view b
         std::ofstream file{temporary, std::ios::binary | std::ios::trunc};
         if(!file)
         {
-            error = "cannot write " + temporary.string();
+            error = "cannot write " + olagarro::oui::utf8_of(temporary);
             return false;
         }
         file.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
         file.flush();
         if(!file)
         {
-            error = "cannot write " + temporary.string();
+            error = "cannot write " + olagarro::oui::utf8_of(temporary);
             std::error_code ignored;
             std::filesystem::remove(temporary, ignored);
             return false;
@@ -84,7 +86,7 @@ bool write_file_atomically(const std::filesystem::path& path, std::string_view b
     std::filesystem::rename(temporary, path, failure);
     if(failure)
     {
-        error = "cannot replace " + path.string() + ": " + failure.message();
+        error = "cannot replace " + olagarro::oui::utf8_of(path) + ": " + failure.message();
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
         return false;
