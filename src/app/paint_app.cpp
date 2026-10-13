@@ -8,6 +8,7 @@
 #include "codecs/codecs.h"
 #include "codecs/openraster.h"
 #include "codecs/palettes.h"
+#include "effects/curves.h"
 #include "effects/plugin_trial.h"
 #include "tools/fill.h"
 #include "tools/gradient.h"
@@ -2809,6 +2810,7 @@ void PaintApp::load_plugins()
     const std::map<std::string, oui::Shortcut> keys{
         {"Auto-Level", {U'l', true, false, true}},           {"Black and White", {U'g', true, false, true}},
         {"Brightness / Contrast", {U't', true, false, true}}, {"Hue / Saturation", {U'u', true, false, true}},
+        {"Curves", {U'm', true, false, true}},
         {"Invert Alpha", {U'i', true, true}},                 {"Invert Colors", {U'i', true, false, true}},
         {"Levels", {U'l', true}},                             {"Posterize", {U'p', true, false, true}},
         {"Sepia", {U'e', true, false, true}}};
@@ -3041,7 +3043,8 @@ void PaintApp::run_effect(std::size_t index, bool again)
                                                    failed = true;
                                                    show_error(effect.name, failure.what());
                                                }
-                                           })};
+                                           },
+                                           histogram_of(source, selection))};
             if(!accepted)
             {
                 const auto before{LayersState::of(document)};

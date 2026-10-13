@@ -40,6 +40,10 @@ class PaintImage {
         return new PaintImage(
             native.lookup(this.id, new Float32Array(red), new Float32Array(green), new Float32Array(blue)));
     }
+    // Each pixel's luminosity through a table from 0 to 1, its colour scaled with it so its hue stays.
+    lookupLuminosity(table) {
+        return new PaintImage(native.lookupLuminosity(this.id, new Float32Array(table)));
+    }
     hueSaturation(hue, saturation, lightness) {
         return new PaintImage(native.hueSaturation(this.id, hue, saturation, lightness));
     }

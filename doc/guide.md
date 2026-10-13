@@ -122,7 +122,14 @@ Copy and paste work with other programs both ways. File > Open Recent lists the 
 ## Effects
 
 Adjustments and Effects run on the selection, or on the whole layer when nothing is selected; their dialogs show the
-change as the values move. Ctrl+F repeats the last effect. Every effect is a plugin, and more can be added:
+change as the values move.
+
+- **Curves** (Ctrl+Shift+M) draws what each level becomes over the image's histogram: a click adds a point, a drag
+  moves it, a right click or dragging it far off takes it away. The transfer map is luminosity, which keeps the
+  colours' hues, or red, green and blue, the ones ticked edited together.
+- **Levels** (Ctrl+L) has the histogram of what goes in, with markers for black, grey and white, and what comes out
+  under it; Auto stretches what the image has from black to white.
+ Ctrl+F repeats the last effect. Every effect is a plugin, and more can be added:
 Effects > Manage Plugins writes and tries them beside an image; see [Plugins](plugins.md).
 
 ## Settings

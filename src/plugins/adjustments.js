@@ -98,9 +98,33 @@ paint.effect({
     },
 });
 
+// The curves come from the program's own dialog, which works out each one's table: "l0" to "l255" for luminosity,
+// "r0", "g0" and "b0" on for each colour.
+paint.effect({
+    name: "Curves",
+    menu: "Adjustments",
+    dialog: "curves",
+    parameters: [{id: "mode", name: "Transfer map", options: ["Luminosity", "RGB"], value: 0}],
+    render(image, values) {
+        const curve = (name) => {
+            const made = [];
+            for (let level = 0; level < 256; level++) {
+                const value = values[name + level];
+                made.push(value === undefined ? level / 255 : value);
+            }
+            return made;
+        };
+        if (values.mode === 0) {
+            return image.lookupLuminosity(curve("l"));
+        }
+        return image.lookup(curve("r"), curve("g"), curve("b"));
+    },
+});
+
 paint.effect({
     name: "Levels",
     menu: "Adjustments",
+    dialog: "levels",
     parameters: [
         {id: "inputLow", name: "Input black", min: 0, max: 255, value: 0},
         {id: "inputHigh", name: "Input white", min: 0, max: 255, value: 255},

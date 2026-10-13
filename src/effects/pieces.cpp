@@ -383,6 +383,48 @@ WorkImage lookup(const WorkImage& image, const std::array<std::vector<double>, 3
     return result;
 }
 
+WorkImage lookup_luminosity(const WorkImage& image, const std::vector<double>& table)
+{
+    WorkImage result{image.width, image.height};
+    for(int y{}; y < image.height; ++ y)
+    {
+        for(int x{}; x < image.width; ++ x)
+        {
+            double red{};
+            double green{};
+            double blue{};
+            double alpha{};
+            unpremultiply(image.at(x, y), red, green, blue, alpha);
+            const auto luminosity{0.299 * red + 0.587 * green + 0.114 * blue};
+            const auto place{std::clamp(luminosity, 0.0, 1.0) * (table.size() - 1)};
+            const auto low{static_cast<std::size_t>(std::floor(place))};
+            const auto high{std::min(low + 1, table.size() - 1)};
+            const auto wanted{table[low] + (table[high] - table[low]) * (place - low)};
+            if(luminosity <= 0.0)
+            {
+                premultiply(result.at(x, y), wanted, wanted, wanted, alpha);
+                continue;
+            }
+            // The colour scaled to the luminosity wanted; what that pushes past white is spread towards white, so the
+            // luminosity stays what the curve says.
+            auto scaled_red{red * wanted / luminosity};
+            auto scaled_green{green * wanted / luminosity};
+            auto scaled_blue{blue * wanted / luminosity};
+            const auto highest{std::max({scaled_red, scaled_green, scaled_blue})};
+            if(highest > 1.0)
+            {
+                const auto towards{(highest - 1.0) / std::max(highest - wanted, 1e-9)};
+                scaled_red += (wanted - scaled_red) * towards;
+                scaled_green += (wanted - scaled_green) * towards;
+                scaled_blue += (wanted - scaled_blue) * towards;
+            }
+            premultiply(result.at(x, y), std::clamp(scaled_red, 0.0, 1.0), std::clamp(scaled_green, 0.0, 1.0),
+                        std::clamp(scaled_blue, 0.0, 1.0), alpha);
+        }
+    }
+    return result;
+}
+
 WorkImage hue_saturation(const WorkImage& image, double hue, double saturation, double lightness)
 {
     WorkImage result{image.width, image.height};

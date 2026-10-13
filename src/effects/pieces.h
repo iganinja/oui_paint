@@ -49,6 +49,9 @@ struct WorkImage
 // Each colour channel through a table of 256 entries from 0 to 1, interpolated between them: curves, levels, invert,
 // posterize. Alpha kept.
 [[nodiscard]] WorkImage lookup(const WorkImage& image, const std::array<std::vector<double>, 3>& tables);
+// Each pixel's luminosity through a table of values from 0 to 1, interpolated, its colour scaled with it so its hue
+// stays, as the Curves adjustment's luminosity map does; a colour that would go past white goes towards it.
+[[nodiscard]] WorkImage lookup_luminosity(const WorkImage& image, const std::vector<double>& table);
 // Hue turned by `hue` degrees, saturation and lightness changed by -1 to 1.
 [[nodiscard]] WorkImage hue_saturation(const WorkImage& image, double hue, double saturation, double lightness);
 // `above` over `below` as a blend mode mixes them, `above` seen through by `opacity`.

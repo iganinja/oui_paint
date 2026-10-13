@@ -100,3 +100,24 @@ TEST(Pieces, ATableInvertsAndSixteenBitsComeBackWhole)
     EXPECT_EQ(inverted.pixel<GrayAlpha16>(0, 0).value[0], 65535);
     EXPECT_EQ(inverted.pixel<GrayAlpha16>(999, 0).value[0], 65535 - 999 * 65);
 }
+
+TEST(Pieces, ALuminosityTableChangesHowLightAColourIsAndKeepsItsHue)
+{
+    WorkImage image{2, 1};
+    const float orange[4]{0.8f, 0.4f, 0.2f, 1.0f};
+    const float half_blue[4]{0.0f, 0.0f, 0.25f, 0.5f};
+    std::copy(orange, orange + 4, image.at(0, 0));
+    std::copy(half_blue, half_blue + 4, image.at(1, 0));
+    // Everything half as light.
+    const auto result{lookup_luminosity(image, {0.0, 0.5})};
+    const auto* const darker{result.at(0, 0)};
+    EXPECT_NEAR(darker[0], 0.4f, 1e-5);
+    EXPECT_NEAR(darker[1], 0.2f, 1e-5);
+    EXPECT_NEAR(darker[2], 0.1f, 1e-5);
+    EXPECT_FLOAT_EQ(result.at(1, 0)[3], 0.5f) << "alpha stays";
+    EXPECT_NEAR(result.at(1, 0)[2], 0.125f, 1e-5);
+    // Everything white: a colour past white goes to it.
+    const auto white{lookup_luminosity(image, {1.0, 1.0})};
+    EXPECT_NEAR(white.at(0, 0)[0], 1.0f, 1e-5);
+    EXPECT_NEAR(white.at(0, 0)[2], 1.0f, 1e-5);
+}

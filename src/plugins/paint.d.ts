@@ -33,6 +33,10 @@ declare namespace paint {
          */
         parameters: Parameter[];
         /**
+         * The program's own dialog for it in place of a slider for each parameter: "curves" or "levels".
+         */
+        dialog: string;
+        /**
          * With `row`: its rows are made on every core at once, each core with its own copy of the plugins, so `row`
          * reads only the row it is given.
          */
@@ -152,6 +156,11 @@ declare namespace paint {
          * given.
          */
         lookup(red: number[], green?: number[], blue?: number[]): Image;
+        /**
+         * Each pixel's luminosity through a table of values from 0 to 1, interpolated, its colour scaled with it so
+         * its hue stays.
+         */
+        lookupLuminosity(table: number[]): Image;
         /**
          * Hue turned by degrees, saturation and lightness changed by -1 to 1.
          */

@@ -117,6 +117,9 @@ PluginHost::PluginHost()
         return lookup(image(arguments.at(0)),
                       {table_of(arguments.at(1)), table_of(arguments.at(2)), table_of(arguments.at(3))});
     });
+    define_image("lookupLuminosity", [this](const std::vector<Value>& arguments) {
+        return lookup_luminosity(image(arguments.at(0)), table_of(arguments.at(1)));
+    });
     define_image("hueSaturation", [this, number](const std::vector<Value>& arguments) {
         return hue_saturation(image(arguments.at(0)), number(arguments, 1), number(arguments, 2),
                               number(arguments, 3));
@@ -172,6 +175,8 @@ PluginHost::PluginHost()
                         effect.index = m_effects.size();
                         effect.by_rows = spec.get("row").is_function();
                         effect.parallel = effect.by_rows && spec.get("parallel").to_bool();
+                        effect.dialog = spec.get("dialog").is_undefined() ? std::string{}
+                                                                          : spec.get("dialog").to_string();
                         if(!effect.by_rows && !spec.get("render").is_function())
                         {
                             throw ScriptError{effect.name + " has neither render nor row"};

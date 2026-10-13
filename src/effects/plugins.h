@@ -43,6 +43,8 @@ struct Effect
     // Its rows may be made at once on every core, each core running its own copy of the plugins: `row` reads only the
     // row it is given and writes only it.
     bool parallel{false};
+    // The program's own dialog for it, in place of a slider for each parameter: "curves" or "levels".
+    std::string dialog;
 };
 
 // What an effect is told besides its parameters' values.

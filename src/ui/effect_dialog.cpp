@@ -1,6 +1,8 @@
 #include "ui/effect_dialog.h"
 
+#include "ui/curves_dialog.h"
 #include "ui/effect_controls.h"
+#include "ui/levels_dialog.h"
 
 #include <oui/button.h>
 #include <oui/combo_box.h>
@@ -21,8 +23,16 @@ namespace oui_paint
 {
 
 bool ask_effect(oui::Application& application, const Effect& effect, std::map<std::string, double>& values,
-                const std::function<void(const std::map<std::string, double>&)>& changed)
+                const std::function<void(const std::map<std::string, double>&)>& changed, const Histogram& histogram)
 {
+    if(effect.dialog == "curves")
+    {
+        return ask_curves(application, values, changed, histogram);
+    }
+    if(effect.dialog == "levels")
+    {
+        return ask_levels(application, values, changed, histogram);
+    }
     auto window{oui::window(effect.name)};
     auto& content{oui::column(*window)};
     content.set_gap(oui::Spacing::tight);
