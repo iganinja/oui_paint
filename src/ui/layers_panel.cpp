@@ -4,6 +4,7 @@
 #include <oui/theme.h>
 
 #include <algorithm>
+#include <cmath>
 
 using namespace olagarro;
 
@@ -128,7 +129,14 @@ void LayersPanel::paint_picture(oui::Painter& painter, const Layer& layer, const
         {
             const auto image_x{std::min(m_document->width() - 1, static_cast<int>((x + 0.5) * scale))};
             const auto image_y{std::min(m_document->height() - 1, static_cast<int>((y + 0.5) * scale))};
-            const auto pixel{screen_pixel(layer, image_x, image_y)};
+            auto pixel{screen_pixel(layer, image_x, image_y)};
+            if(m_document->indexed() && pixel >> 24u != 0)
+            {
+                // An index, as its palette's colour.
+                const auto color{m_document->palettes()->color(layer.palette_slot(), static_cast<int>(pixel & 0xffu))};
+                const auto byte{[](double value) { return static_cast<std::uint32_t>(std::lround(value * 255.0)); }};
+                pixel = byte(color.alpha) << 24u | byte(color.red) << 16u | byte(color.green) << 8u | byte(color.blue);
+            }
             const auto under{((x / 4 + y / 4) % 2 == 0) ? 0xffffffu : 0xccccccu};
             const auto alpha{pixel >> 24u};
             const auto mix{[alpha](std::uint32_t over, std::uint32_t base)

@@ -4,6 +4,7 @@
 #include "app/tools.h"
 #include "codecs/codecs.h"
 #include "codecs/openraster.h"
+#include "codecs/palettes.h"
 #include "tools/fill.h"
 #include "tools/gradient.h"
 #include "tools/shapes.h"
@@ -14,6 +15,8 @@
 #include "ui/effect_dialog.h"
 #include "ui/layer_properties_dialog.h"
 #include "ui/layers_panel.h"
+#include "ui/palettes_panel.h"
+#include "ui/side_column.h"
 #include "ui/main_frame.h"
 #include "ui/new_image_dialog.h"
 #include "ui/tool_options.h"
@@ -27,6 +30,7 @@
 #include <oui/window.h>
 
 #include <algorithm>
+#include <set>
 #include <cmath>
 #include <cstdio>
 #include <cstdio>
@@ -360,7 +364,10 @@ void PaintApp::register_commands()
             if(const auto request{ask_resize(m_application, document.width(), document.height())})
             {
                 change_layers("Resize Image", [&request](Document& changed)
-                              { changed.resize(request->width, request->height, request->resampling); });
+                              {
+                                  changed.resize(request->width, request->height,
+                                                 changed.indexed() ? Resampling::nearest : request->resampling);
+                              });
             }
         },
         {U'r', true});
@@ -416,7 +423,8 @@ void PaintApp::register_commands()
                               [&](Document& d)
                               {
                                   d.rotate_zoom_layer(active(), request->degrees, request->zoom, request->pan_x,
-                                                      request->pan_y, Resampling::bicubic);
+                                                      request->pan_y,
+                                                      d.indexed() ? Resampling::nearest : Resampling::bicubic);
                               });
             }
         },
@@ -424,6 +432,7 @@ void PaintApp::register_commands()
     add("image.flatten", "&Flatten",
         [this] { change_layers("Flatten", [](Document& document) { document.flatten_layers(); }); },
         {U'f', true, false, true});
+    register_palette_commands();
     // Each tool's letter, and again for the next tool with the same letter.
     for(const auto& tool : all_tools())
     {
@@ -485,6 +494,15 @@ void PaintApp::build_window()
                                            "edit.rotate_selection_clockwise", "edit.rotate_selection_counter_clockwise",
                                            "edit.rotate_selection_180"});
     m_frame->menu_bar().add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size",
+                                            oui::menu_separator(), "image.convert_indexed", "image.convert_color",
+                                            oui::menu_submenu("&Palettes",
+                                                              std::vector<oui::MenuItem>{
+                                                                  "palettes.load_setup", "palettes.save_setup",
+                                                                  oui::menu_separator(), "palettes.load_slot",
+                                                                  "palettes.save_slot", oui::menu_separator(),
+                                                                  "palettes.add", "palettes.move_up",
+                                                                  "palettes.move_down", oui::menu_separator(),
+                                                                  "palettes.load_allowed", "palettes.clear_allowed"}),
                                             oui::menu_separator(), "image.flip_horizontal", "image.flip_vertical",
                                             oui::menu_separator(), "image.rotate_clockwise",
                                             "image.rotate_counter_clockwise", "image.rotate_180",
@@ -503,6 +521,9 @@ void PaintApp::build_window()
     m_tool_panel->on_picked([this](const std::string& tool) { select_tool(tool); });
     m_color_panel = &left->add(std::make_unique<ColorPanel>());
     m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
+    // A colour picked from the colour panel's palette is used as the nearest index, not one picked before.
+    m_color_panel->on_picked(
+        [this](bool secondary) { (secondary ? m_secondary_index : m_primary_index).reset(); });
     m_frame->set_left(std::move(left));
     auto layers{std::make_unique<LayersPanel>(m_icons)};
     m_layers_panel = layers.get();
@@ -553,7 +574,62 @@ void PaintApp::build_window()
                 break;
             }
         });
-    m_frame->set_right(std::move(layers));
+    auto palettes{std::make_unique<PalettesPanel>()};
+    m_palettes_panel = palettes.get();
+    m_palettes_panel->on_pick(
+        [this](int index, bool secondary)
+        {
+            auto* const open{current()};
+            if(open == nullptr)
+            {
+                return;
+            }
+            const auto& document{open->document()};
+            const auto shown{document.palettes()->color(document.layers()[document.active_layer()].palette_slot(),
+                                                        index)};
+            (secondary ? m_secondary_index : m_primary_index) = index;
+            if(secondary)
+            {
+                m_color_panel->set_secondary(shown);
+            }
+            else
+            {
+                m_color_panel->set_primary(shown);
+            }
+        });
+    m_palettes_panel->on_edit(
+        [this](int slot, int index)
+        {
+            auto* const open{current()};
+            if(open == nullptr)
+            {
+                return;
+            }
+            const auto& setup{*open->document().palettes()};
+            const auto& palette{setup.palettes.at(static_cast<std::size_t>(slot))};
+            auto start{palette.colors.at(static_cast<std::size_t>(index))};
+            start.alpha = 1.0;
+            if(const auto chosen{ask_color(m_application, "Palette " + std::to_string(slot + 1) + ", Color " +
+                                                              std::to_string(index),
+                                           start)})
+            {
+                change_palettes("Edit Palette Color",
+                                [&](PaletteSetup& changed)
+                                {
+                                    auto color{changed.nearest_allowed(*chosen)};
+                                    color.alpha = 1.0;
+                                    changed.palettes.at(static_cast<std::size_t>(slot)).colors.at(
+                                        static_cast<std::size_t>(index)) = color;
+                                });
+            }
+        });
+    m_palettes_panel->on_slot(
+        [this](int slot)
+        {
+            change_layers("Layer Palette",
+                          [slot](Document& document) { document.layers()[document.active_layer()].set_palette_slot(slot); });
+        });
+    m_frame->set_right(std::make_unique<SideColumn>(std::move(layers), std::move(palettes)));
     auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
     m_tool_options = options.get();
     m_frame->set_top(std::move(options));
@@ -582,7 +658,10 @@ void PaintApp::build_window()
             char zoom[32];
             std::snprintf(zoom, sizeof zoom, "%g%%", std::round(view->document().viewport().zoom() * 1000.0) / 10.0);
             text.right = std::to_string(document.width()) + " x " + std::to_string(document.height()) + "   " +
-                         std::string{describe(document.format())} + "   " + zoom;
+                         (document.indexed() ? "Indexed, " + std::to_string(document.palettes()->count()) + " x " +
+                                                   std::to_string(document.palettes()->size) + " colors"
+                                             : std::string{describe(document.format())}) +
+                         "   " + zoom;
             return text;
         });
 
@@ -748,6 +827,21 @@ bool PaintApp::open(const std::filesystem::path& path)
     }
     else
     {
+        if(file_format_of(path.string()) == FileFormat::png && is_paletted_png(*bytes))
+        {
+            // A PNG with a palette opens indexed, its indices as they are.
+            auto indexed{read_indexed_png(*bytes, error)};
+            if(!indexed)
+            {
+                show_error("Open", path.filename().string() + ": " + error);
+                return false;
+            }
+            auto document{std::make_unique<OpenDocument>(std::move(*indexed))};
+            document->set_path(path);
+            m_last_folder = path.parent_path();
+            add(std::move(document));
+            return true;
+        }
         image = read_image(*bytes, error);
     }
     if(!image)
@@ -816,6 +910,45 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
         {
             return false;
         }
+    }
+    if(document.document().indexed())
+    {
+        auto as_indices{false};
+        if(*format == FileFormat::png)
+        {
+            const auto answer{oui::message_box(m_application, "Save",
+                                               "Save as an indexed PNG, with every palette in order, or in colours?",
+                                               {"&Indexed", "In &Colors", "Cancel"})};
+            if(!answer || *answer == 2u)
+            {
+                return false;
+            }
+            as_indices = *answer == 0u;
+        }
+        std::string error;
+        try
+        {
+            const auto bytes{as_indices ? write_indexed_png(document.document())
+                                        : write_image(converted(document.document().flatten(),
+                                                                written_format(*format, PixelFormat::rgba8)),
+                                                      *format)};
+            if(!write_file_atomically(path, bytes, error))
+            {
+                show_error("Save", error);
+                return false;
+            }
+        }
+        catch(const std::exception& failure)
+        {
+            show_error("Save", failure.what());
+            return false;
+        }
+        document.set_path(path);
+        document.set_modified(false);
+        m_last_folder = path.parent_path();
+        refresh_titles();
+        tell_saved(path);
+        return true;
     }
     const auto pixels{document.document().format()};
     const auto target{written_format(*format, pixels)};
@@ -931,8 +1064,27 @@ void PaintApp::use_tool(const ToolEvent& event)
         {
             return;
         }
-        const auto pixel{converted(document.layers()[document.active_layer()].read(x, y, 1, 1), PixelFormat::rgba16)
-                             .pixel<Rgba16>(0, 0)};
+        const auto& picked_layer{document.layers()[document.active_layer()]};
+        const auto read{picked_layer.read(x, y, 1, 1)};
+        if(document.indexed())
+        {
+            // The index itself, the see-through one where the pixel is see-through.
+            const auto& palette{document.palettes()->palettes.at(static_cast<std::size_t>(picked_layer.palette_slot()))};
+            const auto value{read.pixel<GrayAlpha8>(0, 0)};
+            const auto index{value.alpha() == 0 ? palette.transparent.value_or(0) : static_cast<int>(value.value[0])};
+            (event.secondary ? m_secondary_index : m_primary_index) = index;
+            const auto shown{document.palettes()->color(picked_layer.palette_slot(), index)};
+            if(event.secondary)
+            {
+                m_color_panel->set_secondary(shown);
+            }
+            else
+            {
+                m_color_panel->set_primary(shown);
+            }
+            return;
+        }
+        const auto pixel{converted(read, PixelFormat::rgba16).pixel<Rgba16>(0, 0)};
         const Color color{pixel.value[0] / 65535.0, pixel.value[1] / 65535.0, pixel.value[2] / 65535.0,
                           pixel.value[3] / 65535.0};
         if(event.secondary)
@@ -1037,9 +1189,9 @@ void PaintApp::use_tool(const ToolEvent& event)
         }
         const auto before{LayersState::of(document)};
         open->history().begin_step(document);
-        static_cast<void>(bucket_fill(document, x, y,
-                                      event.secondary ? m_color_panel->secondary() : m_color_panel->primary(),
-                                      m_tool_options->fill()));
+        auto fill{m_tool_options->fill()};
+        fill.exact = document.indexed();
+        static_cast<void>(bucket_fill(document, x, y, ink(event.secondary), fill));
         open->history().finish_step("Paint Bucket", document);
         open->refresh(changed_tiles(before, LayersState::of(document)));
         open->set_modified(true);
@@ -1086,9 +1238,12 @@ void PaintApp::use_tool(const ToolEvent& event)
         {
             settings = {1.0, 1.0, false};
         }
-        const auto color{event.secondary ? m_color_panel->secondary() : m_color_panel->primary()};
+        // Indices are painted whole: no antialiasing and no mixing.
+        settings.exact = document.indexed();
+        auto see_through{false};
+        const auto color{ink(event.secondary, &see_through)};
         open->history().begin_step(document);
-        auto mode{tool == "eraser" ? StrokeMode::erase : StrokeMode::paint};
+        auto mode{tool == "eraser" || see_through ? StrokeMode::erase : StrokeMode::paint};
         StrokeSource source;
         if(tool == "clone_stamp")
         {
@@ -1111,7 +1266,7 @@ void PaintApp::use_tool(const ToolEvent& event)
         {
             // The secondary colour becomes the primary, or the other way round with the right button.
             mode = StrokeMode::recolor;
-            source.match = event.secondary ? m_color_panel->primary() : m_color_panel->secondary();
+            source.match = ink(!event.secondary);
             source.tolerance = m_tool_options->fill().tolerance;
         }
         m_stroke = std::make_unique<Stroke>(document.layers()[document.active_layer()], document.selection(), color,
@@ -1197,6 +1352,7 @@ void PaintApp::show_layers()
     settle();
     auto* const open{current()};
     m_layers_panel->set_document(open != nullptr ? &open->document() : nullptr);
+    m_palettes_panel->set_document(open != nullptr ? &open->document() : nullptr);
     update_ants();
 }
 
@@ -1222,9 +1378,12 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
         return;
     }
     // The right button swaps the colours, as in Paint.NET.
-    const auto& first{m_dragging->secondary ? m_color_panel->secondary() : m_color_panel->primary()};
-    const auto& second{m_dragging->secondary ? m_color_panel->primary() : m_color_panel->secondary()};
-    const auto brush{m_tool_options->settings()};
+    auto first_see_through{false};
+    auto second_see_through{false};
+    const auto first{ink(m_dragging->secondary, &first_see_through)};
+    const auto second{ink(!m_dragging->secondary, &second_see_through)};
+    auto brush{m_tool_options->settings()};
+    brush.antialias = brush.antialias && !document.indexed();
     auto to{event.at};
     const auto from{m_dragging->from};
     if(event.shift && tool == "line")
@@ -1243,7 +1402,19 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
     }
     const auto before{LayersState::of(document)};
     layer = m_dragging->base;
-    if(tool == "gradient")
+    if(tool == "gradient" && document.indexed())
+    {
+        // Between the two indices, dithered.
+        const auto pixel{[](const Color& color, bool see_through)
+                         {
+                             return GrayAlpha8{{static_cast<std::uint8_t>(std::lround(color.red * 255.0)),
+                                                static_cast<std::uint8_t>(see_through ? 0 : 255)}};
+                         }};
+        static_cast<void>(draw_dithered_gradient(layer, m_dragging->base, document.selection(),
+                                                 m_tool_options->gradient(), from, to, pixel(first, first_see_through),
+                                                 pixel(second, second_see_through)));
+    }
+    else if(tool == "gradient")
     {
         static_cast<void>(draw_gradient(layer, m_dragging->base, document.selection(), m_tool_options->gradient(), from,
                                         to, first, second, m_tool_options->gradient_transparency()));
@@ -1360,7 +1531,7 @@ void PaintApp::place_floating()
     auto& document{open.document()};
     const auto before{LayersState::of(document)};
     place_piece(document.layers()[document.active_layer()], m_floating->base, document.selection(),
-                m_floating->piece, m_floating->transform);
+                m_floating->piece, m_floating->transform, document.indexed());
     open.refresh(changed_tiles(before, LayersState::of(document)));
     update_ants();
 }
@@ -1560,13 +1731,17 @@ bool PaintApp::copy(bool merged)
     {
         return false;
     }
-    Layer source{document.format(), "Copy"};
+    const auto& active{document.layers()[document.active_layer()]};
+    const auto flat{merged ? document.flatten() : Image{}};
+    Layer source{merged ? flat.format : document.format(), "Copy"};
     if(merged)
     {
-        source.write(document.flatten(), 0, 0);
+        source.write(flat, 0, 0);
     }
-    const auto lifted{lift_selected(merged ? source : document.layers()[document.active_layer()], selection)};
-    if(!m_application.clipboard().set_data("image/png", write_image(lifted.pixels, FileFormat::png)))
+    const auto lifted{lift_selected(merged ? source : active, selection)};
+    // Other programs take colours, never indices.
+    const auto pixels{merged ? lifted.pixels : document.colors_of(lifted.pixels, active.palette_slot())};
+    if(!m_application.clipboard().set_data("image/png", write_image(pixels, FileFormat::png)))
     {
         show_error("Copy", "The clipboard did not take the image.");
         return false;
@@ -1614,7 +1789,7 @@ void PaintApp::paste(PasteInto into)
     }
     auto* const open{current()};
     auto& document{open->document()};
-    const auto pasted{converted(*image, document.format())};
+    const auto pasted{document.indices_of(*image, document.layers()[document.active_layer()].palette_slot())};
     auto grow{false};
     if(pasted.width > document.width() || pasted.height > document.height())
     {
@@ -1714,9 +1889,9 @@ void PaintApp::show_typing(bool with_cursor)
     layer = m_typing->base;
     if(auto* const font{text_font()})
     {
-        const auto& color{m_color_panel->primary()};
+        const auto color{ink(false)};
         static_cast<void>(draw_text(layer, document.selection(), *font, m_typing->text, m_typing->at, color,
-                                    m_tool_options->settings().antialias));
+                                    m_tool_options->settings().antialias && !document.indexed()));
         if(with_cursor)
         {
             // A thin line after the last character, as tall as a line of text.
@@ -1833,6 +2008,319 @@ void PaintApp::update_ants()
     }
 }
 
+Color PaintApp::ink(bool secondary, bool* see_through)
+{
+    const auto& color{secondary ? m_color_panel->secondary() : m_color_panel->primary()};
+    auto* const open{current()};
+    if(see_through != nullptr)
+    {
+        *see_through = false;
+    }
+    if(open == nullptr || !open->document().indexed())
+    {
+        return color;
+    }
+    const auto& document{open->document()};
+    const auto slot{document.layers()[document.active_layer()].palette_slot()};
+    const auto& picked{secondary ? m_secondary_index : m_primary_index};
+    const auto index{picked ? *picked : document.palettes()->nearest(slot, color)};
+    if(see_through != nullptr)
+    {
+        *see_through = document.palettes()->palettes.at(static_cast<std::size_t>(slot)).transparent == index;
+    }
+    // The index as the grey of a solid pixel, which exact painting writes as it is.
+    const auto grey{index / 255.0};
+    return {grey, grey, grey, 1.0};
+}
+
+void PaintApp::change_palettes(std::string name, const std::function<void(PaletteSetup&)>& change)
+{
+    change_layers(std::move(name),
+                  [&change](Document& document)
+                  {
+                      auto setup{*document.palettes()};
+                      change(setup);
+                      document.set_palettes(std::move(setup));
+                  });
+}
+
+void PaintApp::register_palette_commands()
+{
+    auto& commands{m_application.commands()};
+    const auto indexed{[this] { return current() != nullptr && current()->document().indexed(); }};
+    const auto pick_file{[this](oui::FileDialogMode mode, std::vector<oui::FileFilter> filters,
+                                std::string name) -> std::optional<std::filesystem::path>
+                         {
+                             oui::FileDialogOptions options;
+                             options.mode = mode;
+                             options.directory = m_last_folder;
+                             options.filters = std::move(filters);
+                             options.file_name = std::move(name);
+                             return oui::file_dialog(m_application, options);
+                         }};
+    const auto palette_filters{std::vector<oui::FileFilter>{
+        {"Palettes and images (*.pal, *.gpl, *.act, *.png, *.gif, *.bmp)", "*.pal *.gpl *.act *.png *.gif *.bmp *.tga"},
+        {"JASC palette (*.pal)", "*.pal"},
+        {"GIMP palette (*.gpl)", "*.gpl"},
+        {"Photoshop palette (*.act)", "*.act"}}};
+    const auto read_colors{[this, pick_file, palette_filters]() -> std::optional<std::vector<Color>>
+                           {
+                               const auto path{pick_file(oui::FileDialogMode::open_file, palette_filters, "")};
+                               if(!path)
+                               {
+                                   return std::nullopt;
+                               }
+                               std::string error;
+                               auto bytes{read_file(*path, error)};
+                               std::optional<std::vector<Color>> colors;
+                               if(bytes)
+                               {
+                                   colors = read_palette_file(path->filename().string(), *bytes, error);
+                               }
+                               if(!colors)
+                               {
+                                   show_error("Palette", path->filename().string() + ": " + error);
+                               }
+                               return colors;
+                           }};
+    commands.register_command("palettes.load_setup", "&Load Palette Setup...",
+                              [this, indexed, pick_file]
+                              {
+                                  if(!indexed())
+                                  {
+                                      return;
+                                  }
+                                  const auto path{pick_file(oui::FileDialogMode::open_file,
+                                                            {{"Palette setup (*.json)", "*.json"}}, "")};
+                                  if(!path)
+                                  {
+                                      return;
+                                  }
+                                  std::string error;
+                                  const auto text{read_file(*path, error)};
+                                  std::optional<PaletteSetup> setup;
+                                  if(text)
+                                  {
+                                      setup = read_palette_setup(*text, error);
+                                  }
+                                  if(!setup)
+                                  {
+                                      show_error("Palette Setup", path->filename().string() + ": " + error);
+                                      return;
+                                  }
+                                  change_palettes("Load Palette Setup", [&setup](PaletteSetup& changed) { changed = *setup; });
+                              });
+    commands.register_command("palettes.save_setup", "&Save Palette Setup...",
+                              [this, indexed, pick_file]
+                              {
+                                  if(!indexed())
+                                  {
+                                      return;
+                                  }
+                                  const auto path{pick_file(oui::FileDialogMode::save_file,
+                                                            {{"Palette setup (*.json)", "*.json"}}, "palettes.json")};
+                                  std::string error;
+                                  if(path && !write_file_atomically(*path, write_palette_setup(*current()->document().palettes()),
+                                                                    error))
+                                  {
+                                      show_error("Palette Setup", error);
+                                  }
+                              });
+    commands.register_command("palettes.load_slot", "Load the Layer's &Palette...",
+                              [this, indexed, read_colors]
+                              {
+                                  if(!indexed())
+                                  {
+                                      return;
+                                  }
+                                  const auto colors{read_colors()};
+                                  if(!colors)
+                                  {
+                                      return;
+                                  }
+                                  const auto& document{current()->document()};
+                                  const auto slot{document.layers()[document.active_layer()].palette_slot()};
+                                  change_palettes("Load Palette",
+                                                  [&](PaletteSetup& setup)
+                                                  {
+                                                      auto loaded{*colors};
+                                                      loaded.resize(static_cast<std::size_t>(setup.size), Color{0, 0, 0, 1});
+                                                      setup.palettes.at(static_cast<std::size_t>(slot)).colors = loaded;
+                                                  });
+                              });
+    commands.register_command("palettes.save_slot", "Save the Layer's Pa&lette...",
+                              [this, indexed, pick_file, palette_filters]
+                              {
+                                  if(!indexed())
+                                  {
+                                      return;
+                                  }
+                                  const auto& document{current()->document()};
+                                  const auto slot{document.layers()[document.active_layer()].palette_slot()};
+                                  const auto path{pick_file(oui::FileDialogMode::save_file,
+                                                            {palette_filters.begin() + 1, palette_filters.end()},
+                                                            "palette.pal")};
+                                  std::string error;
+                                  if(path && !write_file_atomically(
+                                                 *path,
+                                                 write_palette_file(path->filename().string(),
+                                                                    document.palettes()->palettes.at(static_cast<std::size_t>(slot)).colors),
+                                                 error))
+                                  {
+                                      show_error("Palette", error);
+                                  }
+                              });
+    commands.register_command("palettes.add", "&Add Palette",
+                              [this, indexed]
+                              {
+                                  if(indexed())
+                                  {
+                                      change_palettes("Add Palette",
+                                                      [](PaletteSetup& setup)
+                                                      {
+                                                          auto added{PaletteSetup::greys(1, setup.size).palettes.front()};
+                                                          added.name = "Palette " + std::to_string(setup.count() + 1);
+                                                          setup.palettes.push_back(std::move(added));
+                                                      });
+                                  }
+                              });
+    // Moving a palette moves it among the slots, and every layer of the slots it passes shows the other palette: how
+    // palette swaps are tried, as reloading a console's palettes.
+    const auto move{[this, indexed](int step)
+                    {
+                        if(!indexed())
+                        {
+                            return;
+                        }
+                        const auto& document{current()->document()};
+                        const auto slot{document.layers()[document.active_layer()].palette_slot()};
+                        const auto other{slot + step};
+                        if(other < 0 || other >= document.palettes()->count())
+                        {
+                            return;
+                        }
+                        change_palettes(step < 0 ? "Move Palette Up" : "Move Palette Down",
+                                        [slot, other](PaletteSetup& setup)
+                                        {
+                                            std::swap(setup.palettes.at(static_cast<std::size_t>(slot)),
+                                                      setup.palettes.at(static_cast<std::size_t>(other)));
+                                        });
+                    }};
+    commands.register_command("palettes.move_up", "Move the Layer's Palette &Up", [move] { move(-1); });
+    commands.register_command("palettes.move_down", "Move the Layer's Palette &Down", [move] { move(1); });
+    commands.register_command("palettes.load_allowed", "Load Allowed &Colors...",
+                              [this, indexed, read_colors]
+                              {
+                                  if(!indexed())
+                                  {
+                                      return;
+                                  }
+                                  if(const auto colors{read_colors()})
+                                  {
+                                      change_palettes("Allowed Colors",
+                                                      [&colors](PaletteSetup& setup) { setup.allowed = *colors; });
+                                  }
+                              });
+    commands.register_command("palettes.clear_allowed", "Allow &Any Color",
+                              [this, indexed]
+                              {
+                                  if(indexed())
+                                  {
+                                      change_palettes("Allow Any Color", [](PaletteSetup& setup) { setup.allowed.clear(); });
+                                  }
+                              });
+    commands.register_command("image.convert_indexed", "Convert to &Indexed", [this] { convert_to_indexed(); });
+    commands.register_command("image.convert_color", "Convert to &Color",
+                              [this]
+                              {
+                                  if(current() == nullptr || !current()->document().indexed())
+                                  {
+                                      return;
+                                  }
+                                  change_layers("Convert to Color",
+                                                [](Document& document)
+                                                {
+                                                    for(auto& layer : document.layers())
+                                                    {
+                                                        auto colored{Layer{PixelFormat::rgba8, layer.name()}};
+                                                        colored.set_visible(layer.visible());
+                                                        colored.set_opacity(layer.opacity());
+                                                        colored.set_blend_mode(layer.blend_mode());
+                                                        colored.write(document.colors_of(layer.read(0, 0, document.width(),
+                                                                                                    document.height()),
+                                                                                         layer.palette_slot()),
+                                                                      0, 0);
+                                                        layer = std::move(colored);
+                                                    }
+                                                    document.set_format(PixelFormat::rgba8);
+                                                    document.set_palettes(std::nullopt);
+                                                });
+                              });
+}
+
+void PaintApp::convert_to_indexed()
+{
+    auto* const open{current()};
+    if(open == nullptr || open->document().indexed())
+    {
+        return;
+    }
+    const auto& document{open->document()};
+    // One palette of the image's own colours, index 0 see-through, as many as there are up to 255.
+    std::vector<Color> colors;
+    std::set<std::uint32_t> seen;
+    for(const auto& layer : document.layers())
+    {
+        const auto pixels{converted(layer.read(0, 0, document.width(), document.height()), PixelFormat::rgba8)};
+        for(int y{}; y < pixels.height; ++ y)
+        {
+            for(int x{}; x < pixels.width; ++ x)
+            {
+                const auto pixel{pixels.pixel<Rgba8>(x, y)};
+                if(pixel.alpha() == 0)
+                {
+                    continue;
+                }
+                const auto key{static_cast<std::uint32_t>(pixel.value[0]) << 16u |
+                               static_cast<std::uint32_t>(pixel.value[1]) << 8u | pixel.value[2]};
+                if(seen.insert(key).second)
+                {
+                    if(colors.size() == 255)
+                    {
+                        show_error("Convert to Indexed",
+                                   "The image has more than 255 colors. Reduce it first, as with Posterize.");
+                        return;
+                    }
+                    colors.push_back({pixel.value[0] / 255.0, pixel.value[1] / 255.0, pixel.value[2] / 255.0, 1.0});
+                }
+            }
+        }
+    }
+    PaletteSetup setup;
+    setup.size = std::max(2, static_cast<int>((colors.size() + 1 + 15) / 16 * 16));
+    Palette palette{"Palette 1", {Color{0, 0, 0, 1}}, 0};
+    palette.colors.insert(palette.colors.end(), colors.begin(), colors.end());
+    palette.colors.resize(static_cast<std::size_t>(setup.size), Color{0, 0, 0, 1});
+    setup.palettes.push_back(std::move(palette));
+    change_layers("Convert to Indexed",
+                  [&setup](Document& changed)
+                  {
+                      const auto old_format{changed.format()};
+                      changed.set_format(PixelFormat::gray_alpha8);
+                      changed.set_palettes(setup);
+                      for(auto& layer : changed.layers())
+                      {
+                          auto indexed{Layer{PixelFormat::gray_alpha8, layer.name()}};
+                          indexed.set_visible(layer.visible());
+                          indexed.set_opacity(layer.opacity());
+                          indexed.set_blend_mode(layer.blend_mode());
+                          static_cast<void>(old_format);
+                          indexed.write(changed.indices_of(layer.read(0, 0, changed.width(), changed.height()), 0), 0, 0);
+                          layer = std::move(indexed);
+                      }
+                  });
+}
+
 void PaintApp::undo()
 {
     settle();
@@ -1865,6 +2353,7 @@ void PaintApp::edit_color(bool primary)
     {
         return;
     }
+    (primary ? m_primary_index : m_secondary_index).reset();
     if(primary)
     {
         m_color_panel->set_primary(*chosen);
@@ -1988,7 +2477,9 @@ void PaintApp::run_effect(std::size_t index, bool again)
     }
     // The effect sees the whole layer, so a blur reaches past the selection's edge, and changes only what is
     // selected, as much as it is.
-    const auto source{to_work(layer.read(0, 0, document.width(), document.height()))};
+    // An indexed layer is worked on as its colours and put back as the nearest indices of its palette.
+    const auto source{to_work(document.colors_of(layer.read(0, 0, document.width(), document.height()),
+                                                 layer.palette_slot()))};
     EffectContext context;
     context.primary = m_color_panel->primary();
     context.secondary = m_color_panel->secondary();
@@ -2023,7 +2514,28 @@ void PaintApp::run_effect(std::size_t index, bool again)
                                     }
                                 }
                             }
-                            layer.write(from_work(inside, document.format()), area.x, area.y);
+                            if(document.indexed())
+                            {
+                                // Whole pixels only: half selected or more takes the effect.
+                                auto colors{from_work(inside, PixelFormat::rgba8)};
+                                auto indices{document.indices_of(colors, layer.palette_slot())};
+                                const auto old{layer.read(area.x, area.y, area.width, area.height)};
+                                for(int y{}; y < area.height; ++ y)
+                                {
+                                    for(int x{}; x < area.width; ++ x)
+                                    {
+                                        if(selection.at(area.x + x, area.y + y) < 128)
+                                        {
+                                            indices.set_pixel(x, y, old.pixel<GrayAlpha8>(x, y));
+                                        }
+                                    }
+                                }
+                                layer.write(indices, area.x, area.y);
+                            }
+                            else
+                            {
+                                layer.write(from_work(inside, document.format()), area.x, area.y);
+                            }
                         }
                         catch(const std::exception& failure)
                         {

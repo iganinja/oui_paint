@@ -53,8 +53,16 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
                           std::vector<std::string>{"8 bits per channel", "16 bits per channel"}, start.bits == 16 ? 1u : 0u),
                       "")};
     auto& color{field("&Color:",
-                      std::make_unique<oui::ComboBox>(std::vector<std::string>{"Color", "Grayscale"}, start.gray ? 1u : 0u),
+                      std::make_unique<oui::ComboBox>(std::vector<std::string>{"Color", "Grayscale", "Indexed"},
+                                                      start.indexed ? 2u : start.gray ? 1u : 0u),
                       "")};
+    // For an indexed image: how many palettes, of how many colours.
+    auto& palettes{field("&Palettes:", oui::number_field(), "of")};
+    palettes.set_range(1, 64);
+    palettes.set_value(start.palettes);
+    auto& palette_size{field("Colors &each:", oui::number_field(), "colors")};
+    palette_size.set_range(2, 256);
+    palette_size.set_value(start.palette_size);
     auto& background{field("&Background:",
                            std::make_unique<oui::ComboBox>(std::vector<std::string>{"White", "Black", "Transparent"},
                                                            static_cast<std::size_t>(start.background)),
@@ -69,6 +77,8 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
                 {
                     width.commit();
                     height.commit();
+                    palettes.commit();
+                    palette_size.commit();
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 });
@@ -87,6 +97,9 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
     result.height = static_cast<int>(height.value());
     result.bits = depth.selected() == 1 ? 16 : 8;
     result.gray = color.selected() == 1;
+    result.indexed = color.selected() == 2;
+    result.palettes = static_cast<int>(palettes.value());
+    result.palette_size = static_cast<int>(palette_size.value());
     result.background = static_cast<Background>(background.selected());
     return result;
 }

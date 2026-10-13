@@ -19,6 +19,10 @@ struct NewImage
     int height{600};
     int bits{8};
     bool gray{false};
+    // Indexed, with `palettes` palettes of `palette_size` greys to start with.
+    bool indexed{false};
+    int palettes{4};
+    int palette_size{16};
     Background background{Background::white};
 };
 

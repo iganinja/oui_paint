@@ -74,6 +74,7 @@ add_library(oui_paint_core STATIC
     src/ui/layers_panel.cpp
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
+    src/ui/palettes_panel.cpp
     src/ui/tool_options.cpp
     src/ui/transform_dialogs.cpp
     src/ui/tool_panel.cpp)

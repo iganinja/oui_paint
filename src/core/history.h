@@ -21,6 +21,7 @@ struct LayersState
     int width{0};
     int height{0};
     std::optional<PaletteSetup> palettes;
+    PixelFormat format{PixelFormat::rgba8};
 
     [[nodiscard]] static LayersState of(const Document& document);
     void restore_into(Document& document) const;

@@ -31,6 +31,8 @@ class Document
     [[nodiscard]] int width() const { return m_width; }
     [[nodiscard]] int height() const { return m_height; }
     [[nodiscard]] PixelFormat format() const { return m_format; }
+    // The format its layers are in, as converting the image and undoing it change it with the layers.
+    void set_format(PixelFormat format) { m_format = format; }
 
     // An indexed image keeps an index in each pixel, as grey, and see-through where alpha is 0, of the palette of the
     // layer's slot. None for an image of colours or greys.

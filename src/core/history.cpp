@@ -9,7 +9,7 @@ namespace oui_paint
 LayersState LayersState::of(const Document& document)
 {
     return {document.layers(), document.active_layer(), document.selection().mask(), document.width(),
-            document.height(),  document.palettes()};
+            document.height(),  document.palettes(), document.format()};
 }
 
 void LayersState::restore_into(Document& document) const
@@ -18,6 +18,7 @@ void LayersState::restore_into(Document& document) const
     {
         document.set_size(width, height);
     }
+    document.set_format(format);
     document.layers() = layers;
     document.selection().set_mask(selection);
     document.set_palettes(palettes);
@@ -75,7 +76,8 @@ void History::finish_step(std::string name, const Document& document)
     m_open.reset();
     const auto same_selection{before.selection.has_value() == after.selection.has_value() &&
                               (!before.selection || before.selection->tiles() == after.selection->tiles())};
-    if(same_selection && before.palettes == after.palettes && before.width == after.width && before.height == after.height &&
+    if(same_selection && before.format == after.format && before.palettes == after.palettes &&
+       before.width == after.width && before.height == after.height &&
        changed_tiles(before, after).empty() && before.layers.size() == after.layers.size() &&
        before.active_layer == after.active_layer)
     {

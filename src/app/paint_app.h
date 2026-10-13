@@ -27,6 +27,7 @@ namespace oui_paint
 class CanvasView;
 class ColorPanel;
 class LayersPanel;
+class PalettesPanel;
 class MainFrame;
 class ToolOptions;
 class ToolPanel;
@@ -115,6 +116,14 @@ class PaintApp
     void update_ants();
     void undo();
     void redo();
+    // What a tool paints with: the colour, or in an indexed image the index as its pixel's grey, and whether that
+    // index is the see-through one of the active layer's palette.
+    [[nodiscard]] Color ink(bool secondary, bool* see_through = nullptr);
+    // Changes the current document's palettes as one undoable step.
+    void change_palettes(std::string name, const std::function<void(PaletteSetup&)>& change);
+    // The Palettes menu's commands, and turning an image indexed or into colours.
+    void register_palette_commands();
+    void convert_to_indexed();
     // Asks for the primary or the secondary colour as hexadecimal.
     void edit_color(bool primary);
     void build_window();
@@ -132,6 +141,11 @@ class PaintApp
     ToolPanel* m_tool_panel{};
     ColorPanel* m_color_panel{};
     LayersPanel* m_layers_panel{};
+    PalettesPanel* m_palettes_panel{};
+    // In an indexed image, the indices picked as primary and secondary; none when a colour was picked, whose nearest
+    // index of the layer's palette is used.
+    std::optional<int> m_primary_index;
+    std::optional<int> m_secondary_index;
     ToolOptions* m_tool_options{};
     std::unique_ptr<Stroke> m_stroke;
     std::unique_ptr<PluginHost> m_plugins;

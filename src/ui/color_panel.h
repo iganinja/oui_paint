@@ -27,6 +27,8 @@ class ColorPanel final : public olagarro::oui::Widget
     void swap();
     // Called with true for the primary square, false for the secondary, when it is clicked.
     void on_edit(std::function<void(bool primary)> edit);
+    // Called after a palette colour was clicked: true for the secondary.
+    void on_picked(std::function<void(bool secondary)> picked);
 
     // The palette colour at a cell inside the panel, counted from its top left corner.
     [[nodiscard]] std::optional<Color> palette_at(olagarro::oui::Point cell) const;
@@ -43,6 +45,7 @@ class ColorPanel final : public olagarro::oui::Widget
     Color m_secondary{1.0, 1.0, 1.0, 1.0};
     std::vector<Color> m_palette;
     std::function<void(bool)> m_edit;
+    std::function<void(bool)> m_picked;
 };
 
 

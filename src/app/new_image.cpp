@@ -5,6 +5,28 @@ namespace oui_paint
 
 Document make_document(const NewImage& request)
 {
+    if(request.indexed)
+    {
+        // Greys from black to white, index 0 see-through: the background is the white at the end, the darkest grey
+        // after the see-through index, or see-through.
+        Document document{request.width, request.height, PixelFormat::gray_alpha8};
+        document.set_palettes(PaletteSetup::greys(request.palettes, request.palette_size));
+        auto& layer{document.add_layer("Background")};
+        if(request.background != Background::transparent)
+        {
+            const auto index{request.background == Background::white ? request.palette_size - 1 : 1};
+            Image row{PixelFormat::gray_alpha8, request.width, 1};
+            for(int x{}; x < request.width; ++ x)
+            {
+                row.set_pixel(x, 0, GrayAlpha8{{static_cast<std::uint8_t>(index), 255}});
+            }
+            for(int y{}; y < request.height; ++ y)
+            {
+                layer.write(row, 0, y);
+            }
+        }
+        return document;
+    }
     const auto format{pixel_format(request.gray, request.bits)};
     Document document{request.width, request.height, format};
     auto& layer{document.add_layer("Background")};

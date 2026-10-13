@@ -60,6 +60,11 @@ void ColorPanel::on_edit(std::function<void(bool primary)> edit)
     m_edit = std::move(edit);
 }
 
+void ColorPanel::on_picked(std::function<void(bool secondary)> picked)
+{
+    m_picked = std::move(picked);
+}
+
 std::optional<Color> ColorPanel::palette_at(oui::Point cell) const
 {
     if(cell.y < squares_rows || cell.x < 0 || cell.x >= width)
@@ -120,6 +125,10 @@ bool ColorPanel::handle_event(const oui::Event& event)
         else
         {
             m_primary = *color;
+        }
+        if(m_picked)
+        {
+            m_picked(mouse->right);
         }
         return true;
     }
