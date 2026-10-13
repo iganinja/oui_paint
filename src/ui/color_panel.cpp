@@ -1,5 +1,7 @@
 #include "ui/color_panel.h"
 
+#include "ui/side_panel.h"
+
 #include <oui/painter.h>
 #include <oui/theme.h>
 
@@ -87,7 +89,7 @@ oui::Size ColorPanel::measure(const oui::Constraints& constraints) const
 
 void ColorPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
 {
-    painter.fill_rect(m_bounds, theme.status_background);
+    painter.fill_rect(m_bounds, side_panel_color(theme));
     // The secondary square behind, down and to the right, the primary in front.
     painter.fill_rect({m_bounds.x + 1, m_bounds.y + 1, 3, 2}, on_screen(m_secondary));
     painter.fill_rect({m_bounds.x, m_bounds.y, 3, 2}, on_screen(m_primary));

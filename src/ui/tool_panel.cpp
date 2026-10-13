@@ -1,5 +1,7 @@
 #include "ui/tool_panel.h"
 
+#include "ui/side_panel.h"
+
 #include <oui/painter.h>
 #include <oui/theme.h>
 
@@ -62,7 +64,7 @@ oui::Size ToolPanel::measure(const oui::Constraints& constraints) const
 
 void ToolPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
 {
-    painter.fill_rect(m_bounds, theme.status_background);
+    painter.fill_rect(m_bounds, side_panel_color(theme));
     for(std::size_t index{}; index < m_buttons.size(); ++ index)
     {
         const auto bounds{button_bounds(index)};

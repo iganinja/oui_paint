@@ -1,5 +1,7 @@
 #include "ui/palettes_panel.h"
 
+#include "ui/side_panel.h"
+
 #include <oui/painter.h>
 #include <oui/theme.h>
 
@@ -89,7 +91,7 @@ void PalettesPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     {
         return;
     }
-    painter.fill_rect(m_bounds, theme.status_background);
+    painter.fill_rect(m_bounds, side_panel_color(theme));
     const auto& setup{*m_document->palettes()};
     const auto active{m_document->layers().empty()
                           ? 0
@@ -99,7 +101,7 @@ void PalettesPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     {
         const auto top{m_bounds.y + slot * rows};
         const oui::TextStyle style{slot == active ? theme.menu_selected_foreground : theme.status_foreground,
-                                   slot == active ? theme.menu_selected_background : theme.status_background};
+                                   slot == active ? theme.menu_selected_background : side_panel_color(theme)};
         painter.fill_rect({m_bounds.x, top, label_width, rows}, style.background);
         painter.draw_text({m_bounds.x, top}, (slot == active ? ">" : " ") + std::to_string(slot + 1), style);
         const auto& palette{setup.palettes[static_cast<std::size_t>(slot)]};

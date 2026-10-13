@@ -1,5 +1,7 @@
 #include "ui/layers_panel.h"
 
+#include "ui/side_panel.h"
+
 #include <oui/painter.h>
 #include <oui/theme.h>
 
@@ -151,7 +153,7 @@ void LayersPanel::paint_picture(oui::Painter& painter, const Layer& layer, const
 
 void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
 {
-    painter.fill_rect(m_bounds, theme.status_background);
+    painter.fill_rect(m_bounds, side_panel_color(theme));
     if(m_document != nullptr)
     {
         const auto& layers{m_document->layers()};
@@ -178,7 +180,7 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             }
             paint_picture(painter, layer, {line.x + eye_width, line.y, picture_width, 1});
             const oui::TextStyle style{active ? theme.menu_selected_foreground : theme.status_foreground,
-                                       active ? theme.menu_selected_background : theme.status_background};
+                                       active ? theme.menu_selected_background : side_panel_color(theme)};
             painter.draw_label({line.x + eye_width + picture_width + 1, line.y}, layer.name(), style);
         }
     }

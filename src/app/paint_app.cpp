@@ -25,6 +25,7 @@
 #include "ui/palettes_panel.h"
 #include "ui/plugin_workbench.h"
 #include "ui/side_column.h"
+#include "ui/side_panel.h"
 #include "ui/tool_options.h"
 #include "ui/tool_panel.h"
 #include "ui/transform_dialogs.h"
@@ -545,7 +546,7 @@ void PaintApp::build_window()
     // A colour picked from the colour panel's palette is used as the nearest index, not one picked before.
     m_color_panel->on_picked(
         [this](bool secondary) { (secondary ? m_secondary_index : m_primary_index).reset(); });
-    m_frame->set_left(std::move(left));
+    m_frame->set_left(std::make_unique<SidePanel>(std::move(left)));
     auto layers{std::make_unique<LayersPanel>(m_icons)};
     m_layers_panel = layers.get();
     m_layers_panel->on_select(
@@ -650,7 +651,8 @@ void PaintApp::build_window()
             change_layers("Layer Palette",
                           [slot](Document& document) { document.layers()[document.active_layer()].set_palette_slot(slot); });
         });
-    m_frame->set_right(std::make_unique<SideColumn>(std::move(layers), std::move(palettes)));
+    m_frame->set_right(
+        std::make_unique<SidePanel>(std::make_unique<SideColumn>(std::move(layers), std::move(palettes))));
     show_layers_panel(m_settings.bool_value("layers_panel", true));
     auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
     m_tool_options = options.get();
