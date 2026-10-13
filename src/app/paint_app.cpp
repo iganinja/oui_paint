@@ -3,6 +3,9 @@
 #include "app/tools.h"
 #include "codecs/codecs.h"
 #include "codecs/openraster.h"
+#include "tools/fill.h"
+#include "tools/gradient.h"
+#include "tools/shapes.h"
 #include "ui/canvas_view.h"
 #include "ui/color_panel.h"
 #include "ui/layer_properties_dialog.h"
@@ -291,8 +294,7 @@ void PaintApp::register_commands()
                                   {
                                       if(const auto next{tool_for_key(key, m_tool_panel->selected())})
                                       {
-                                          settle();
-                                          m_tool_panel->set_selected(*next);
+                                          select_tool(*next);
                                       }
                                   });
         commands.bind(id, {tool.key});
@@ -346,7 +348,7 @@ void PaintApp::build_window()
     auto left{oui::column()};
     m_tool_panel = &left->add(std::make_unique<ToolPanel>(tool_buttons(), m_icons));
     m_tool_panel->set_selected("brush");
-    m_tool_panel->on_picked([this](const std::string&) { settle(); });
+    m_tool_panel->on_picked([this](const std::string& tool) { select_tool(tool); });
     m_color_panel = &left->add(std::make_unique<ColorPanel>());
     m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
     m_frame->set_left(std::move(left));
@@ -784,6 +786,31 @@ void PaintApp::use_tool(const ToolEvent& event)
         select_shape(event, tool == "ellipse_select");
         return;
     }
+    if(tool == "bucket")
+    {
+        const auto x{static_cast<int>(std::floor(event.at.x))};
+        const auto y{static_cast<int>(std::floor(event.at.y))};
+        if(event.phase != ToolEvent::Phase::press || x < 0 || y < 0 || x >= document.width() ||
+           y >= document.height())
+        {
+            return;
+        }
+        const auto before{LayersState::of(document)};
+        open->history().begin_step(document);
+        static_cast<void>(bucket_fill(document, x, y,
+                                      event.secondary ? m_color_panel->secondary() : m_color_panel->primary(),
+                                      m_tool_options->fill()));
+        open->history().finish_step("Paint Bucket", document);
+        open->refresh(changed_tiles(before, LayersState::of(document)));
+        open->set_modified(true);
+        refresh_titles();
+        return;
+    }
+    if(tool == "gradient" || tool == "line" || tool == "shapes")
+    {
+        drag_draw(event, tool);
+        return;
+    }
     const auto painting{tool == "brush" || tool == "pencil" || tool == "eraser"};
     if(!painting || document.layers().empty())
     {
@@ -880,6 +907,76 @@ void PaintApp::show_layers()
     auto* const open{current()};
     m_layers_panel->set_document(open != nullptr ? &open->document() : nullptr);
     update_ants();
+}
+
+void PaintApp::select_tool(const std::string& tool)
+{
+    settle();
+    m_tool_panel->set_selected(tool);
+    m_tool_options->show_for(tool);
+}
+
+void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
+{
+    auto* const open{current()};
+    auto& document{open->document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    if(event.phase == ToolEvent::Phase::press)
+    {
+        open->history().begin_step(document);
+        m_dragging = Dragging{event.at, layer, event.secondary};
+    }
+    if(!m_dragging)
+    {
+        return;
+    }
+    // The right button swaps the colours, as in Paint.NET.
+    const auto& first{m_dragging->secondary ? m_color_panel->secondary() : m_color_panel->primary()};
+    const auto& second{m_dragging->secondary ? m_color_panel->primary() : m_color_panel->secondary()};
+    const auto brush{m_tool_options->settings()};
+    auto to{event.at};
+    const auto from{m_dragging->from};
+    if(event.shift && tool == "line")
+    {
+        // In steps of 15 degrees.
+        constexpr auto step{3.14159265358979323846 / 12.0};
+        const auto angle{std::round(std::atan2(to.y - from.y, to.x - from.x) / step) * step};
+        const auto length{std::hypot(to.x - from.x, to.y - from.y)};
+        to = {from.x + std::cos(angle) * length, from.y + std::sin(angle) * length};
+    }
+    else if(event.shift && tool == "shapes")
+    {
+        // A square or a circle.
+        const auto side{std::max(std::abs(to.x - from.x), std::abs(to.y - from.y))};
+        to = {from.x + (to.x < from.x ? -side : side), from.y + (to.y < from.y ? -side : side)};
+    }
+    const auto before{LayersState::of(document)};
+    layer = m_dragging->base;
+    if(tool == "gradient")
+    {
+        static_cast<void>(draw_gradient(layer, m_dragging->base, document.selection(), m_tool_options->gradient(), from,
+                                        to, first, second, m_tool_options->gradient_transparency()));
+    }
+    else if(tool == "line")
+    {
+        static_cast<void>(draw_line(layer, document.selection(), from, to, first, brush.width, brush.antialias,
+                                    m_tool_options->line()));
+    }
+    else
+    {
+        const auto shape{m_tool_options->shape()};
+        static_cast<void>(draw_shape(layer, document.selection(), shape.kind, shape.style, from, to, first, second,
+                                     brush.width, brush.antialias));
+    }
+    open->refresh(changed_tiles(before, LayersState::of(document)));
+    if(event.phase == ToolEvent::Phase::release)
+    {
+        m_dragging.reset();
+        open->history().finish_step(tool == "gradient" ? "Gradient" : tool == "line" ? "Line / Curve" : "Shapes",
+                                    document);
+        open->set_modified(true);
+        refresh_titles();
+    }
 }
 
 void PaintApp::select_shape(const ToolEvent& event, bool ellipse)
@@ -1140,6 +1237,7 @@ void PaintApp::paste(PasteInto into)
     m_floating = std::move(floating);
     // What is pasted can be moved straight away.
     m_tool_panel->set_selected("move_pixels");
+    m_tool_options->show_for("move_pixels");
     open->refresh(changed_tiles(before, LayersState::of(document)));
     open->set_modified(true);
     refresh_titles();

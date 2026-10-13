@@ -64,6 +64,10 @@ class PaintApp
     void layer_properties();
     // Shows the current document's layers in the panel.
     void show_layers();
+    // Makes `tool` the one in use, putting down what floats and showing its options.
+    void select_tool(const std::string& tool);
+    // Uses a tool drawn by dragging, gradient, line or shape, drawn anew from the layer as it was at each move.
+    void drag_draw(const ToolEvent& event, const std::string& tool);
     // Uses the rectangle or ellipse select tool.
     void select_shape(const ToolEvent& event, bool ellipse);
     // Copies what is selected of the active layer, or of the whole image when `merged`, as PNG.
@@ -133,6 +137,14 @@ class PaintApp
         std::optional<Layer> selection;
     };
     std::optional<Moving> m_moving;
+    // A gradient, line or shape being dragged: where it began, the layer before it, and which button.
+    struct Dragging
+    {
+        Position from;
+        Layer base;
+        bool secondary{false};
+    };
+    std::optional<Dragging> m_dragging;
     // Where the Pan tool's drag was last, in the view.
     std::optional<Position> m_panning;
     // The marching ants move while there is a selection to show.
