@@ -1,5 +1,6 @@
 #include "app/paint_app.h"
 
+#include "app/file_filters.h"
 #include "app/fonts.h"
 #include "app/tools.h"
 #include "codecs/codecs.h"
@@ -46,20 +47,6 @@ namespace oui_paint
 namespace
 {
 
-const std::vector<oui::FileFilter>& image_filters()
-{
-    static const std::vector<oui::FileFilter> filters{
-        {"Images (*.ora, *.png, *.jpg, *.bmp, *.tga, *.gif, *.r16)",
-         "*.ora *.png *.jpg *.jpeg *.bmp *.tga *.gif *.r16 *.raw"},
-        {"OpenRaster, with layers (*.ora)", "*.ora"},
-        {"PNG (*.png)", "*.png"},
-        {"JPEG (*.jpg)", "*.jpg *.jpeg"},
-        {"BMP (*.bmp)", "*.bmp"},
-        {"TGA (*.tga)", "*.tga"},
-        {"Raw 16-bit heightmap (*.r16)", "*.r16 *.raw"},
-    };
-    return filters;
-}
 
 std::vector<ToolButton> tool_buttons()
 {
@@ -2065,14 +2052,10 @@ void PaintApp::register_palette_commands()
                              options.file_name = std::move(name);
                              return oui::file_dialog(m_application, options);
                          }};
-    const auto palette_filters{std::vector<oui::FileFilter>{
-        {"Palettes and images (*.pal, *.gpl, *.act, *.png, *.gif, *.bmp)", "*.pal *.gpl *.act *.png *.gif *.bmp *.tga"},
-        {"JASC palette (*.pal)", "*.pal"},
-        {"GIMP palette (*.gpl)", "*.gpl"},
-        {"Photoshop palette (*.act)", "*.act"}}};
-    const auto read_colors{[this, pick_file, palette_filters]() -> std::optional<std::vector<Color>>
+    const auto& filters{palette_filters()};
+    const auto read_colors{[this, pick_file, filters]() -> std::optional<std::vector<Color>>
                            {
-                               const auto path{pick_file(oui::FileDialogMode::open_file, palette_filters, "")};
+                               const auto path{pick_file(oui::FileDialogMode::open_file, filters, "")};
                                if(!path)
                                {
                                    return std::nullopt;
@@ -2156,7 +2139,7 @@ void PaintApp::register_palette_commands()
                                                   });
                               });
     commands.register_command("palettes.save_slot", "Save the Layer's Pa&lette...",
-                              [this, indexed, pick_file, palette_filters]
+                              [this, indexed, pick_file, filters]
                               {
                                   if(!indexed())
                                   {
@@ -2165,7 +2148,7 @@ void PaintApp::register_palette_commands()
                                   const auto& document{current()->document()};
                                   const auto slot{document.layers()[document.active_layer()].palette_slot()};
                                   const auto path{pick_file(oui::FileDialogMode::save_file,
-                                                            {palette_filters.begin() + 1, palette_filters.end()},
+                                                            {filters.begin() + 1, filters.end()},
                                                             "palette.pal")};
                                   std::string error;
                                   if(path && !write_file_atomically(

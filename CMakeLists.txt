@@ -33,6 +33,7 @@ target_compile_options(oui_paint_miniz PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/W0,
 
 # Everything but main(), so the tests reach it too.
 add_library(oui_paint_core STATIC
+    src/app/file_filters.cpp
     src/app/fonts.cpp
     src/app/new_image.cpp
     src/app/open_document.cpp
@@ -119,6 +120,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/codecs_test.cpp
         tests/color_math_test.cpp
         tests/core_test.cpp
+        tests/file_filters_test.cpp
         tests/fill_test.cpp
         tests/floating_test.cpp
         tests/fonts_test.cpp
