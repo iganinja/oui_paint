@@ -7,6 +7,7 @@
 
 #include <oui/graphics/font.h>
 
+#include <array>
 #include <string_view>
 #include <vector>
 
@@ -14,8 +15,9 @@ namespace oui_paint
 {
 
 // What goes around text, each off at 0, each in its own colour: an outline `outline` pixels wide; a shadow `shadow`
-// pixels down and to the right, its edge soft, as see-through as its colour's alpha makes it; a glow reaching `glow`
-// pixels out from the text and its outline, fading as it goes.
+// pixels away from the light, its edge soft, as see-through as its colour's alpha makes it; a glow reaching `glow`
+// pixels out from the text and its outline, fading as it goes. The light comes from `light` degrees, counted
+// anticlockwise from the right, as the image shows it: 135, from the top left, casts the shadow down and to the right.
 struct TextEffects
 {
     int outline{0};
@@ -24,6 +26,7 @@ struct TextEffects
     Color outline_color{1, 1, 1, 1};
     Color shadow_color{0, 0, 0, 0.6};
     Color glow_color{1, 1, 1, 1};
+    double light{135.0};
 
     [[nodiscard]] bool any() const { return outline > 0 || shadow > 0 || glow > 0; }
 };
@@ -38,10 +41,15 @@ struct TextFace
 };
 
 // Text in `font`, its lines split at '\n', with the top left of its first line at `at`, mixed over the layer inside the
-// selection, as `face` makes its letters, over its shadow, glow and outline when `effects` has them; without
-// antialiasing, each pixel covered half or more is solid. Returns the tiles written.
+// selection, as `face` makes its letters, turned `radians` clockwise round `at`, over its shadow, glow and outline when
+// `effects` has them; without antialiasing, each pixel covered half or more is solid. Returns the tiles written.
 std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olagarro::oui::Font& font,
                                  std::string_view text, Position at, const Color& color, bool antialias,
-                                 const TextEffects& effects = {}, const TextFace& face = {});
+                                 const TextEffects& effects = {}, const TextFace& face = {}, double radians = 0.0);
+
+// The corners of the box the lines of `text` take, from where it starts, as draw_text lays them out and turns them:
+// its top left, top right, bottom right and bottom left.
+[[nodiscard]] std::array<Position, 4> text_corners(olagarro::oui::Font& font, std::string_view text, Position at,
+                                                   double radians);
 
 } // namespace oui_paint

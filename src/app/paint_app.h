@@ -181,6 +181,10 @@ class PaintApp
     // Where the moving and turning signs show beside the piece, in the view's pixels: what dragging them does is clear
     // from them, as the right button turning is not.
     [[nodiscard]] std::optional<std::pair<Position, Position>> floating_gizmos();
+    // Where the moving and turning signs of the text being typed are, in the view, as floating_gizmos says them.
+    [[nodiscard]] std::optional<std::pair<Position, Position>> typing_gizmos();
+    // Whether a point of the view is on the sign at `gizmo`.
+    [[nodiscard]] static bool on_gizmo(Position gizmo, Position in_view);
     static constexpr double gizmo_size{20.0};
     // The point Move Selected Pixels turns round, in the image's pixels: the middle of the piece as it shows unless
     // dragged elsewhere, kept for the document it was set in until what floats is put down.
@@ -355,8 +359,19 @@ class PaintApp
         Position at;
         std::string text;
         Layer base;
+        // Turned round `at`, clockwise.
+        double radians{0.0};
     };
     std::optional<Typing> m_typing;
+    // A sign of the text being typed being dragged: turning it or moving it, from where, and the text as it was.
+    struct TextDrag
+    {
+        bool turning;
+        Position from;
+        Position at;
+        double radians;
+    };
+    std::optional<TextDrag> m_text_drag;
     // Fonts as loaded, by file and size; the bytes must outlive the fonts made of them.
     std::map<std::filesystem::path, std::string> m_font_files;
     std::map<std::pair<std::filesystem::path, int>, std::unique_ptr<olagarro::oui::Font>> m_fonts;

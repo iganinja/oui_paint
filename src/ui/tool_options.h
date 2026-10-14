@@ -38,8 +38,15 @@ class ToolOptions final : public olagarro::oui::Container
     using ColorChooser = std::function<std::optional<Color>(const std::string& title, const Color& start,
                                                             const std::function<void(const Color&)>& changed)>;
 
-    // `fonts` are those the Text tool offers; `choose_color` asks for the colours of what goes around text.
-    ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts, Icons& icons, ColorChooser choose_color);
+    // Asks where light comes from, in degrees, from `start`, telling `changed` each direction as it is chosen; none
+    // when cancelled.
+    using LightChooser =
+        std::function<std::optional<double>(double start, const std::function<void(double)>& changed)>;
+
+    // `fonts` are those the Text tool offers; `choose_color` asks for the colours of what goes around text, and
+    // `choose_light` for where the light that casts its shadow comes from.
+    ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts, Icons& icons, ColorChooser choose_color,
+                LightChooser choose_light);
 
     // Shows the options of the tool called `tool`.
     void show_for(std::string_view tool);
@@ -102,6 +109,8 @@ class ToolOptions final : public olagarro::oui::Container
     std::array<Color, 3> m_effect_colors{Color{1, 1, 1, 1}, Color{0, 0, 0, 0.6}, Color{1, 1, 1, 1}};
     std::array<bool, 3> m_text_style{};
     ColorChooser m_choose_color;
+    LightChooser m_choose_light;
+    double m_light{135.0};
     olagarro::oui::NumberField* m_width{};
     olagarro::oui::Slider* m_width_slider{};
     olagarro::oui::NumberField* m_hardness{};

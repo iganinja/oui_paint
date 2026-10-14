@@ -135,6 +135,55 @@ class ToggleIcons final : public oui::Widget
     std::function<void()> m_changed;
 };
 
+// A button that is an icon, as the bar's sun: a click on it calls `clicked`.
+class IconButton final : public oui::Widget
+{
+  public:
+    IconButton(Icons& icons, std::string icon, std::string tooltip, std::function<void()> clicked)
+        : m_icons{icons}, m_icon{std::move(icon)}, m_tooltip{std::move(tooltip)}, m_clicked{std::move(clicked)}
+    {
+    }
+
+    [[nodiscard]] oui::Size measure(const oui::Constraints& constraints) const override
+    {
+        return constraints.constrain({2, 1});
+    }
+
+    void paint(oui::Painter& painter, const oui::Theme& theme) const override
+    {
+        const auto area{painter.pixel_bounds(m_bounds)};
+        if(!area)
+        {
+            return;
+        }
+        if(const auto* const picture{m_icons.picture(m_icon, area->width, area->height)})
+        {
+            oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
+            image.alpha = true;
+            painter.draw_image(m_bounds, image, theme);
+        }
+    }
+
+    bool handle_event(const oui::Event& event) override
+    {
+        const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+        if(mouse == nullptr || !mouse->pressed || mouse->right)
+        {
+            return false;
+        }
+        m_clicked();
+        return true;
+    }
+
+    [[nodiscard]] std::optional<std::string> tooltip_at(oui::Point) const override { return m_tooltip; }
+
+  private:
+    Icons& m_icons;
+    std::string m_icon;
+    std::string m_tooltip;
+    std::function<void()> m_clicked;
+};
+
 // A square of a colour; a click on it calls `clicked`, to choose another.
 class Swatch final : public oui::Widget
 {
@@ -187,8 +236,9 @@ oui::ComboBox& choice(oui::Row& row, std::string_view label, std::vector<std::st
 } // namespace
 
 ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts, Icons& icons,
-                         ColorChooser choose_color)
-    : m_settings{settings}, m_fonts{std::move(fonts)}, m_choose_color{std::move(choose_color)}
+                         ColorChooser choose_color, LightChooser choose_light)
+    : m_settings{settings}, m_fonts{std::move(fonts)}, m_choose_color{std::move(choose_color)},
+      m_choose_light{std::move(choose_light)}
 {
     auto& bar{oui::row(*this)};
     bar.set_gap(oui::Spacing::normal);
@@ -309,6 +359,18 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts, 
                       }};
     m_outline = effect(oui::translate("Tools", "&Outline:"), 50, 0);
     m_shadow = effect(oui::translate("Tools", "S&hadow:"), 50, 1);
+    // Where the light that casts the shadow comes from, asked for with the sun beside its colour.
+    m_effects_group->add(std::make_unique<IconButton>(icons, "Light", oui::translate("Tools", "Light Direction"),
+                                                      [this]
+                                                      {
+                                                          const auto start{m_light};
+                                                          const auto put{[this](double degrees)
+                                                                         {
+                                                                             m_light = degrees;
+                                                                             text_changed();
+                                                                         }};
+                                                          put(m_choose_light(start, put).value_or(start));
+                                                      }));
     m_glow = effect(oui::translate("Tools", "&Glow:"), 100, 2);
     static_cast<void>(m_font->on_selected([this](std::size_t) { text_changed(); }));
     static_cast<void>(m_font_size->on_changed([this](double) { text_changed(); }));
@@ -410,6 +472,7 @@ TextEffects ToolOptions::text_effects() const
     effects.outline_color = m_effect_colors[0];
     effects.shadow_color = m_effect_colors[1];
     effects.glow_color = m_effect_colors[2];
+    effects.light = m_light;
     return effects;
 }
 

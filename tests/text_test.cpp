@@ -267,3 +267,45 @@ TEST(Text, StruckThroughALineCrossesTheWholeText)
     face.strikethrough = true;
     EXPECT_TRUE(crossed(typed("I I", face)));
 }
+
+TEST(Text, AShadowFallsAwayFromTheLight)
+{
+    const auto plain{inked_box(letter({}), side, side)};
+    TextEffects effects;
+    effects.shadow = 5;
+    // From the right: the shadow to the left, nothing to the right of the text, above or below beyond its softness.
+    effects.light = 0.0;
+    const auto shadowed{inked_box(letter(effects), side, side)};
+    EXPECT_LE(shadowed[0], plain[0] - 5);
+    EXPECT_EQ(shadowed[2], plain[2]);
+}
+
+TEST(Text, TurnedAQuarterRoundWhereItStartsAnUprightLetterLiesDown)
+{
+    auto font{olagarro::oui::built_in_interface_font(32.0f)};
+    Layer upright{PixelFormat::rgba8, "Upright"};
+    draw_text(upright, Selection{side, side}, *font, "I", {80, 40}, {0, 0, 0, 1}, false);
+    Layer lying{PixelFormat::rgba8, "Lying"};
+    draw_text(lying, Selection{side, side}, *font, "I", {80, 40}, {0, 0, 0, 1}, false, {}, {},
+              3.14159265358979323846 / 2.0);
+    const auto stands{inked_box(upright, side, side)};
+    const auto lies{inked_box(lying, side, side)};
+    EXPECT_GT(stands[3] - stands[1], stands[2] - stands[0]);
+    EXPECT_GT(lies[2] - lies[0], lies[3] - lies[1]);
+    // Clockwise round its start: what was below it is now to its left.
+    EXPECT_LT(lies[2], 80);
+    EXPECT_GE(lies[1], 40 - 1);
+}
+
+TEST(Text, ItsCornersTurnWithIt)
+{
+    auto font{olagarro::oui::built_in_interface_font(32.0f)};
+    const auto flat{text_corners(*font, "Hi", {10, 20}, 0.0)};
+    EXPECT_DOUBLE_EQ(flat[0].x, 10);
+    EXPECT_DOUBLE_EQ(flat[0].y, 20);
+    EXPECT_DOUBLE_EQ(flat[2].y, 20 + font->line_height());
+    const auto quarter{text_corners(*font, "Hi", {10, 20}, 3.14159265358979323846 / 2.0)};
+    // The top right corner, a line's width along, goes straight down.
+    EXPECT_NEAR(quarter[1].x, 10, 1e-9);
+    EXPECT_NEAR(quarter[1].y, 20 + (flat[1].x - 10), 1e-9);
+}

@@ -144,7 +144,7 @@ std::vector<float> distances(const std::vector<bool>& inside, int width, int hei
 
 std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olagarro::oui::Font& font,
                                  std::string_view text, Position at, const Color& color, bool antialias,
-                                 const TextEffects& effects, const TextFace& face)
+                                 const TextEffects& effects, const TextFace& face, double radians)
 {
     const auto left{static_cast<int>(std::lround(at.x))};
     const auto top{static_cast<int>(std::lround(at.y))};
@@ -198,23 +198,17 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
     }
     // A thicker letter grows to the right.
     last_x += thicker;
-    const auto outline{std::max(effects.outline, 0)};
-    const auto shadow{std::max(effects.shadow, 0)};
-    const auto glow{std::max(effects.glow, 0)};
-    const auto softness{std::max(1.0, shadow / 2.0)};
-    const auto room{effects.any() ? std::max({outline + 2, outline + glow + 2,
-                                              outline + shadow + static_cast<int>(std::ceil(softness)) + 2})
-                                  : 0};
-    const auto box_x{first_x - room};
-    const auto box_y{first_y - room};
-    const auto width{last_x - first_x + 1 + 2 * room};
-    const auto height{last_y - first_y + 1 + 2 * room};
-    const auto cell{[width](int x, int y) { return static_cast<std::size_t>(y) * width + x; }};
 
-    std::vector<float> coverage(static_cast<std::size_t>(width) * height);
+    // The glyphs as they are laid out, before they are turned.
+    const auto laid_x{first_x};
+    const auto laid_y{first_y};
+    const auto laid_width{last_x - first_x + 1};
+    const auto laid_height{last_y - first_y + 1};
+    std::vector<float> laid(static_cast<std::size_t>(laid_width) * laid_height);
+    const auto laid_cell{[laid_width](int x, int y) { return static_cast<std::size_t>(y) * laid_width + x; }};
     const auto add{[&](int x, int y, float amount)
                    {
-                       auto& value{coverage[cell(x - box_x, y - box_y)]};
+                       auto& value{laid[laid_cell(x - laid_x, y - laid_y)]};
                        value = std::min(1.0f, std::max(value, amount));
                    }};
     each_glyph(font, text, left, top,
@@ -223,8 +217,7 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                    for(int row{}; row < glyph.height; ++ row)
                    {
                        // A slanted row moves right by how far it is above the baseline, shared between the two
-                       // columns it falls between.
-                       // Without antialiasing the row moves whole, to the nearest column.
+                       // columns it falls between; without antialiasing it moves whole, to the nearest column.
                        const auto shift{face.slant ? lean * (baseline - (y + row) - 0.5) : 0.0};
                        const auto whole{static_cast<int>(antialias ? std::floor(shift) : std::round(shift))};
                        const auto part{antialias ? static_cast<float>(shift - whole) : 0.0f};
@@ -239,9 +232,9 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                            const auto image_x{x + column + whole};
                            if(face.slant)
                            {
-                               auto& here{coverage[cell(image_x - box_x, y + row - box_y)]};
+                               auto& here{laid[laid_cell(image_x - laid_x, y + row - laid_y)]};
                                here = std::min(1.0f, here + value * (1.0f - part));
-                               auto& next{coverage[cell(image_x + 1 - box_x, y + row - box_y)]};
+                               auto& next{laid[laid_cell(image_x + 1 - laid_x, y + row - laid_y)]};
                                next = std::min(1.0f, next + value * part);
                            }
                            else
@@ -254,15 +247,15 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
     // Thicker: each pixel as covered as the most covered of those up to `thicker` to its left.
     if(thicker > 0)
     {
-        const auto before{coverage};
-        for(int y{}; y < height; ++ y)
+        const auto before{laid};
+        for(int y{}; y < laid_height; ++ y)
         {
-            for(int x{}; x < width; ++ x)
+            for(int x{}; x < laid_width; ++ x)
             {
-                auto& value{coverage[cell(x, y)]};
+                auto& value{laid[laid_cell(x, y)]};
                 for(int step{1}; step <= thicker && x - step >= 0; ++ step)
                 {
-                    value = std::max(value, before[cell(x - step, y)]);
+                    value = std::max(value, before[laid_cell(x - step, y)]);
                 }
             }
         }
@@ -277,6 +270,88 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                 {
                     add(x, y, 1.0f);
                 }
+            }
+        }
+    }
+
+    // Turned round where the text starts, by `radians`, clockwise as the image shows it: each pixel takes what lies
+    // under it once turned back, between the four pixels it falls among. Then room around it for what goes around it.
+    const auto outline{std::max(effects.outline, 0)};
+    const auto shadow{std::max(effects.shadow, 0)};
+    const auto glow{std::max(effects.glow, 0)};
+    const auto softness{std::max(1.0, shadow / 2.0)};
+    const auto room{effects.any() ? std::max({outline + 2, outline + glow + 2,
+                                              outline + shadow + static_cast<int>(std::ceil(softness)) + 2})
+                                  : 0};
+    const auto turned{radians != 0.0};
+    const auto cosine{std::cos(radians)};
+    const auto sine{std::sin(radians)};
+    auto turned_x{laid_x};
+    auto turned_y{laid_y};
+    auto turned_right{laid_x + laid_width};
+    auto turned_bottom{laid_y + laid_height};
+    if(turned)
+    {
+        auto low_x{std::numeric_limits<double>::max()};
+        auto low_y{std::numeric_limits<double>::max()};
+        auto high_x{std::numeric_limits<double>::lowest()};
+        auto high_y{std::numeric_limits<double>::lowest()};
+        for(const auto& [cx, cy] : {std::pair{laid_x, laid_y}, std::pair{laid_x + laid_width, laid_y},
+                                    std::pair{laid_x + laid_width, laid_y + laid_height},
+                                    std::pair{laid_x, laid_y + laid_height}})
+        {
+            const auto dx{cx - at.x};
+            const auto dy{cy - at.y};
+            const auto x{at.x + dx * cosine - dy * sine};
+            const auto y{at.y + dx * sine + dy * cosine};
+            low_x = std::min(low_x, x);
+            low_y = std::min(low_y, y);
+            high_x = std::max(high_x, x);
+            high_y = std::max(high_y, y);
+        }
+        turned_x = static_cast<int>(std::floor(low_x)) - 1;
+        turned_y = static_cast<int>(std::floor(low_y)) - 1;
+        turned_right = static_cast<int>(std::ceil(high_x)) + 1;
+        turned_bottom = static_cast<int>(std::ceil(high_y)) + 1;
+    }
+    const auto box_x{turned_x - room};
+    const auto box_y{turned_y - room};
+    const auto width{turned_right - turned_x + 2 * room};
+    const auto height{turned_bottom - turned_y + 2 * room};
+    const auto cell{[width](int x, int y) { return static_cast<std::size_t>(y) * width + x; }};
+    std::vector<float> coverage(static_cast<std::size_t>(width) * height);
+    if(!turned)
+    {
+        for(int y{}; y < laid_height; ++ y)
+        {
+            std::copy_n(laid.begin() + static_cast<std::ptrdiff_t>(laid_cell(0, y)), laid_width,
+                        coverage.begin() + static_cast<std::ptrdiff_t>(cell(room, y + room)));
+        }
+    }
+    else
+    {
+        const auto laid_at{[&](int x, int y)
+                           {
+                               return x < 0 || y < 0 || x >= laid_width || y >= laid_height
+                                          ? 0.0
+                                          : static_cast<double>(laid[laid_cell(x, y)]);
+                           }};
+        for(int y{}; y < height; ++ y)
+        {
+            for(int x{}; x < width; ++ x)
+            {
+                // The middle of the pixel, turned back, as a place among the laid pixels' middles.
+                const auto dx{box_x + x + 0.5 - at.x};
+                const auto dy{box_y + y + 0.5 - at.y};
+                const auto from_x{at.x + dx * cosine + dy * sine - laid_x - 0.5};
+                const auto from_y{at.y - dx * sine + dy * cosine - laid_y - 0.5};
+                const auto x0{static_cast<int>(std::floor(from_x))};
+                const auto y0{static_cast<int>(std::floor(from_y))};
+                const auto fx{from_x - x0};
+                const auto fy{from_y - y0};
+                const auto value{(laid_at(x0, y0) * (1 - fx) + laid_at(x0 + 1, y0) * fx) * (1 - fy) +
+                                 (laid_at(x0, y0 + 1) * (1 - fx) + laid_at(x0 + 1, y0 + 1) * fx) * fy};
+                coverage[cell(x, y)] = static_cast<float>(value);
             }
         }
     }
@@ -366,12 +441,30 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                                             }};
                          if(shadow > 0)
                          {
-                             // The text and its outline, moved down and to the right, fading over `softness`
-                             // pixels out from their edge.
+                             // The text and its outline, moved away from the light, fading over `softness` pixels
+                             // out from their edge: how far from the text, between the four pixels it falls among.
+                             const auto light{effects.light * 3.14159265358979323846 / 180.0};
+                             const auto shift_x{-std::cos(light) * shadow};
+                             const auto shift_y{std::sin(light) * shadow};
+                             const auto far{1e6};
+                             const auto away_between{[&](double x, double y)
+                                                     {
+                                                         const auto x0{static_cast<int>(std::floor(x))};
+                                                         const auto y0{static_cast<int>(std::floor(y))};
+                                                         const auto fx{x - x0};
+                                                         const auto fy{y - y0};
+                                                         const auto at_cell{[&](int cx, int cy)
+                                                                            { return std::min(away_at(cx, cy), far); }};
+                                                         return (at_cell(x0, y0) * (1 - fx) + at_cell(x0 + 1, y0) * fx) *
+                                                                    (1 - fy) +
+                                                                (at_cell(x0, y0 + 1) * (1 - fx) +
+                                                                 at_cell(x0 + 1, y0 + 1) * fx) *
+                                                                    fy;
+                                                     }};
                              mix(effects.shadow_color,
                                  [&](int x, int y)
                                  {
-                                     const auto distance{away_at(x - shadow, y - shadow)};
+                                     const auto distance{away_between(x - shift_x, y - shift_y)};
                                      return std::clamp((outline + 0.5 + softness - distance) / softness, 0.0, 1.0);
                                  });
                          }
@@ -396,6 +489,23 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                      mix(color, text_at);
                  });
     return {touched.begin(), touched.end()};
+}
+
+std::array<Position, 4> text_corners(olagarro::oui::Font& font, std::string_view text, Position at, double radians)
+{
+    const auto lines{lines_of(font, text, static_cast<int>(std::lround(at.x)), static_cast<int>(std::lround(at.y)))};
+    auto widest{0};
+    for(const auto& line : lines)
+    {
+        widest = std::max(widest, line.right - line.left);
+    }
+    const auto width{static_cast<double>(widest)};
+    const auto height{static_cast<double>(lines.size()) * font.line_height()};
+    const auto cosine{std::cos(radians)};
+    const auto sine{std::sin(radians)};
+    const auto turned{[&](double dx, double dy)
+                      { return Position{at.x + dx * cosine - dy * sine, at.y + dx * sine + dy * cosine}; }};
+    return {turned(0, 0), turned(width, 0), turned(width, height), turned(0, height)};
 }
 
 } // namespace oui_paint

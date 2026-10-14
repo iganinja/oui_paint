@@ -94,6 +94,7 @@ add_library(oui_paint_core STATIC
     src/ui/layers_panel.cpp
     src/ui/levels_bar.cpp
     src/ui/levels_dialog.cpp
+    src/ui/light_dialog.cpp
     src/ui/mode_dialogs.cpp
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
@@ -118,8 +119,8 @@ set(OUI_PAINT_GODOT_ICONS
     Add Bucket ColorPick Duplicate Edit Eraser Gradient GuiVisibilityHidden GuiVisibilityVisible Image Line MoveDown
     MoveUp RegionEdit Remove RotateLeft RotateRight ToolMove ToolPan ToolSelect Tools Zoom)
 list(TRANSFORM OUI_PAINT_GODOT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
-set(OUI_PAINT_OWN_ICONS Arc Bold CloneStamp EllipseSelect Italic Lasso MagicWand MergeDown Paintbrush Recolor Shapes
-    Strikethrough Text)
+set(OUI_PAINT_OWN_ICONS Arc Bold CloneStamp EllipseSelect Italic Lasso Light MagicWand MergeDown Paintbrush Recolor
+    Shapes Strikethrough Text)
 list(TRANSFORM OUI_PAINT_OWN_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/oui_paint/)
 set(OUI_PAINT_ICONS ${OUI_PAINT_GODOT_ICONS} ${OUI_PAINT_OWN_ICONS})
 list(TRANSFORM OUI_PAINT_ICONS APPEND .svg)

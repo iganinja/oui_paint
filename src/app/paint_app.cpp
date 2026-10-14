@@ -25,6 +25,7 @@
 #include "ui/history_panel.h"
 #include "ui/layer_properties_dialog.h"
 #include "ui/layers_panel.h"
+#include "ui/light_dialog.h"
 #include "ui/main_frame.h"
 #include "ui/new_image_dialog.h"
 #include "ui/palettes_panel.h"
@@ -697,7 +698,9 @@ void PaintApp::build_window()
     auto options{std::make_unique<ToolOptions>(
         BrushSettings{}, installed_fonts(), m_icons,
         [this](const std::string& title, const Color& start, const std::function<void(const Color&)>& changed)
-        { return ask_color(m_application, title, start, changed); })};
+        { return ask_color(m_application, title, start, changed); },
+        [this](double start, const std::function<void(double)>& changed)
+        { return ask_light_direction(m_application, start, changed); })};
     m_tool_options = options.get();
     // Text being typed shows a change of its look at once.
     m_tool_options->on_text_changed([this] { show_typing(true); });
@@ -878,14 +881,43 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
                 }
             }
             const auto moving{m_tool_panel->selected() == "move_pixels"};
-            if(!moving && !m_line_edit)
+            const auto typing{m_typing && m_typing->document == current()};
+            if(!moving && !m_line_edit && !typing)
             {
                 return;
             }
-            // The moving and turning signs beside the piece, each an icon on a square with an edge, as Paint.NET has them.
-            if(moving)
+            // Text being typed: the box its lines take, in dashes of black and white that show on any colour.
+            if(typing)
             {
-                if(const auto gizmos{floating_gizmos()})
+                TextFace face;
+                if(auto* const font{text_font(face)})
+                {
+                    const auto corners{text_corners(*font, m_typing->text, m_typing->at, m_typing->radians)};
+                    const auto& viewport{current()->viewport()};
+                    for(std::size_t side{}; side < corners.size(); ++ side)
+                    {
+                        const auto from{viewport.view_at(corners[side])};
+                        const auto to{viewport.view_at(corners[(side + 1) % corners.size()])};
+                        const auto steps{static_cast<int>(std::ceil(std::hypot(to.x - from.x, to.y - from.y)))};
+                        for(int step{}; step <= steps; ++ step)
+                        {
+                            const auto along{steps == 0 ? 0.0 : static_cast<double>(step) / steps};
+                            const auto px{static_cast<int>(std::lround(from.x + (to.x - from.x) * along))};
+                            const auto py{static_cast<int>(std::lround(from.y + (to.y - from.y) * along))};
+                            if(px >= 0 && py >= 0 && px < width && py < height)
+                            {
+                                pixels[static_cast<std::ptrdiff_t>(py) * width + px] =
+                                    (step / 4) % 2 == 0 ? 0x000000u : 0xffffffu;
+                            }
+                        }
+                    }
+                }
+            }
+            // The moving and turning signs beside the piece, or the text being typed, each an icon on a square with an
+            // edge, as Paint.NET has them.
+            if(moving || typing)
+            {
+                if(const auto gizmos{moving ? floating_gizmos() : typing_gizmos()})
                 {
                     const auto side{static_cast<int>(gizmo_size)};
                     const auto& face{m_icons.dark_interface() ? 0x303030u : 0xf4f4f4u};
@@ -1001,7 +1033,11 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
             }
             if(tool == "text")
             {
-                return oui::Pointer::text;
+                // Over the signs that move and turn the text being typed, or dragging one, the arrow.
+                const auto gizmos{typing_gizmos()};
+                const auto over{gizmos && in_view && (on_gizmo(gizmos->first, *in_view) ||
+                                                      on_gizmo(gizmos->second, *in_view))};
+                return over || (held && m_text_drag) ? oui::Pointer::arrow : oui::Pointer::text;
             }
             return oui::Pointer::crosshair;
         });
@@ -1598,6 +1634,48 @@ void PaintApp::use_tool(const ToolEvent& event)
         drag_draw(event, tool);
         return;
     }
+    if(tool == "text" && m_text_drag && m_typing)
+    {
+        // Dragging the text being typed: moved by whole pixels, or turned round where it starts, by 15 degrees
+        // with Shift.
+        const auto& drag{*m_text_drag};
+        if(drag.turning)
+        {
+            const auto& round{m_typing->at};
+            auto radians{drag.radians + std::atan2(event.at.y - round.y, event.at.x - round.x) -
+                         std::atan2(drag.from.y - round.y, drag.from.x - round.x)};
+            if(event.shift)
+            {
+                constexpr auto step{3.14159265358979323846 / 12.0};
+                radians = std::round(radians / step) * step;
+            }
+            m_typing->radians = radians;
+        }
+        else
+        {
+            m_typing->at = {drag.at.x + std::round(event.at.x - drag.from.x),
+                            drag.at.y + std::round(event.at.y - drag.from.y)};
+        }
+        if(event.phase == ToolEvent::Phase::release)
+        {
+            m_text_drag.reset();
+        }
+        show_typing(true);
+        return;
+    }
+    if(tool == "text" && event.phase == ToolEvent::Phase::press && m_typing && m_typing->document == open)
+    {
+        // The signs beside the text being typed move it and turn it, and it goes on being typed.
+        if(const auto gizmos{typing_gizmos()}; gizmos && !event.secondary)
+        {
+            const auto turning{on_gizmo(gizmos->second, event.in_view)};
+            if(turning || on_gizmo(gizmos->first, event.in_view))
+            {
+                m_text_drag = TextDrag{turning, event.at, m_typing->at, m_typing->radians};
+                return;
+            }
+        }
+    }
     if(tool == "text" && event.phase == ToolEvent::Phase::press)
     {
         // A click puts down what was typed and starts typing anew where it is.
@@ -2187,6 +2265,30 @@ std::optional<std::pair<Position, Position>> PaintApp::floating_gizmos()
                      Position{corner.x + gizmo_size * 2.0 + 4.0, corner.y + gizmo_size}};
 }
 
+std::optional<std::pair<Position, Position>> PaintApp::typing_gizmos()
+{
+    if(!m_typing || m_typing->document != current())
+    {
+        return std::nullopt;
+    }
+    TextFace face;
+    auto* const font{text_font(face)};
+    if(font == nullptr)
+    {
+        return std::nullopt;
+    }
+    // Beyond the bottom right corner of the box its lines take, as the moving piece has them.
+    const auto corner{current()->viewport().view_at(
+        text_corners(*font, m_typing->text, m_typing->at, m_typing->radians)[2])};
+    return std::pair{Position{corner.x + gizmo_size, corner.y + gizmo_size},
+                     Position{corner.x + gizmo_size * 2.0 + 4.0, corner.y + gizmo_size}};
+}
+
+bool PaintApp::on_gizmo(Position gizmo, Position in_view)
+{
+    return std::abs(gizmo.x - in_view.x) <= gizmo_size / 2.0 && std::abs(gizmo.y - in_view.y) <= gizmo_size / 2.0;
+}
+
 std::vector<Position> PaintApp::floating_handles()
 {
     std::vector<Position> handles;
@@ -2619,7 +2721,8 @@ void PaintApp::show_typing(bool with_cursor)
             }
         }
         static_cast<void>(draw_text(layer, document.selection(), *font, m_typing->text, m_typing->at, color,
-                                    m_tool_options->settings().antialias && !document.indexed(), effects, face));
+                                    m_tool_options->settings().antialias && !document.indexed(), effects, face,
+                                    m_typing->radians));
         if(with_cursor)
         {
             // A thin line after the last character, as tall as a line of text.
@@ -2627,10 +2730,18 @@ void PaintApp::show_typing(bool with_cursor)
                                                            ? 0
                                                            : m_typing->text.rfind('\n') + 1)};
             const auto lines{std::count(m_typing->text.begin(), m_typing->text.end(), '\n')};
-            const auto x{m_typing->at.x + font->measure(last_line) + 1.0};
-            const auto top{m_typing->at.y + static_cast<double>(lines) * font->line_height()};
-            static_cast<void>(draw_line(layer, document.selection(), {x, top}, {x, top + font->line_height()}, color,
-                                        1.0, false, {}));
+            // Turned with the text, round where it starts.
+            const auto across{font->measure(last_line) + 1.0};
+            const auto down{static_cast<double>(lines) * font->line_height()};
+            const auto cosine{std::cos(m_typing->radians)};
+            const auto sine{std::sin(m_typing->radians)};
+            const auto turned{[&](double dx, double dy)
+                              {
+                                  return Position{m_typing->at.x + dx * cosine - dy * sine,
+                                                  m_typing->at.y + dx * sine + dy * cosine};
+                              }};
+            static_cast<void>(draw_line(layer, document.selection(), turned(across, down),
+                                        turned(across, down + font->line_height()), color, 1.0, false, {}));
         }
     }
     open.refresh(changed_tiles(before, LayersState::of(document)));
@@ -2710,6 +2821,7 @@ void PaintApp::settle(bool keep_line)
     cancel_arc();
     m_floating.reset();
     m_pivot.reset();
+    m_text_drag.reset();
     if(m_typing)
     {
         // What was typed stays, without its cursor, as one step.
