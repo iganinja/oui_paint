@@ -8,6 +8,7 @@
 #include <oui/graphics/font.h>
 
 #include <array>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -46,6 +47,31 @@ struct TextFace
 std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olagarro::oui::Font& font,
                                  std::string_view text, Position at, const Color& color, bool antialias,
                                  const TextEffects& effects = {}, const TextFace& face = {}, double radians = 0.0);
+
+// Text being typed, and where in it what is typed goes: a place between characters, as bytes from its start.
+struct TypedText
+{
+    std::string text;
+    std::size_t cursor{0};
+
+    // What is typed, or a new line, at the cursor, which goes after it.
+    void insert(std::string_view typed);
+    // The character before the cursor, or after it; nothing at the start, or the end.
+    void erase_back();
+    void erase_forward();
+    // One character to the left or the right; to the start or the end of its line.
+    void left();
+    void right();
+    void home();
+    void end();
+    // To the line above or below, as near as it gets to where it was across, as `font` lays the lines out; nothing on
+    // the first line, or the last.
+    void up(olagarro::oui::Font& font);
+    void down(olagarro::oui::Font& font);
+    // Which line the cursor is on, from 0, and how far across it is, as `font` lays it out.
+    [[nodiscard]] std::size_t line() const;
+    [[nodiscard]] double across(olagarro::oui::Font& font) const;
+};
 
 // The corners of the box the lines of `text` take, from where it starts, as draw_text lays them out and turns them:
 // its top left, top right, bottom right and bottom left.

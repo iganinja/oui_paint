@@ -309,3 +309,47 @@ TEST(Text, ItsCornersTurnWithIt)
     EXPECT_NEAR(quarter[1].x, 10, 1e-9);
     EXPECT_NEAR(quarter[1].y, 20 + (flat[1].x - 10), 1e-9);
 }
+
+TEST(TypedText, WhatIsTypedGoesWhereTheCursorIsAndItMovesOneCharacterAtATime)
+{
+    TypedText typed;
+    typed.insert("Hla");
+    typed.left();
+    typed.left();
+    typed.insert("o");
+    EXPECT_EQ(typed.text, "Hola");
+    typed.end();
+    typed.insert("é");
+    typed.left();
+    EXPECT_EQ(typed.cursor, 4u) << "before the é, whatever bytes it takes";
+    typed.erase_forward();
+    EXPECT_EQ(typed.text, "Hola");
+    typed.erase_back();
+    EXPECT_EQ(typed.text, "Hol");
+    typed.home();
+    typed.erase_back();
+    EXPECT_EQ(typed.text, "Hol") << "nothing before the start";
+    typed.right();
+    EXPECT_EQ(typed.cursor, 1u);
+}
+
+TEST(TypedText, UpAndDownGoToTheLineAboveAndBelowNearWhereItWasAcross)
+{
+    auto font{olagarro::oui::built_in_interface_font(24.0f)};
+    TypedText typed;
+    typed.insert("abcdef\nab\nabcdef");
+    EXPECT_EQ(typed.line(), 2u);
+    typed.left();
+    typed.up(*font);
+    EXPECT_EQ(typed.line(), 1u);
+    EXPECT_EQ(typed.cursor, 9u) << "the short line's end is as near as it gets";
+    typed.up(*font);
+    EXPECT_EQ(typed.line(), 0u);
+    EXPECT_EQ(typed.cursor, 2u);
+    typed.up(*font);
+    EXPECT_EQ(typed.cursor, 2u) << "nothing above the first line";
+    typed.down(*font);
+    typed.down(*font);
+    EXPECT_EQ(typed.line(), 2u);
+    EXPECT_EQ(typed.cursor, 12u);
+}

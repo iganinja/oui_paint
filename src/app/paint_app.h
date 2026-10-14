@@ -357,7 +357,7 @@ class PaintApp
     {
         OpenDocument* document{};
         Position at;
-        std::string text;
+        TypedText typed;
         Layer base;
         // Turned round `at`, clockwise.
         double radians{0.0};

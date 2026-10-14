@@ -892,7 +892,7 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
                 TextFace face;
                 if(auto* const font{text_font(face)})
                 {
-                    const auto corners{text_corners(*font, m_typing->text, m_typing->at, m_typing->radians)};
+                    const auto corners{text_corners(*font, m_typing->typed.text, m_typing->at, m_typing->radians)};
                     const auto& viewport{current()->viewport()};
                     for(std::size_t side{}; side < corners.size(); ++ side)
                     {
@@ -2279,7 +2279,7 @@ std::optional<std::pair<Position, Position>> PaintApp::typing_gizmos()
     }
     // Beyond the bottom right corner of the box its lines take, as the moving piece has them.
     const auto corner{current()->viewport().view_at(
-        text_corners(*font, m_typing->text, m_typing->at, m_typing->radians)[2])};
+        text_corners(*font, m_typing->typed.text, m_typing->at, m_typing->radians)[2])};
     return std::pair{Position{corner.x + gizmo_size, corner.y + gizmo_size},
                      Position{corner.x + gizmo_size * 2.0 + 4.0, corner.y + gizmo_size}};
 }
@@ -2720,19 +2720,16 @@ void PaintApp::show_typing(bool with_cursor)
                 *effect_color = {grey, grey, grey, 1.0};
             }
         }
-        static_cast<void>(draw_text(layer, document.selection(), *font, m_typing->text, m_typing->at, color,
+        static_cast<void>(draw_text(layer, document.selection(), *font, m_typing->typed.text, m_typing->at, color,
                                     m_tool_options->settings().antialias && !document.indexed(), effects, face,
                                     m_typing->radians));
         if(with_cursor)
         {
-            // A thin line after the last character, as tall as a line of text.
-            const auto last_line{m_typing->text.substr(m_typing->text.rfind('\n') == std::string::npos
-                                                           ? 0
-                                                           : m_typing->text.rfind('\n') + 1)};
-            const auto lines{std::count(m_typing->text.begin(), m_typing->text.end(), '\n')};
+            // A thin line where what is typed goes, as tall as a line of text.
+            // Where the cursor is, in its line.
             // Turned with the text, round where it starts.
-            const auto across{font->measure(last_line) + 1.0};
-            const auto down{static_cast<double>(lines) * font->line_height()};
+            const auto across{m_typing->typed.across(*font) + 1.0};
+            const auto down{static_cast<double>(m_typing->typed.line()) * font->line_height()};
             const auto cosine{std::cos(m_typing->radians)};
             const auto sine{std::sin(m_typing->radians)};
             const auto turned{[&](double dx, double dy)
@@ -2767,34 +2764,61 @@ bool PaintApp::type_key(const oui::Event& event)
     {
         return false;
     }
-    auto& text{m_typing->text};
-    if(const auto* const typed{std::get_if<oui::TextEvent>(&event)})
+    auto& typed{m_typing->typed};
+    if(const auto* const text{std::get_if<oui::TextEvent>(&event)})
     {
-        if(typed->control || typed->alt)
+        if(text->control || text->alt)
         {
             return false;
         }
-        text += oui::encode_utf8(typed->codepoint);
+        typed.insert(oui::encode_utf8(text->codepoint));
     }
     else if(const auto* const key{std::get_if<oui::KeyEvent>(&event)})
     {
+        if(key->control || key->alt)
+        {
+            return false;
+        }
+        TextFace face;
+        auto* const font{text_font(face)};
         switch(key->key)
         {
         case oui::Key::enter:
-            text += '\n';
+            typed.insert("\n");
             break;
         case oui::Key::space:
-            text += ' ';
+            typed.insert(" ");
             break;
         case oui::Key::backspace:
-            // The last character, whatever bytes it takes.
-            while(!text.empty() && (static_cast<unsigned char>(text.back()) & 0xc0u) == 0x80u)
+            typed.erase_back();
+            break;
+        case oui::Key::delete_:
+            typed.erase_forward();
+            break;
+        // The arrows, Home and End move the cursor through the text, and are the text's: they neither scroll the
+        // image nor go to another tab.
+        case oui::Key::left:
+            typed.left();
+            break;
+        case oui::Key::right:
+            typed.right();
+            break;
+        case oui::Key::home:
+            typed.home();
+            break;
+        case oui::Key::end:
+            typed.end();
+            break;
+        case oui::Key::up:
+            if(font != nullptr)
             {
-                text.pop_back();
+                typed.up(*font);
             }
-            if(!text.empty())
+            break;
+        case oui::Key::down:
+            if(font != nullptr)
             {
-                text.pop_back();
+                typed.down(*font);
             }
             break;
         case oui::Key::escape:
@@ -2827,7 +2851,7 @@ void PaintApp::settle(bool keep_line)
         // What was typed stays, without its cursor, as one step.
         show_typing(false);
         auto& open{*m_typing->document};
-        const auto typed{!m_typing->text.empty()};
+        const auto typed{!m_typing->typed.text.empty()};
         m_typing.reset();
         if(typed)
         {

@@ -508,4 +508,134 @@ std::array<Position, 4> text_corners(olagarro::oui::Font& font, std::string_view
     return {turned(0, 0), turned(width, 0), turned(width, height), turned(0, height)};
 }
 
+namespace
+{
+
+// Where the character before `at` starts, whatever bytes it takes.
+[[nodiscard]] std::size_t before(const std::string& text, std::size_t at)
+{
+    while(at > 0)
+    {
+        -- at;
+        if((static_cast<unsigned char>(text[at]) & 0xc0u) != 0x80u)
+        {
+            break;
+        }
+    }
+    return at;
+}
+
+// Where the character after `at` ends.
+[[nodiscard]] std::size_t after(const std::string& text, std::size_t at)
+{
+    if(at < text.size())
+    {
+        static_cast<void>(olagarro::oui::decode_utf8(text, at));
+    }
+    return at;
+}
+
+[[nodiscard]] std::size_t line_start(const std::string& text, std::size_t at)
+{
+    const auto found{at == 0 ? std::string::npos : text.rfind('\n', at - 1)};
+    return found == std::string::npos ? 0 : found + 1;
+}
+
+[[nodiscard]] std::size_t line_end(const std::string& text, std::size_t at)
+{
+    const auto found{text.find('\n', at)};
+    return found == std::string::npos ? text.size() : found;
+}
+
+// The place in the line from `start` to `end` nearest `across`, as `font` lays it out.
+[[nodiscard]] std::size_t nearest(olagarro::oui::Font& font, const std::string& text, std::size_t start,
+                                  std::size_t end, double across)
+{
+    auto best{start};
+    auto best_distance{std::abs(across)};
+    for(auto at{start}; at < end;)
+    {
+        at = after(text, at);
+        const auto distance{std::abs(font.measure(std::string_view{text}.substr(start, at - start)) - across)};
+        if(distance < best_distance)
+        {
+            best = at;
+            best_distance = distance;
+        }
+    }
+    return best;
+}
+
+} // namespace
+
+void TypedText::insert(std::string_view typed)
+{
+    text.insert(cursor, typed);
+    cursor += typed.size();
+}
+
+void TypedText::erase_back()
+{
+    const auto from{before(text, cursor)};
+    text.erase(from, cursor - from);
+    cursor = from;
+}
+
+void TypedText::erase_forward()
+{
+    text.erase(cursor, after(text, cursor) - cursor);
+}
+
+void TypedText::left()
+{
+    cursor = before(text, cursor);
+}
+
+void TypedText::right()
+{
+    cursor = after(text, cursor);
+}
+
+void TypedText::home()
+{
+    cursor = line_start(text, cursor);
+}
+
+void TypedText::end()
+{
+    cursor = line_end(text, cursor);
+}
+
+void TypedText::up(olagarro::oui::Font& font)
+{
+    const auto start{line_start(text, cursor)};
+    if(start == 0)
+    {
+        return;
+    }
+    const auto previous{line_start(text, start - 1)};
+    cursor = nearest(font, text, previous, start - 1, across(font));
+}
+
+void TypedText::down(olagarro::oui::Font& font)
+{
+    const auto end{line_end(text, cursor)};
+    if(end == text.size())
+    {
+        return;
+    }
+    cursor = nearest(font, text, end + 1, line_end(text, end + 1), across(font));
+}
+
+std::size_t TypedText::line() const
+{
+    return static_cast<std::size_t>(std::count(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(cursor), '\n'));
+}
+
+double TypedText::across(olagarro::oui::Font& font) const
+{
+    const auto start{line_start(text, cursor)};
+    return font.measure(std::string_view{text}.substr(start, cursor - start));
+}
+
 } // namespace oui_paint
