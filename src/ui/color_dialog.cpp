@@ -169,7 +169,8 @@ class Swatches final : public oui::Widget
 
 } // namespace
 
-std::optional<Color> ask_color(oui::Application& application, const std::string& title, const Color& start)
+std::optional<Color> ask_color(oui::Application& application, const std::string& title, const Color& start,
+                               const std::function<void(const Color&)>& changed)
 {
     // Hue kept apart, so it stays where it was when the colour turns grey.
     auto hsv{to_hsv(start)};
@@ -253,6 +254,10 @@ std::optional<Color> ask_color(oui::Application& application, const std::string&
         }
         static_cast<void>(from_areas);
         updating = false;
+        if(changed)
+        {
+            changed(color);
+        }
     };
     for(std::size_t index{}; index < fields.size(); ++ index)
     {

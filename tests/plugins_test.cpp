@@ -138,3 +138,20 @@ TEST(Plugins, LevelsCanGiveEachColourLevelsOfItsOwn)
     EXPECT_NEAR(result.at(0, 0)[1], 160.0f / 255.0f, 1e-3f) << "green as it was";
     EXPECT_NEAR(result.at(0, 0)[2], 160.0f / 255.0f, 1e-3f);
 }
+
+TEST(Plugins, AutoLevelStretchesEachChannelFromItsDarkestToItsLightest)
+{
+    PluginHost host;
+    for(const auto& [source, name] : built_in_plugins())
+    {
+        host.load(source, name);
+    }
+    auto image{gray(2, 1, 0.25f)};
+    image.at(1, 0)[0] = image.at(1, 0)[1] = image.at(1, 0)[2] = 0.75f;
+    image.at(0, 0)[2] = 0.5f;
+    const auto result{host.apply(named(host, "Auto-Level"), image, {}, {})};
+    EXPECT_NEAR(result.at(0, 0)[0], 0.0, 0.01);
+    EXPECT_NEAR(result.at(1, 0)[0], 1.0, 0.01);
+    EXPECT_NEAR(result.at(0, 0)[2], 0.0, 0.01) << "blue from 0.5 to 0.75 on its own";
+    EXPECT_NEAR(result.at(1, 0)[2], 1.0, 0.01);
+}

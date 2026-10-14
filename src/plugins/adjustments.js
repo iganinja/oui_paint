@@ -16,19 +16,7 @@ paint.effect({
     parameters: [],
     render(image) {
         // Each channel stretched from its darkest to its lightest.
-        const low = [1, 1, 1];
-        const high = [0, 0, 0];
-        image.rows((row) => {
-            for (let i = 0; i < row.length; i += 4) {
-                const alpha = row[i + 3];
-                if (alpha <= 0) continue;
-                for (let c = 0; c < 3; c++) {
-                    const value = row[i + c] / alpha;
-                    if (value < low[c]) low[c] = value;
-                    if (value > high[c]) high[c] = value;
-                }
-            }
-        });
+        const {low, high} = image.channelRange();
         const stretch = (c) => table((x) => (high[c] > low[c] ? (x - low[c]) / (high[c] - low[c]) : x));
         return image.lookup(stretch(0), stretch(1), stretch(2));
     },

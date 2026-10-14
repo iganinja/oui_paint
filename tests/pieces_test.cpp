@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 using namespace oui_paint;
 
 namespace
@@ -40,6 +42,28 @@ TEST(Pieces, AGaussianBlurSpreadsADotAndKeepsItsLight)
     EXPECT_LT(blurred.at(10, 10)[0], 0.5f);
     EXPECT_GT(blurred.at(12, 10)[0], 0.0f);
     EXPECT_FLOAT_EQ(blurred.at(10, 12)[0], blurred.at(12, 10)[0]) << "the same every way";
+}
+
+TEST(Pieces, AWideGaussianBlurHasAGaussiansShapeAndKeepsItsLight)
+{
+    const auto blurred{gaussian_blur(dot(201), 30.0)};
+    auto total{0.0};
+    for(int y{}; y < 201; ++ y)
+    {
+        for(int x{}; x < 201; ++ x)
+        {
+            total += blurred.at(x, y)[0];
+        }
+    }
+    EXPECT_NEAR(total, 1.0, 1e-3);
+    // The radius is two sigmas, as the narrow one's.
+    const auto middle{blurred.at(100, 100)[0]};
+    for(const auto distance : {5, 10, 15, 20, 25})
+    {
+        const auto expected{std::exp(-distance * distance / (2.0 * 15.0 * 15.0))};
+        EXPECT_NEAR(blurred.at(100 + distance, 100)[0] / middle, expected, 0.06) << distance;
+        EXPECT_NEAR(blurred.at(100, 100 - distance)[0], blurred.at(100 + distance, 100)[0], 1e-6) << distance;
+    }
 }
 
 TEST(Pieces, AMotionBlurSmearsAlongItsAngleOnly)
@@ -120,4 +144,29 @@ TEST(Pieces, ALuminosityTableChangesHowLightAColourIsAndKeepsItsHue)
     const auto white{lookup_luminosity(image, {1.0, 1.0})};
     EXPECT_NEAR(white.at(0, 0)[0], 1.0f, 1e-5);
     EXPECT_NEAR(white.at(0, 0)[2], 1.0f, 1e-5);
+}
+
+TEST(Pieces, NoiseIsTheSameForTheSameSeedAndCoversWhatItIsAskedTo)
+{
+    WorkImage gray{64, 64};
+    for(std::size_t at{}; at < gray.pixels.size(); ++ at)
+    {
+        gray.pixels[at] = at % 4 == 3 ? 1.0f : 0.5f;
+    }
+    const auto first{add_noise(gray, 0.3, 1.0, 0.5, 7)};
+    EXPECT_EQ(first.pixels, add_noise(gray, 0.3, 1.0, 0.5, 7).pixels);
+    EXPECT_NE(first.pixels, add_noise(gray, 0.3, 1.0, 0.5, 8).pixels);
+    auto changed{0};
+    for(int y{}; y < 64; ++ y)
+    {
+        for(int x{}; x < 64; ++ x)
+        {
+            const auto* const pixel{first.at(x, y)};
+            changed += pixel[0] != 0.5f ? 1 : 0;
+            EXPECT_GE(pixel[0], 0.05f - 1e-6f) << "lighter or darker by 0.3, and the channel by half that again";
+            EXPECT_LE(pixel[0], 0.95f + 1e-6f);
+        }
+    }
+    EXPECT_NEAR(changed / 4096.0, 0.5, 0.05) << "half the pixels";
+    EXPECT_EQ(add_noise(gray, 0.3, 1.0, 0.0, 7).pixels, gray.pixels) << "none covered";
 }

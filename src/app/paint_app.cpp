@@ -677,19 +677,29 @@ void PaintApp::build_window()
             const auto& palette{setup.palettes.at(static_cast<std::size_t>(slot))};
             auto start{palette.colors.at(static_cast<std::size_t>(index))};
             start.alpha = 1.0;
-            if(const auto chosen{ask_color(m_application, "Palette " + std::to_string(slot + 1) + ", Color " +
-                                                              std::to_string(index),
-                                           start)})
-            {
-                change_palettes("Edit Palette Color",
-                                [&](PaletteSetup& changed)
-                                {
-                                    auto color{changed.nearest_allowed(*chosen)};
-                                    color.alpha = 1.0;
-                                    changed.palettes.at(static_cast<std::size_t>(slot)).colors.at(
-                                        static_cast<std::size_t>(index)) = color;
-                                });
-            }
+            // The image shows the colour as it is chosen, as an effect does.
+            auto chosen{start};
+            static_cast<void>(change_with_preview(
+                "Edit Palette Color",
+                [&](Document& document)
+                {
+                    auto setup{*document.palettes()};
+                    auto color{setup.nearest_allowed(chosen)};
+                    color.alpha = 1.0;
+                    setup.palettes.at(static_cast<std::size_t>(slot)).colors.at(static_cast<std::size_t>(index)) = color;
+                    document.set_palettes(std::move(setup));
+                },
+                [&](const std::function<std::string()>& show)
+                {
+                    return ask_color(m_application,
+                                     "Palette " + std::to_string(slot + 1) + ", Color " + std::to_string(index), start,
+                                     [&](const Color& color)
+                                     {
+                                         chosen = color;
+                                         static_cast<void>(show());
+                                     })
+                        .has_value();
+                }));
         });
     m_palettes_panel->on_slot(
         [this](int slot)
@@ -2833,21 +2843,27 @@ void PaintApp::redo()
 
 void PaintApp::edit_color(bool primary)
 {
-    const auto chosen{ask_color(m_application, primary ? "Primary Color" : "Secondary Color",
-                                primary ? m_color_panel->primary() : m_color_panel->secondary())};
+    const auto put{[this, primary](const Color& color)
+                   {
+                       if(primary)
+                       {
+                           m_color_panel->set_primary(color);
+                       }
+                       else
+                       {
+                           m_color_panel->set_secondary(color);
+                       }
+                   }};
+    const auto start{primary ? m_color_panel->primary() : m_color_panel->secondary()};
+    // The panel shows the colour as it is chosen, and goes back when cancelled.
+    const auto chosen{ask_color(m_application, primary ? "Primary Color" : "Secondary Color", start, put)};
     if(!chosen)
     {
+        put(start);
         return;
     }
     (primary ? m_primary_index : m_secondary_index).reset();
-    if(primary)
-    {
-        m_color_panel->set_primary(*chosen);
-    }
-    else
-    {
-        m_color_panel->set_secondary(*chosen);
-    }
+    put(*chosen);
 }
 
 bool PaintApp::edit_text(TextAction action)

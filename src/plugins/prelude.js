@@ -64,6 +64,15 @@ class PaintImage {
     ditherLevels(levels, size = 4, strength = 1) {
         return new PaintImage(native.ditherLevels(this.id, levels, size, strength));
     }
+    // Random noise over `coverage` of the pixels, from 0 to 1, each lighter or darker by up to `intensity`, its
+    // channels apart by `saturation` of that; the same `seed` gives the same noise.
+    addNoise(intensity, saturation = 1, coverage = 1, seed = 1) {
+        return new PaintImage(native.addNoise(this.id, intensity, saturation, coverage, seed));
+    }
+    // The darkest and the lightest of each channel, as {low: [red, green, blue], high: [red, green, blue]}.
+    channelRange() {
+        return JSON.parse(native.channelRange(this.id));
+    }
     // Its different colours, as {color: [red, green, blue], count}, the commonest first, no more than `most`.
     colors(most = 65536) {
         return JSON.parse(native.colors(this.id, most));

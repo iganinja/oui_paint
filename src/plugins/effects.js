@@ -115,21 +115,8 @@ paint.effect({
         {id: "saturation", name: "Color saturation", min: 0, max: 400, value: 100},
         {id: "coverage", name: "Coverage", min: 0, max: 100, value: 100},
     ],
-    // Written pixel by pixel in JavaScript, as an example of what a plugin can do when no piece fits, on every core.
-    parallel: true,
-    row(row, y, values) {
-        const intensity = values.intensity / 100 / 2;
-        const color = values.saturation / 100;
-        const coverage = values.coverage / 100;
-        for (let i = 0; i < row.length; i += 4) {
-            if (Math.random() > coverage) continue;
-            const alpha = row[i + 3];
-            const gray = (Math.random() * 2 - 1) * intensity;
-            for (let c = 0; c < 3; c++) {
-                const noise = gray + (Math.random() * 2 - 1) * intensity * color * 0.5;
-                row[i + c] = Math.min(alpha, Math.max(0, row[i + c] + noise * alpha));
-            }
-        }
+    render(image, values) {
+        return image.addNoise(values.intensity / 100 / 2, values.saturation / 100, values.coverage / 100);
     },
 });
 

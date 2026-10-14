@@ -51,12 +51,24 @@ void for_each_row(int height, const std::function<void(int y)>& row);
 // Fractal noise of grey, `scale` pixels to its largest features, `roughness` from 0 to 1 how much the finer ones count,
 // the same for the same seed.
 [[nodiscard]] WorkImage clouds(int width, int height, double scale, double roughness, std::uint32_t seed);
+// Random noise over the image: `coverage` of its pixels, from 0 to 1, each lighter or darker by up to `intensity`, and
+// each of its channels apart by `saturation` of that. The same `seed` gives the same noise.
+[[nodiscard]] WorkImage add_noise(const WorkImage& image, double intensity, double saturation, double coverage,
+                                  std::uint32_t seed);
 // Each colour channel through a table of 256 entries from 0 to 1, interpolated between them: curves, levels, invert,
 // posterize. Alpha kept.
 [[nodiscard]] WorkImage lookup(const WorkImage& image, const std::array<std::vector<double>, 3>& tables);
 // Each pixel's luminosity through a table of values from 0 to 1, interpolated, its colour scaled with it so its hue
 // stays, as the Curves adjustment's luminosity map does; a colour that would go past white goes towards it.
 [[nodiscard]] WorkImage lookup_luminosity(const WorkImage& image, const std::vector<double>& table);
+// The darkest and the lightest of each of red, green and blue among the pixels not wholly see-through, as their
+// colour is; 1 and 0 when there are none.
+struct ChannelRange
+{
+    std::array<double, 3> low{1.0, 1.0, 1.0};
+    std::array<double, 3> high{0.0, 0.0, 0.0};
+};
+[[nodiscard]] ChannelRange channel_range(const WorkImage& image);
 // Hue turned by `hue` degrees, saturation and lightness changed by -1 to 1.
 [[nodiscard]] WorkImage hue_saturation(const WorkImage& image, double hue, double saturation, double lightness);
 // `above` over `below` as a blend mode mixes them, `above` seen through by `opacity`.

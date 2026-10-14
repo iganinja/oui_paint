@@ -117,3 +117,34 @@ TEST(Indexing, DitheringMakesAGreyOfBlackAndWhite)
     const auto nearest{nearest_indices(image, palette)};
     EXPECT_EQ(none.pixels, nearest.pixels) << "without strength, the nearest colour each";
 }
+
+TEST(Indexing, WithoutStrengthDitheringPicksTheNearestColourAsThePlainWayDoes)
+{
+    // Colours of 8 bits a channel, so the two see the same colour: a dither looks up what it has worked out before.
+    std::uint32_t state{12345u};
+    const auto next{[&state]
+                    {
+                        state ^= state << 13u;
+                        state ^= state >> 17u;
+                        state ^= state << 5u;
+                        return static_cast<float>(state % 256u) / 255.0f;
+                    }};
+    std::vector<Color> palette;
+    for(int index{}; index < 200; ++ index)
+    {
+        palette.push_back({next(), next(), next(), 1.0});
+    }
+    WorkImage image{97, 61};
+    for(int y{}; y < image.height; ++ y)
+    {
+        for(int x{}; x < image.width; ++ x)
+        {
+            auto* const pixel{image.at(x, y)};
+            pixel[0] = next();
+            pixel[1] = next();
+            pixel[2] = next();
+            pixel[3] = 1.0f;
+        }
+    }
+    EXPECT_EQ(floyd_steinberg_indices(image, palette, 0.0).pixels, nearest_indices(image, palette).pixels);
+}

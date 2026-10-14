@@ -3,6 +3,7 @@
 #include "core/document.h"
 #include "render/viewport.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <utility>
@@ -26,10 +27,20 @@ class DisplayCache
     void invalidate(TilePoint point);
     // The tile at `point` of `level`, (tile_size >> level) pixels a side, row after row.
     [[nodiscard]] const std::vector<std::uint32_t>& tile(TilePoint point, int level);
+    // Makes every tile of `points` at `level` that is not kept, and the levels above it that it is made from, the
+    // tiles shared among the cores: tile() then only finds them.
+    void prepare(const std::vector<TilePoint>& points, int level);
+    // A tile prepare() made, read only, as the cores read it at once.
+    [[nodiscard]] const std::vector<std::uint32_t>& prepared(TilePoint point, int level) const
+    {
+        return m_tiles.at({std::clamp(level, 0, levels - 1), point});
+    }
 
   private:
     [[nodiscard]] std::vector<std::uint32_t> mixed(TilePoint point) const;
     [[nodiscard]] std::vector<std::uint32_t> halved(TilePoint point, int level);
+    // A tile halved from the one of the level above, which must be kept.
+    [[nodiscard]] std::vector<std::uint32_t> halved_from(const std::vector<std::uint32_t>& above, int level) const;
 
     const Document& m_document;
     std::map<std::pair<int, TilePoint>, std::vector<std::uint32_t>> m_tiles;

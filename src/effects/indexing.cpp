@@ -4,7 +4,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
-#include <map>
+#include <cstdint>
 
 namespace oui_paint
 {
@@ -94,23 +94,147 @@ void put_index(float* pixel, std::size_t index, bool opaque)
     return matrix;
 }
 
+// Every colour of the opaque pixels as 8 bits a channel, with how many pixels have it, the lower key first: a count for
+// each of the 2²⁴ colours there can be, which is quicker than a map however many there are.
+[[nodiscard]] std::vector<std::pair<std::uint32_t, std::size_t>> counted_colors(const WorkImage& image)
+{
+    std::vector<std::uint32_t> keys(static_cast<std::size_t>(image.width) * image.height);
+    constexpr std::uint32_t none{0xffffffffu};
+    for_each_row(image.height, [&](int y) {
+        for(int x{}; x < image.width; ++ x)
+        {
+            const auto pixel{shown(image.at(x, y))};
+            keys[static_cast<std::size_t>(y) * image.width + x] =
+                pixel.opaque ? key_of(pixel.red, pixel.green, pixel.blue) : none;
+        }
+    });
+    std::vector<std::uint32_t> counts(std::size_t{1} << 24u);
+    for(const auto key : keys)
+    {
+        if(key != none)
+        {
+            ++ counts[key];
+        }
+    }
+    std::vector<std::pair<std::uint32_t, std::size_t>> found;
+    for(std::uint32_t key{}; key < counts.size(); ++ key)
+    {
+        if(counts[key] != 0)
+        {
+            found.emplace_back(key, counts[key]);
+        }
+    }
+    return found;
+}
+
+// The palette's index nearest a colour of 8 bits a channel, looked for among the few that can be, and the colours
+// looked up last kept: a dither asks for the same colours again and again.
+class NearestCache
+{
+  public:
+    // The colour cube in cells, each with the palette's colours that can be the nearest to some colour in it: those
+    // no farther from the cell than the farthest the colour nearest the whole cell can be.
+    explicit NearestCache(const std::vector<Color>& palette) : m_palette{palette}
+    {
+        m_cells.resize(static_cast<std::size_t>(cells * cells * cells));
+        const auto side{1.0 / cells};
+        for(int r{}; r < cells; ++ r)
+        {
+            for(int g{}; g < cells; ++ g)
+            {
+                for(int b{}; b < cells; ++ b)
+                {
+                    const double low[3]{r * side, g * side, b * side};
+                    const auto reach{[&](const Color& color, bool farthest)
+                                     {
+                                         const double value[3]{color.red, color.green, color.blue};
+                                         auto total{0.0};
+                                         for(int channel{}; channel < 3; ++ channel)
+                                         {
+                                             const auto from{low[channel]};
+                                             const auto to{low[channel] + side};
+                                             const auto away{farthest ? std::max(std::abs(value[channel] - from),
+                                                                                 std::abs(value[channel] - to))
+                                                                      : std::max({from - value[channel], 0.0,
+                                                                                  value[channel] - to})};
+                                             total += away * away;
+                                         }
+                                         return total;
+                                     }};
+                    auto bound{std::numeric_limits<double>::max()};
+                    for(const auto& color : palette)
+                    {
+                        bound = std::min(bound, reach(color, true));
+                    }
+                    auto& candidates{m_cells[static_cast<std::size_t>((r * cells + g) * cells + b)]};
+                    for(std::size_t index{}; index < palette.size(); ++ index)
+                    {
+                        if(reach(palette[index], false) <= bound)
+                        {
+                            candidates.push_back(static_cast<std::uint16_t>(index));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    [[nodiscard]] std::size_t operator()(double red, double green, double blue)
+    {
+        const auto key{key_of(red, green, blue)};
+        auto& slot{m_known[(key * 0x9e3779b1u) >> (32u - slot_bits)]};
+        if(slot.key != key)
+        {
+            slot.key = key;
+            slot.index = static_cast<std::uint32_t>(search(red, green, blue));
+        }
+        return slot.index;
+    }
+
+  private:
+    // The nearest among the cell's candidates; among as near, the lower index, as nearest() gives.
+    [[nodiscard]] std::size_t search(double red, double green, double blue) const
+    {
+        const auto cell{[](double value) { return std::clamp(static_cast<int>(value * cells), 0, cells - 1); }};
+        const auto& candidates{
+            m_cells[static_cast<std::size_t>((cell(red) * cells + cell(green)) * cells + cell(blue))]};
+        auto shortest{std::numeric_limits<double>::max()};
+        std::size_t best{};
+        for(const auto index : candidates)
+        {
+            const auto& color{m_palette[index]};
+            const auto dr{color.red - red};
+            const auto dg{color.green - green};
+            const auto db{color.blue - blue};
+            const auto distance{dr * dr + dg * dg + db * db};
+            if(distance < shortest)
+            {
+                shortest = distance;
+                best = index;
+            }
+        }
+        return best;
+    }
+
+    // The colours looked up last, one a slot by a hash of the colour: small enough to stay in the processor's cache.
+    struct Slot
+    {
+        std::uint32_t key{0xffffffffu};
+        std::uint32_t index{0};
+    };
+    static constexpr std::uint32_t slot_bits{16};
+    static constexpr int cells{16};
+
+    const std::vector<Color>& m_palette;
+    std::vector<std::vector<std::uint16_t>> m_cells;
+    std::vector<Slot> m_known = std::vector<Slot>(std::size_t{1} << slot_bits);
+};
+
 } // namespace
 
 std::vector<std::pair<Color, std::size_t>> distinct_colors(const WorkImage& image, std::size_t most)
 {
-    std::map<std::uint32_t, std::size_t> counts;
-    for(int y{}; y < image.height; ++ y)
-    {
-        for(int x{}; x < image.width; ++ x)
-        {
-            const auto pixel{shown(image.at(x, y))};
-            if(pixel.opaque)
-            {
-                ++ counts[key_of(pixel.red, pixel.green, pixel.blue)];
-            }
-        }
-    }
-    std::vector<std::pair<std::uint32_t, std::size_t>> sorted{counts.begin(), counts.end()};
+    auto sorted{counted_colors(image)};
     // The commonest first, and among as common the lower key first, so the same image gives the same order.
     std::stable_sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
     if(sorted.size() > most)
@@ -128,22 +252,7 @@ std::vector<std::pair<Color, std::size_t>> distinct_colors(const WorkImage& imag
 std::vector<Color> median_cut(const WorkImage& image, int count)
 {
     // Every colour there is, with how many pixels have it.
-    std::vector<std::pair<std::uint32_t, std::size_t>> colors;
-    {
-        std::map<std::uint32_t, std::size_t> counts;
-        for(int y{}; y < image.height; ++ y)
-        {
-            for(int x{}; x < image.width; ++ x)
-            {
-                const auto pixel{shown(image.at(x, y))};
-                if(pixel.opaque)
-                {
-                    ++ counts[key_of(pixel.red, pixel.green, pixel.blue)];
-                }
-            }
-        }
-        colors.assign(counts.begin(), counts.end());
-    }
+    auto colors{counted_colors(image)};
     if(colors.empty() || count <= 0)
     {
         return {};
@@ -154,6 +263,9 @@ std::vector<Color> median_cut(const WorkImage& image, int count)
     {
         std::size_t begin;
         std::size_t end;
+        // Its widest spread and the channel it is in, worked out once.
+        int spread{-1};
+        int widest{0};
     };
     std::vector<Box> boxes{{0, colors.size()}};
     const auto spread{[&](const Box& box, int& widest)
@@ -184,17 +296,20 @@ std::vector<Color> median_cut(const WorkImage& image, int count)
         auto chosen_channel{0};
         for(std::size_t index{}; index < boxes.size(); ++ index)
         {
-            if(boxes[index].end - boxes[index].begin < 2)
+            auto& box{boxes[index]};
+            if(box.end - box.begin < 2)
             {
                 continue;
             }
-            auto widest{0};
-            const auto range{spread(boxes[index], widest)};
-            if(range > chosen_spread)
+            if(box.spread < 0)
             {
-                chosen_spread = range;
+                box.spread = spread(box, box.widest);
+            }
+            if(box.spread > chosen_spread)
+            {
+                chosen_spread = box.spread;
                 chosen = index;
-                chosen_channel = widest;
+                chosen_channel = box.widest;
             }
         }
         if(chosen == boxes.size())
@@ -225,6 +340,7 @@ std::vector<Color> median_cut(const WorkImage& image, int count)
         }
         const Box upper{middle, box.end};
         box.end = middle;
+        box.spread = -1;
         boxes.push_back(upper);
     }
     std::vector<Color> palette;
@@ -285,6 +401,7 @@ WorkImage floyd_steinberg_indices(const WorkImage& image, const std::vector<Colo
     // What each pixel missed, carried to the row it is in and the next, three numbers a pixel.
     std::vector<double> current(static_cast<std::size_t>(image.width + 2) * 3);
     std::vector<double> next(current.size());
+    NearestCache nearest_of{palette};
     for(int y{}; y < image.height; ++ y)
     {
         std::fill(next.begin(), next.end(), 0.0);
@@ -303,7 +420,7 @@ WorkImage floyd_steinberg_indices(const WorkImage& image, const std::vector<Colo
             const auto red{std::clamp(pixel.red + current[at], 0.0, 1.0)};
             const auto green{std::clamp(pixel.green + current[at + 1], 0.0, 1.0)};
             const auto blue{std::clamp(pixel.blue + current[at + 2], 0.0, 1.0)};
-            const auto index{nearest(palette, red, green, blue)};
+            const auto index{nearest_of(red, green, blue)};
             put_index(indices.at(x, y), index, true);
             const std::array<double, 3> missed{(red - palette[index].red) * strength,
                                                (green - palette[index].green) * strength,

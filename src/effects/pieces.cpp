@@ -41,8 +41,7 @@ void premultiply(float* pixel, double red, double green, double blue, double alp
 template <typename Path> WorkImage along(const WorkImage& image, int samples, Path path)
 {
     WorkImage result{image.width, image.height};
-    for(int y{}; y < image.height; ++ y)
-    {
+    for_each_row(image.height, [&](int y) {
         for(int x{}; x < image.width; ++ x)
         {
             double sum[4]{};
@@ -64,7 +63,7 @@ template <typename Path> WorkImage along(const WorkImage& image, int samples, Pa
                 out[channel] = static_cast<float>(sum[channel] / samples);
             }
         }
-    }
+    });
     return result;
 }
 
@@ -85,6 +84,11 @@ class Noise
                       m_permutation[state % static_cast<std::uint32_t>(index + 1)]);
         }
         std::copy(m_permutation.begin(), m_permutation.begin() + 256, m_permutation.begin() + 256);
+        for(int hash{}; hash < 256; ++ hash)
+        {
+            const auto angle{hash * (2.0 * pi / 256.0)};
+            m_gradients[static_cast<std::size_t>(hash)] = {std::cos(angle), std::sin(angle)};
+        }
     }
 
     [[nodiscard]] double at(double x, double y) const
@@ -100,8 +104,8 @@ class Noise
                           {
                               const auto hash{m_permutation[static_cast<std::size_t>(
                                   m_permutation[static_cast<std::size_t>(cell_x + i)] + cell_y + j)]};
-                              const auto angle{hash * (2.0 * pi / 256.0)};
-                              return std::cos(angle) * (fx - i) + std::sin(angle) * (fy - j);
+                              const auto& [across, down]{m_gradients[static_cast<std::size_t>(hash)]};
+                              return across * (fx - i) + down * (fy - j);
                           }};
         const auto top{corner(0, 0) + u * (corner(1, 0) - corner(0, 0))};
         const auto bottom{corner(0, 1) + u * (corner(1, 1) - corner(0, 1))};
@@ -110,6 +114,8 @@ class Noise
 
   private:
     std::array<int, 512> m_permutation{};
+    // Each hash's gradient, a direction of the 256 round the circle.
+    std::array<std::pair<double, double>, 256> m_gradients{};
 };
 
 } // namespace
@@ -199,6 +205,56 @@ Image from_work(const WorkImage& work, PixelFormat format)
     return image;
 }
 
+namespace
+{
+
+// Each row averaged over a box `reach` pixels each side, its ends repeating its edge pixels, by a running sum: as fast
+// whatever the reach.
+WorkImage box_rows(const WorkImage& source, int reach)
+{
+    WorkImage result{source.width, source.height};
+    const auto last{source.width - 1};
+    const auto scale{1.0 / (2 * reach + 1)};
+    for_each_row(source.height, [&](int y) {
+        double sum[4]{};
+        for(int offset{-reach}; offset <= reach; ++ offset)
+        {
+            const auto* const pixel{source.at(std::clamp(offset, 0, last), y)};
+            for(int channel{}; channel < 4; ++ channel)
+            {
+                sum[channel] += pixel[channel];
+            }
+        }
+        for(int x{}; x < source.width; ++ x)
+        {
+            auto* const out{result.at(x, y)};
+            const auto* const entering{source.at(std::min(x + reach + 1, last), y)};
+            const auto* const leaving{source.at(std::max(x - reach, 0), y)};
+            for(int channel{}; channel < 4; ++ channel)
+            {
+                out[channel] = static_cast<float>(sum[channel] * scale);
+                sum[channel] += entering[channel] - leaving[channel];
+            }
+        }
+    });
+    return result;
+}
+
+// Rows become columns.
+WorkImage transposed(const WorkImage& source)
+{
+    WorkImage result{source.height, source.width};
+    for_each_row(result.height, [&](int y) {
+        for(int x{}; x < result.width; ++ x)
+        {
+            std::copy_n(source.at(y, x), 4, result.at(x, y));
+        }
+    });
+    return result;
+}
+
+} // namespace
+
 WorkImage gaussian_blur(const WorkImage& image, double radius)
 {
     if(radius <= 0.0)
@@ -207,6 +263,33 @@ WorkImage gaussian_blur(const WorkImage& image, double radius)
     }
     const auto sigma{std::max(0.3, radius / 2.0)};
     const auto reach{static_cast<int>(std::ceil(radius))};
+    // Wide, three box blurs one after another, whose sizes are worked out to make the same spread: as near a
+    // gaussian as the eye tells, and as fast whatever the radius.
+    if(reach > 12)
+    {
+        constexpr int boxes{3};
+        const auto ideal{std::sqrt(12.0 * sigma * sigma / boxes + 1.0)};
+        auto lower{static_cast<int>(std::floor(ideal))};
+        if(lower % 2 == 0)
+        {
+            -- lower;
+        }
+        const auto upper{lower + 2};
+        const auto with_lower{static_cast<int>(std::lround((12.0 * sigma * sigma - boxes * lower * lower -
+                                                            4.0 * boxes * lower - 3.0 * boxes) /
+                                                           (-4.0 * lower - 4.0)))};
+        auto rows{image};
+        for(int box{}; box < boxes; ++ box)
+        {
+            rows = box_rows(rows, ((box < with_lower ? lower : upper) - 1) / 2);
+        }
+        auto columns{transposed(rows)};
+        for(int box{}; box < boxes; ++ box)
+        {
+            columns = box_rows(columns, ((box < with_lower ? lower : upper) - 1) / 2);
+        }
+        return transposed(columns);
+    }
     std::vector<double> kernel(static_cast<std::size_t>(reach) * 2 + 1);
     auto total{0.0};
     for(int offset{-reach}; offset <= reach; ++ offset)
@@ -223,8 +306,7 @@ WorkImage gaussian_blur(const WorkImage& image, double radius)
     const auto pass{[&](const WorkImage& source, bool horizontal)
                     {
                         WorkImage result{source.width, source.height};
-                        for(int y{}; y < source.height; ++ y)
-                        {
+                        for_each_row(source.height, [&](int y) {
                             for(int x{}; x < source.width; ++ x)
                             {
                                 double sum[4]{};
@@ -244,7 +326,7 @@ WorkImage gaussian_blur(const WorkImage& image, double radius)
                                     out[channel] = static_cast<float>(sum[channel]);
                                 }
                             }
-                        }
+                        });
                         return result;
                     }};
     return pass(pass(image, true), false);
@@ -273,15 +355,23 @@ WorkImage radial_blur(const WorkImage& image, double degrees, double center_x, d
 {
     const auto span{degrees * pi / 180.0};
     const auto farthest{std::hypot(std::max(center_x, image.width - center_x), std::max(center_y, image.height - center_y))};
-    const auto samples{std::max(1, static_cast<int>(std::ceil(span * farthest / 2.0)) + 1)};
-    return along(image, std::min(samples, 64),
+    const auto samples{std::min(64, std::max(1, static_cast<int>(std::ceil(span * farthest / 2.0)) + 1))};
+    // The turn of each sample, the same for every pixel, worked out once.
+    std::vector<std::pair<double, double>> turns;
+    for(int sample{}; sample < samples; ++ sample)
+    {
+        const auto t{samples == 1 ? 0.0 : static_cast<double>(sample) / (samples - 1) - 0.5};
+        turns.emplace_back(std::cos(span * t), std::sin(span * t));
+    }
+    return along(image, samples,
                  [&](double x, double y, double t, double& sx, double& sy)
                  {
-                     const auto angle{span * t};
+                     const auto sample{samples == 1 ? 0 : static_cast<int>(std::lround((t + 0.5) * (samples - 1)))};
+                     const auto [cosine, sine]{turns[static_cast<std::size_t>(sample)]};
                      const auto rx{x - center_x};
                      const auto ry{y - center_y};
-                     sx = center_x + rx * std::cos(angle) - ry * std::sin(angle);
-                     sy = center_y + rx * std::sin(angle) + ry * std::cos(angle);
+                     sx = center_x + rx * cosine - ry * sine;
+                     sy = center_y + rx * sine + ry * cosine;
                  });
 }
 
@@ -304,8 +394,7 @@ WorkImage convolve(const WorkImage& image, const std::vector<double>& matrix, in
     WorkImage result{image.width, image.height};
     const auto half{size / 2};
     const auto divide{divisor != 0.0 ? 1.0 / divisor : 1.0};
-    for(int y{}; y < image.height; ++ y)
-    {
+    for_each_row(image.height, [&](int y) {
         for(int x{}; x < image.width; ++ x)
         {
             double sum[3]{};
@@ -331,7 +420,7 @@ WorkImage convolve(const WorkImage& image, const std::vector<double>& matrix, in
             premultiply(result.at(x, y), sum[0] * divide + offset, sum[1] * divide + offset, sum[2] * divide + offset,
                         image.at(x, y)[3]);
         }
-    }
+    });
     return result;
 }
 
@@ -340,10 +429,7 @@ WorkImage clouds(int width, int height, double scale, double roughness, std::uin
     WorkImage result{width, height};
     const Noise noise{seed};
     std::vector<double> values(static_cast<std::size_t>(width) * height);
-    auto lowest{1e18};
-    auto highest{-1e18};
-    for(int y{}; y < height; ++ y)
-    {
+    for_each_row(height, [&](int y) {
         for(int x{}; x < width; ++ x)
         {
             auto sum{0.0};
@@ -353,19 +439,18 @@ WorkImage clouds(int width, int height, double scale, double roughness, std::uin
                 sum += noise.at(x / size + seed % 1000, y / size) * amplitude;
             }
             values[static_cast<std::size_t>(y) * width + x] = sum;
-            lowest = std::min(lowest, sum);
-            highest = std::max(highest, sum);
         }
-    }
-    const auto span{highest > lowest ? highest - lowest : 1.0};
-    for(int y{}; y < height; ++ y)
-    {
+    });
+    const auto [lowest, highest]{std::minmax_element(values.begin(), values.end())};
+    const auto low{values.empty() ? 0.0 : *lowest};
+    const auto span{!values.empty() && *highest > low ? *highest - low : 1.0};
+    for_each_row(height, [&](int y) {
         for(int x{}; x < width; ++ x)
         {
-            const auto gray{(values[static_cast<std::size_t>(y) * width + x] - lowest) / span};
+            const auto gray{(values[static_cast<std::size_t>(y) * width + x] - low) / span};
             premultiply(result.at(x, y), gray, gray, gray, 1.0);
         }
-    }
+    });
     return result;
 }
 
@@ -439,11 +524,78 @@ WorkImage lookup_luminosity(const WorkImage& image, const std::vector<double>& t
     return result;
 }
 
+WorkImage add_noise(const WorkImage& image, double intensity, double saturation, double coverage, std::uint32_t seed)
+{
+    WorkImage result{image};
+    for_each_row(image.height, [&](int y) {
+        for(int x{}; x < image.width; ++ x)
+        {
+            // Numbers from 0 to 1 from the pixel's place and the seed alone, so every row is the same on any core.
+            auto state{static_cast<std::uint32_t>(x) * 0x9e3779b1u ^ static_cast<std::uint32_t>(y) * 0x85ebca77u ^
+                       seed * 0xc2b2ae3du};
+            const auto next{[&state]
+                            {
+                                state ^= state >> 16u;
+                                state *= 0x7feb352du;
+                                state ^= state >> 15u;
+                                state *= 0x846ca68bu;
+                                state ^= state >> 16u;
+                                return state / 4294967296.0;
+                            }};
+            if(next() >= coverage)
+            {
+                continue;
+            }
+            auto* const pixel{result.at(x, y)};
+            const auto alpha{pixel[3]};
+            const auto gray{(next() * 2.0 - 1.0) * intensity};
+            for(int channel{}; channel < 3; ++ channel)
+            {
+                const auto noise{gray + (next() * 2.0 - 1.0) * intensity * saturation * 0.5};
+                pixel[channel] = static_cast<float>(std::clamp(pixel[channel] + noise * alpha, 0.0, static_cast<double>(alpha)));
+            }
+        }
+    });
+    return result;
+}
+
+ChannelRange channel_range(const WorkImage& image)
+{
+    // Each row's range, then the rows' together.
+    std::vector<ChannelRange> rows(static_cast<std::size_t>(image.height));
+    for_each_row(image.height, [&](int y) {
+        auto& range{rows[static_cast<std::size_t>(y)]};
+        for(int x{}; x < image.width; ++ x)
+        {
+            const auto* const pixel{image.at(x, y)};
+            if(pixel[3] <= 0.0f)
+            {
+                continue;
+            }
+            for(std::size_t channel{}; channel < 3; ++ channel)
+            {
+                const auto value{static_cast<double>(pixel[channel]) / pixel[3]};
+                range.low[channel] = std::min(range.low[channel], value);
+                range.high[channel] = std::max(range.high[channel], value);
+            }
+        }
+    });
+    ChannelRange whole;
+    for(const auto& row : rows)
+    {
+        for(std::size_t channel{}; channel < 3; ++ channel)
+        {
+            whole.low[channel] = std::min(whole.low[channel], row.low[channel]);
+            whole.high[channel] = std::max(whole.high[channel], row.high[channel]);
+        }
+    }
+    return whole;
+}
+
 WorkImage hue_saturation(const WorkImage& image, double hue, double saturation, double lightness)
 {
     WorkImage result{image.width, image.height};
-    for(int y{}; y < image.height; ++ y)
-    {
+    for_each_row(image.height, [&](int y) {
         for(int x{}; x < image.width; ++ x)
         {
             double red{};
@@ -463,15 +615,14 @@ WorkImage hue_saturation(const WorkImage& image, double hue, double saturation, 
             color.blue += (target - color.blue) * amount;
             premultiply(result.at(x, y), color.red, color.green, color.blue, alpha);
         }
-    }
+    });
     return result;
 }
 
 WorkImage mix(const WorkImage& below, const WorkImage& above, BlendMode mode, double opacity)
 {
     WorkImage result{below.width, below.height};
-    for(int y{}; y < below.height; ++ y)
-    {
+    for_each_row(below.height, [&](int y) {
         for(int x{}; x < below.width; ++ x)
         {
             double base[4]{};
@@ -494,7 +645,7 @@ WorkImage mix(const WorkImage& below, const WorkImage& above, BlendMode mode, do
             premultiply(result.at(x, y), mixed.value[0] / 65535.0, mixed.value[1] / 65535.0, mixed.value[2] / 65535.0,
                         mixed.value[3] / 65535.0);
         }
-    }
+    });
     return result;
 }
 

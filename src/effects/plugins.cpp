@@ -195,6 +195,10 @@ PluginHost::PluginHost()
                      return clouds(width, height, number(arguments, 2), number(arguments, 3),
                                    static_cast<std::uint32_t>(number(arguments, 4)));
                  });
+    define_image("addNoise", [this, number](const std::vector<Value>& arguments) {
+        return add_noise(image(arguments.at(0)), number(arguments, 1), number(arguments, 2), number(arguments, 3),
+                         static_cast<std::uint32_t>(number(arguments, 4)));
+    });
     m_engine.define("__paint.row",
                     [this](const std::vector<Value>& arguments)
                     {
@@ -300,6 +304,12 @@ PluginHost::PluginHost()
                         }
                         return m_engine.string(json + "]");
                     });
+    m_engine.define("__paint.channelRange", [this](const std::vector<Value>& arguments) {
+        const auto range{channel_range(image(arguments.at(0)))};
+        const auto list{[](const std::array<double, 3>& values)
+                        { return "[" + json_number(values[0]) + "," + json_number(values[1]) + "," + json_number(values[2]) + "]"; }};
+        return m_engine.string("{\"low\":" + list(range.low) + ",\"high\":" + list(range.high) + "}");
+    });
     m_engine.define("__paint.medianCut", [this, number](const std::vector<Value>& arguments) {
         return m_engine.string(
             json_of_palette(median_cut(image(arguments.at(0)), static_cast<int>(number(arguments, 1)))));

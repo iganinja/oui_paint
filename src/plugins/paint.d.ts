@@ -127,6 +127,14 @@ declare namespace paint {
     }
 
     /**
+     * The darkest and the lightest of each channel, each [red, green, blue] from 0 to 1.
+     */
+    class ChannelRange {
+        low: number[];
+        high: number[];
+    }
+
+    /**
      * A colour and how many pixels have it.
      */
     class ColorCount {
@@ -264,6 +272,15 @@ declare namespace paint {
          * from 0, plain rounding, to 1, so bands become a fine pattern.
          */
         ditherLevels(levels: number, size?: number, strength?: number): Image;
+        /**
+         * Random noise over `coverage` of the pixels, from 0 to 1, each lighter or darker by up to `intensity`, its
+         * channels apart by `saturation` of that; the same `seed` gives the same noise.
+         */
+        addNoise(intensity: number, saturation?: number, coverage?: number, seed?: number): Image;
+        /**
+         * The darkest and the lightest of each of red, green and blue among the pixels not wholly see-through.
+         */
+        channelRange(): ChannelRange;
         /**
          * Its different colours and how many pixels have each, the commonest first, no more than `most`.
          */

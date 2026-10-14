@@ -2,8 +2,11 @@
 
 #include "core/blend.h"
 
+#include <concurrency/concurrency.h>
+
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace oui_paint
 {
@@ -179,7 +182,42 @@ std::vector<std::uint32_t> DisplayCache::mixed(TilePoint point) const
 
 std::vector<std::uint32_t> DisplayCache::halved(TilePoint point, int level)
 {
-    const auto& above{tile(point, level - 1)};
+    return halved_from(tile(point, level - 1), level);
+}
+
+void DisplayCache::prepare(const std::vector<TilePoint>& points, int level)
+{
+    level = std::clamp(level, 0, levels - 1);
+    for(int at{}; at <= level; ++ at)
+    {
+        std::vector<TilePoint> missing;
+        for(const auto& point : points)
+        {
+            if(m_tiles.find({at, point}) == m_tiles.end())
+            {
+                missing.push_back(point);
+            }
+        }
+        std::vector<std::vector<std::uint32_t>> made(missing.size());
+        std::vector<std::size_t> order(missing.size());
+        std::iota(order.begin(), order.end(), std::size_t{});
+        olagarro::concurrency::concurrent_for(order.begin(), order.end(),
+                                              [&](std::size_t, std::size_t index)
+                                              {
+                                                  const auto& point{missing[index]};
+                                                  made[index] = at == 0 ? mixed(point)
+                                                                        : halved_from(m_tiles.at({at - 1, point}), at);
+                                              })
+            .get();
+        for(std::size_t index{}; index < missing.size(); ++ index)
+        {
+            m_tiles.emplace(std::make_pair(at, missing[index]), std::move(made[index]));
+        }
+    }
+}
+
+std::vector<std::uint32_t> DisplayCache::halved_from(const std::vector<std::uint32_t>& above, int level) const
+{
     const auto side{tile_size >> level};
     const auto above_side{side * 2};
     std::vector<std::uint32_t> result(static_cast<std::size_t>(side) * side);
@@ -208,14 +246,30 @@ void render_view(const Viewport& viewport, DisplayCache& cache, int image_width,
     constexpr std::uint32_t light{0xffffffu};
     constexpr std::uint32_t dark{0xccccccu};
     constexpr int check{8};
-    for(int y{}; y < height; ++ y)
+    // The tiles in view made first, on every core, so the rows only read them, each core its own rows.
+    const auto first_x{std::max(0, static_cast<int>(std::floor((0.5 - origin.x) / zoom)))};
+    const auto last_x{std::min(image_width - 1, static_cast<int>(std::floor((width - 0.5 - origin.x) / zoom)))};
+    const auto first_y{std::max(0, static_cast<int>(std::floor((0.5 - origin.y) / zoom)))};
+    const auto last_y{std::min(image_height - 1, static_cast<int>(std::floor((height - 0.5 - origin.y) / zoom)))};
+    std::vector<TilePoint> in_view;
+    for(auto tile_y{first_y / tile_size}; first_y <= last_y && tile_y <= last_y / tile_size; ++ tile_y)
+    {
+        for(auto tile_x{first_x / tile_size}; first_x <= last_x && tile_x <= last_x / tile_size; ++ tile_x)
+        {
+            in_view.push_back({tile_x, tile_y});
+        }
+    }
+    cache.prepare(in_view, level);
+    std::vector<int> rows(static_cast<std::size_t>(std::max(0, height)));
+    std::iota(rows.begin(), rows.end(), 0);
+    olagarro::concurrency::concurrent_for(rows.begin(), rows.end(), [&](std::size_t, int y)
     {
         auto* const row{pixels + static_cast<std::ptrdiff_t>(y) * width};
         const auto image_y{static_cast<int>(std::floor((y + 0.5 - origin.y) / zoom))};
         if(image_y < 0 || image_y >= image_height)
         {
             std::fill(row, row + width, background);
-            continue;
+            return;
         }
         const auto level_y{image_y / scale};
         const TilePoint tile_row{0, level_y / side};
@@ -234,7 +288,7 @@ void render_view(const Viewport& viewport, DisplayCache& cache, int image_width,
             if(level_x / side != tile_x)
             {
                 tile_x = level_x / side;
-                tile = &cache.tile({tile_x, tile_row.y}, level);
+                tile = &cache.prepared({tile_x, tile_row.y}, level);
             }
             const auto pixel{(*tile)[static_cast<std::size_t>(in_tile_y * side + level_x % side)]};
             const auto alpha{pixel >> 24u};
@@ -249,7 +303,7 @@ void render_view(const Viewport& viewport, DisplayCache& cache, int image_width,
             row[x] = mix(pixel >> 16u & 0xffu, under >> 16u & 0xffu) << 16u |
                      mix(pixel >> 8u & 0xffu, under >> 8u & 0xffu) << 8u | mix(pixel & 0xffu, under & 0xffu);
         }
-    }
+    }).get();
 }
 
 std::vector<int> selection_edge(const Viewport& viewport, const Selection& selection, int width, int height)

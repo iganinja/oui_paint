@@ -4,6 +4,7 @@
 
 #include <oui/application.h>
 
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -12,8 +13,9 @@ namespace oui_paint
 
 // Asks for a colour, as Paint.NET's Colors window: a square of saturation and value and a bar of hue, numbers for red,
 // green, blue, alpha, hue, saturation and value, hexadecimal, and grey as a 16-bit value, for heightmaps; none when
-// cancelled.
+// cancelled. `changed`, when given, hears the colour each time it changes, so what uses it can show it.
 [[nodiscard]] std::optional<Color> ask_color(olagarro::oui::Application& application, const std::string& title,
-                                             const Color& start);
+                                             const Color& start,
+                                             const std::function<void(const Color&)>& changed = {});
 
 } // namespace oui_paint
