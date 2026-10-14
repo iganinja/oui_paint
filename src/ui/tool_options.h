@@ -5,6 +5,7 @@
 #include "tools/gradient.h"
 #include "tools/shapes.h"
 #include "tools/stroke.h"
+#include "tools/text.h"
 
 #include <oui/container.h>
 
@@ -44,10 +45,15 @@ class ToolOptions final : public olagarro::oui::Container
     // The Text tool's font, none when there are no fonts, and its size in pixels.
     [[nodiscard]] const FontFamily* font() const;
     [[nodiscard]] double font_size() const;
+    // What goes around text: its outline's width, its shadow's distance and its glow's reach, the colours left as
+    // TextEffects has them.
+    [[nodiscard]] TextEffects text_effects() const;
     // Width by `step` pixels, kept from 1 to the widest, as [ and ] do.
     void change_width(double step);
     // Called after a brush option changed.
     void on_changed(std::function<void(const BrushSettings&)> changed);
+    // Called after what text looks like changed: its font, size, antialiasing or what goes around it.
+    void on_text_changed(std::function<void()> changed);
 
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override;
     void arrange(const olagarro::oui::Rect& bounds) override;
@@ -55,6 +61,7 @@ class ToolOptions final : public olagarro::oui::Container
 
   private:
     void changed();
+    void text_changed();
 
     BrushSettings m_settings;
     olagarro::oui::Row* m_width_group{};
@@ -68,6 +75,9 @@ class ToolOptions final : public olagarro::oui::Container
     std::vector<FontFamily> m_fonts;
     olagarro::oui::ComboBox* m_font{};
     olagarro::oui::NumberField* m_font_size{};
+    olagarro::oui::NumberField* m_outline{};
+    olagarro::oui::NumberField* m_shadow{};
+    olagarro::oui::NumberField* m_glow{};
     olagarro::oui::NumberField* m_width{};
     olagarro::oui::Slider* m_width_slider{};
     olagarro::oui::NumberField* m_hardness{};
@@ -82,6 +92,7 @@ class ToolOptions final : public olagarro::oui::Container
     olagarro::oui::ComboBox* m_shape_kind{};
     olagarro::oui::ComboBox* m_shape_style{};
     std::function<void(const BrushSettings&)> m_changed;
+    std::function<void()> m_text_changed;
     bool m_updating{false};
 };
 

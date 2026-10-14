@@ -13,6 +13,7 @@
 #include <oui/slider.h>
 #include <oui/theme.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,6 +27,30 @@ namespace
 {
 
 constexpr double widest{2000.0};
+
+// Its one child no wider than `columns`, as a list of fonts whose longest name would push the rest of the bar off the
+// window.
+class Capped final : public oui::Container
+{
+  public:
+    explicit Capped(int columns) : m_columns{columns} {}
+
+    [[nodiscard]] oui::Size measure(const oui::Constraints& constraints) const override
+    {
+        auto size{child_at(0).measure(constraints)};
+        size.width = std::min(size.width, m_columns);
+        return size;
+    }
+
+    void arrange(const oui::Rect& bounds) override
+    {
+        Widget::arrange(bounds);
+        child_at(0).arrange(bounds);
+    }
+
+  private:
+    int m_columns;
+};
 
 oui::Row& group(oui::Container& parent)
 {
@@ -115,13 +140,33 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
     {
         names.push_back(oui::translate("Tools", "(no fonts)"));
     }
-    m_font = &choice(*m_text_group, oui::translate("Tools", "&Font:"), names);
+    auto& font_label{oui::label(oui::translate("Tools", "&Font:"), *m_text_group)};
+    auto& capped{m_text_group->add(std::make_unique<Capped>(16))};
+    m_font = &capped.add(std::make_unique<oui::ComboBox>(std::move(names), 0));
+    font_label.set_buddy(*m_font);
     m_font->set_selected(chosen);
     auto& size_label{oui::label(oui::translate("Tools", "Si&ze:"), *m_text_group)};
-    m_font_size = &oui::number_field(*m_text_group);
+    // Three figures and the arrows: the text's options fit a narrow window.
+    m_font_size = &oui::number_field(m_text_group->add(std::make_unique<Capped>(7)));
     m_font_size->set_range(4, 1000);
     m_font_size->set_value(32);
     size_label.set_buddy(m_font_size->text_field());
+    // What goes around text, in pixels, each off at 0.
+    const auto effect{[this](std::string_view name, double most)
+                      {
+                          auto& label{oui::label(name, *m_text_group)};
+                          auto& field{oui::number_field(m_text_group->add(std::make_unique<Capped>(7)))};
+                          field.set_range(0, most);
+                          field.set_value(0);
+                          label.set_buddy(field.text_field());
+                          static_cast<void>(field.on_changed([this](double) { text_changed(); }));
+                          return &field;
+                      }};
+    m_outline = effect(oui::translate("Tools", "&Outline:"), 50);
+    m_shadow = effect(oui::translate("Tools", "S&hadow:"), 50);
+    m_glow = effect(oui::translate("Tools", "&Glow:"), 100);
+    static_cast<void>(m_font->on_selected([this](std::size_t) { text_changed(); }));
+    static_cast<void>(m_font_size->on_changed([this](double) { text_changed(); }));
 
     static_cast<void>(m_width->on_changed(
         [this](double value)
@@ -156,6 +201,7 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
         {
             m_settings.antialias = checked;
             changed();
+            text_changed();
         }));
     show_for("brush");
 }
@@ -209,6 +255,15 @@ double ToolOptions::font_size() const
     return m_font_size->value();
 }
 
+TextEffects ToolOptions::text_effects() const
+{
+    TextEffects effects;
+    effects.outline = static_cast<int>(m_outline->value());
+    effects.shadow = static_cast<int>(m_shadow->value());
+    effects.glow = static_cast<int>(m_glow->value());
+    return effects;
+}
+
 void ToolOptions::change_width(double step)
 {
     m_width->set_value(m_settings.width + step);
@@ -217,6 +272,19 @@ void ToolOptions::change_width(double step)
 void ToolOptions::on_changed(std::function<void(const BrushSettings&)> changed)
 {
     m_changed = std::move(changed);
+}
+
+void ToolOptions::on_text_changed(std::function<void()> changed)
+{
+    m_text_changed = std::move(changed);
+}
+
+void ToolOptions::text_changed()
+{
+    if(m_text_changed)
+    {
+        m_text_changed();
+    }
 }
 
 void ToolOptions::changed()

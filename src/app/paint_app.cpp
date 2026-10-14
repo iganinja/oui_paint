@@ -42,6 +42,7 @@
 #include <oui/file_dialog.h>
 #include <oui/file_system.h>
 #include <oui/layout.h>
+#include <oui/line_edit.h>
 #include <oui/utf8.h>
 #include <oui/window.h>
 
@@ -693,6 +694,8 @@ void PaintApp::build_window()
     show_history_panel(m_settings.bool_value("history_panel", true));
     auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
     m_tool_options = options.get();
+    // Text being typed shows a change of its look at once.
+    m_tool_options->on_text_changed([this] { show_typing(true); });
     m_frame->set_top(std::move(options));
     auto tabs{std::make_unique<oui::TabView>()};
     m_tabs = tabs.get();
@@ -1368,6 +1371,11 @@ bool PaintApp::close(std::size_t index)
     if(m_arc && m_arc->document == document)
     {
         cancel_arc();
+    }
+    // Text being typed in it is put down first: it is a change to save, and once the image is gone nothing may hold it.
+    if(m_typing && m_typing->document == document)
+    {
+        settle();
     }
     if(document->modified())
     {
@@ -2573,8 +2581,18 @@ void PaintApp::show_typing(bool with_cursor)
     if(auto* const font{text_font()})
     {
         const auto color{ink(false)};
+        // The outline and the glow in the secondary colour, the shadow in black: in an indexed image, the colours of
+        // the palette nearest them.
+        auto effects{m_tool_options->text_effects()};
+        effects.color = ink(true);
+        if(document.indexed())
+        {
+            const auto slot{layer.palette_slot()};
+            const auto grey{document.palettes()->nearest(slot, Color{0, 0, 0, 1}) / 255.0};
+            effects.shadow_color = {grey, grey, grey, 1.0};
+        }
         static_cast<void>(draw_text(layer, document.selection(), *font, m_typing->text, m_typing->at, color,
-                                    m_tool_options->settings().antialias && !document.indexed()));
+                                    m_tool_options->settings().antialias && !document.indexed(), effects));
         if(with_cursor)
         {
             // A thin line after the last character, as tall as a line of text.
@@ -3281,12 +3299,40 @@ void PaintApp::edit_color(bool primary)
 
 bool PaintApp::edit_text(TextAction action)
 {
+    std::string taken;
+    // A field of one line, as one of the tool's options: it selects, cuts, copies and pastes its own text, and has no
+    // undo of its own, so undoing goes on to the image.
+    if(auto* const field{dynamic_cast<oui::LineEdit*>(m_application.focused())})
+    {
+        switch(action)
+        {
+        case TextAction::undo:
+        case TextAction::redo:
+            return false;
+        case TextAction::cut:
+            field->cut_selection(taken);
+            break;
+        case TextAction::copy:
+            field->copy_selection(taken);
+            break;
+        case TextAction::paste:
+            field->paste(m_application.clipboard().text());
+            break;
+        case TextAction::select_all:
+            field->select_all();
+            break;
+        }
+        if(!taken.empty())
+        {
+            static_cast<void>(m_application.clipboard().set_text(taken));
+        }
+        return true;
+    }
     auto* const text{dynamic_cast<oui::TextEdit*>(m_application.focused())};
     if(text == nullptr)
     {
         return false;
     }
-    std::string taken;
     switch(action)
     {
     case TextAction::undo:

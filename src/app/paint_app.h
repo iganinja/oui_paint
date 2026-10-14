@@ -94,8 +94,8 @@ class PaintApp
     [[nodiscard]] OpenDocument* document_in_tab(std::size_t index);
     // The plugin a tab holds being written; none for a tab of another kind.
     [[nodiscard]] PluginWorkbench* workbench_in_tab(std::size_t index);
-    // What the edit commands do to the text with the focus, as a plugin's code: false, leaving them to the image,
-    // when no text has it.
+    // What the edit commands do to the text with the focus, as a plugin's code or a field of the tool's options: false,
+    // leaving them to the image, when no text has it.
     enum class TextAction
     {
         undo,

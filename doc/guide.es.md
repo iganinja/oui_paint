@@ -69,7 +69,7 @@ seleccionado en su sitio.
 | Tampón de clonar | L | Ctrl+clic elige de dónde copia, y luego al pintar copia de allí |
 | Recolorear | R | Cambia el color secundario por el primario donde pinta; con el botón derecho, al revés |
 | Cuentagotas | K | Toma el color bajo el puntero: el izquierdo para el primario, el derecho para el secundario |
-| Texto | T | Escribe texto donde se hace clic |
+| Texto | T | Escribe texto donde se hace clic; Contorno, Sombra y Resplandor le ponen alrededor un contorno y un resplandor del color secundario y debajo una sombra, cada uno de tantos píxeles, ninguno con 0, y el texto muestra cada cambio mientras se escribe |
 | Línea / curva | O | Arrastrar de un extremo al otro, Mayús de 15 en 15 grados; luego arrastrar sus cuatro asas para curvarla, y Intro, o un clic lejos de ellas, la deja como está |
 | Formas | O otra vez | Arrastrar de una esquina a la otra; Mayús las mantiene cuadradas o redondas |
 | Arco | O una tercera vez | Como con un compás: un clic pone el centro, otro el radio y dónde empieza, y el puntero lo gira, hacia cualquier lado, hasta la circunferencia entera, hasta que un tercer clic lo deja; Mayús de 15 en 15 grados, Esc lo descarta |
