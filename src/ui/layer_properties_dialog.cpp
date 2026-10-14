@@ -1,5 +1,8 @@
 #include "ui/layer_properties_dialog.h"
 
+#include "ui/shown_names.h"
+
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/check_button.h>
 #include <oui/combo_box.h>
@@ -22,21 +25,21 @@ namespace oui_paint
 std::optional<LayerProperties> ask_layer_properties(oui::Application& application, const LayerProperties& start,
                                                     const std::function<void(const LayerProperties&)>& changed)
 {
-    auto window{oui::window("Layer Properties")};
+    auto window{oui::window(oui::translate("Dialogs", "Layer Properties"))};
     auto& content{oui::column(*window)};
     content.set_gap(oui::Spacing::tight);
     auto& form{oui::grid(content)};
     form.set_columns({oui::Length::content(), oui::Length::content(), oui::Length::content()});
     form.set_gap(oui::Spacing::tight);
 
-    auto& name_label{oui::label("&Name:", form)};
+    auto& name_label{oui::label(oui::translate("Dialogs", "&Name:"), form)};
     auto& name{oui::line_edit(form)};
     name.set_text(start.name);
     name_label.set_buddy(name);
     oui::label("", form);
 
     oui::label("", form);
-    auto& visible{oui::check_button("&Visible", form)};
+    auto& visible{oui::check_button(oui::translate("Dialogs", "&Visible"), form)};
     visible.set_checked(start.visible);
     oui::label("", form);
 
@@ -48,15 +51,15 @@ std::optional<LayerProperties> ask_layer_properties(oui::Application& applicatio
         {
             selected = modes.size();
         }
-        modes.emplace_back(blend_mode_name(mode));
+        modes.push_back(shown_name(mode));
     }
-    auto& mode_label{oui::label("&Blend mode:", form)};
+    auto& mode_label{oui::label(oui::translate("Dialogs", "&Blend mode:"), form)};
     auto& mode{form.add(std::make_unique<oui::ComboBox>(modes, selected))};
     mode_label.set_buddy(mode);
     oui::label("", form);
 
     // Opacity from 0 to 255, as Paint.NET counts it.
-    auto& opacity_label{oui::label("&Opacity:", form)};
+    auto& opacity_label{oui::label(oui::translate("Dialogs", "&Opacity:"), form)};
     auto& opacity_slider{oui::slider(form)};
     opacity_slider.set_range(0, 255);
     auto& opacity{oui::number_field(form)};
@@ -85,14 +88,14 @@ std::optional<LayerProperties> ask_layer_properties(oui::Application& applicatio
     buttons.set_gap(oui::Spacing::normal);
     auto& window_reference{*window};
     auto accepted{false};
-    oui::button("OK", buttons,
+    oui::button(oui::translate("Dialogs", "OK"), buttons,
                 [&]
                 {
                     opacity.commit();
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 }).set_default(true);
-    oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
 
     application.focus(name);
     static_cast<void>(application.show_modal_and_keep(window));

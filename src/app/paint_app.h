@@ -66,8 +66,14 @@ class PaintApp
     bool close(std::size_t index);
     // Saves every document with unsaved changes, asking for a file for those that have none.
     void save_all();
-    // Closes every tab and quits, unless the person keeps one open.
+    // Closes every tab and quits, unless the person keeps one open; the images open with a file are kept for the next
+    // session.
     void quit();
+    // The images open when OUI Paint last closed, open again, unless the preferences say not to; the ones gone since
+    // are left out.
+    void open_last_session();
+    // Asks for the preferences and keeps them.
+    void show_preferences();
 
   private:
     void register_commands();

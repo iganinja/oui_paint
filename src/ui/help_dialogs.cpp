@@ -1,5 +1,6 @@
 #include "ui/help_dialogs.h"
 
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/grid.h>
 #include <oui/layout.h>
@@ -50,7 +51,7 @@ void open_link(std::string_view link)
 
 void show_help(oui::Application& application, const std::vector<HelpPage>& pages, std::size_t first)
 {
-    auto window{reading_window("OUI Paint Help")};
+    auto window{reading_window(oui::translate("Dialogs", "OUI Paint Help"))};
     auto& tabs{oui::tab_view(*window)};
     tabs.set_closable(false);
     std::vector<oui::MarkdownView*> views;
@@ -89,7 +90,7 @@ void show_help(oui::Application& application, const std::vector<HelpPage>& pages
 
 void show_about(oui::Application& application)
 {
-    auto window{oui::window("About OUI Paint")};
+    auto window{oui::window(oui::translate("Dialogs", "About OUI Paint"))};
     window->set_preferred_size({84, 0});
     window->set_height_share(0.7);
     window->set_resizable(true);
@@ -101,16 +102,16 @@ void show_about(oui::Application& application)
     auto& view{reading_view(content.add(oui::markdown_view(about_markdown())))};
     auto& buttons{oui::row(content)};
     buttons.set_gap(oui::Spacing::normal);
-    oui::button("Third-Party &Notices", buttons,
+    oui::button(oui::translate("Dialogs", "Third-Party &Notices"), buttons,
                 [&application]
                 {
-                    auto notices{reading_window("Third-Party Notices")};
+                    auto notices{reading_window(oui::translate("Dialogs", "Third-Party Notices"))};
                     auto& shown{reading_view(notices->add(oui::markdown_view(third_party_notices())))};
                     application.post([&application, &shown] { application.focus(shown); });
                     static_cast<void>(application.show_modal(std::move(notices)));
                 });
     auto& window_reference{*window};
-    oui::button("&Close", buttons, [&window_reference] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "&Close"), buttons, [&window_reference] { window_reference.close(oui::DialogResult::cancelled); });
     application.post([&application, &view] { application.focus(view); });
     static_cast<void>(application.show_modal(std::move(window)));
 }

@@ -43,6 +43,7 @@ add_library(oui_paint_core STATIC
     src/app/paint_app.cpp
     src/app/recent_files.cpp
     src/app/tools.cpp
+    src/app/translations.cpp
     src/app/window_place.cpp
     src/codecs/codecs.cpp
     src/codecs/openraster.cpp
@@ -96,6 +97,8 @@ add_library(oui_paint_core STATIC
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
     src/ui/palettes_panel.cpp
+    src/ui/preferences_dialog.cpp
+    src/ui/shown_names.cpp
     src/ui/plugin_workbench.cpp
     src/ui/plugins_dialog.cpp
     src/ui/tool_options.cpp
@@ -125,7 +128,9 @@ olagarro_embed_files(oui_paint_core FUNCTION embedded_plugins
 # What plugins can use, which the workbench suggests from and the help lists.
 olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_plugin_api FILES src/plugins/paint.d.ts)
 # The help, and OUI Paint's license, which About shows.
-olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_help FILES doc/guide.md doc/plugins.md LICENSE)
+olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_help
+    FILES doc/guide.md doc/guide.es.md doc/plugins.md LICENSE)
+olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_catalogs FILES translations/es.json)
 # The licenses of what the program carries, which a copy of it has to carry: in the order help.cpp names them.
 set(OUI_PAINT_NOTICES
     third_party/olagarro/LICENSE
@@ -201,7 +206,9 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/tool_panel_test.cpp
         tests/tools_test.cpp
         tests/transform_test.cpp
+        tests/translation_test.cpp
         tests/window_place_test.cpp)
     target_link_libraries(oui_paint_tests PRIVATE oui_paint_core GTest::gtest_main)
+    target_compile_definitions(oui_paint_tests PRIVATE OUI_PAINT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     gtest_discover_tests(oui_paint_tests)
 endif()

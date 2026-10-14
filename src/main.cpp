@@ -1,5 +1,6 @@
 // OUI Paint: a raster image editor in the spirit of Paint.NET, in a desktop window.
 #include "app/paint_app.h"
+#include "app/translations.h"
 #include "app/window_place.h"
 
 #include <oui/file_system.h>
@@ -31,6 +32,8 @@ int main(int argument_count, char* const* const arguments)
 
     oui::Settings settings{oui::SettingsLocation::portable, "oui_paint"};
     static_cast<void>(settings.load());
+    // Before anything shows a text, or makes one to show later, as the commands do.
+    static_cast<void>(oui_paint::install_paint_language(settings.value("language", "auto")));
     std::unique_ptr<oui::DesktopWindow> backend;
     try
     {
@@ -56,6 +59,10 @@ int main(int argument_count, char* const* const arguments)
     application.set_wheel_zooms(false);
 
     oui_paint::PaintApp paint{application, window, settings};
+    if(!command_line.positional(0))
+    {
+        paint.open_last_session();
+    }
     for(std::size_t index{}; const auto path{command_line.positional(index)}; ++ index)
     {
         static_cast<void>(paint.open(oui::path_from_utf8(*path)));

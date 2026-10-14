@@ -1,5 +1,7 @@
 #include "app/open_document.h"
 
+#include <oui/translation.h>
+
 #include <oui/file_system.h>
 
 #include <fstream>
@@ -41,7 +43,9 @@ std::string OpenDocument::title() const
     {
         return olagarro::oui::utf8_of(m_path->filename());
     }
-    return m_untitled_number == 1 ? std::string{"Untitled"} : "Untitled " + std::to_string(m_untitled_number);
+    return m_untitled_number == 1 ? olagarro::oui::translate("Documents", "Untitled")
+                                   : olagarro::oui::format_text(olagarro::oui::translate("Documents", "Untitled {0}"),
+                                                                {std::to_string(m_untitled_number)});
 }
 
 std::optional<std::string> read_file(const std::filesystem::path& path, std::string& error)

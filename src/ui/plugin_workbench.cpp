@@ -5,6 +5,7 @@
 #include "ui/canvas_view.h"
 #include "ui/effect_controls.h"
 
+#include <oui/translation.h>
 #include <oui/file_system.h>
 #include <oui/label.h>
 #include <oui/layout.h>
@@ -141,7 +142,7 @@ PluginWorkbench::PluginWorkbench(oui::Application& application, std::string sour
     auto& choices{oui::grid(right)};
     choices.set_columns({oui::Length::content(), oui::Length::fill(), oui::Length::content()});
     choices.set_gap(oui::Spacing::tight);
-    auto& effect_label{oui::label("Effec&t:", choices)};
+    auto& effect_label{oui::label(oui::translate("Dialogs", "Effec&t:"), choices)};
     m_effects = &choices.add(std::make_unique<oui::ComboBox>(std::vector<std::string>{"(none)"}));
     effect_label.set_buddy(*m_effects);
     oui::label("", choices);
@@ -154,8 +155,8 @@ PluginWorkbench::PluginWorkbench(oui::Application& application, std::string sour
                 run_now();
             }
         }));
-    auto& image_label{oui::label("Tr&y on:", choices)};
-    m_images = &choices.add(std::make_unique<oui::ComboBox>(std::vector<std::string>{"Test Card"}));
+    auto& image_label{oui::label(oui::translate("Dialogs", "Tr&y on:"), choices)};
+    m_images = &choices.add(std::make_unique<oui::ComboBox>(std::vector<std::string>{oui::translate("Dialogs", "Test Card")}));
     image_label.set_buddy(*m_images);
     static_cast<void>(m_images->on_selected(
         [this](std::size_t index)
@@ -165,7 +166,7 @@ PluginWorkbench::PluginWorkbench(oui::Application& application, std::string sour
                                                            : std::string{"\x01loaded"};
             run_now();
         }));
-    oui::button("Loa&d Image...", choices,
+    oui::button(oui::translate("Dialogs", "Loa&d Image..."), choices,
                 [this]
                 {
                     if(m_load_image)
@@ -233,7 +234,7 @@ bool PluginWorkbench::modified() const
 
 std::string PluginWorkbench::title() const
 {
-    return (m_file ? oui::utf8_of(m_file->filename()) : std::string{"New Plugin"}) + (modified() ? " *" : "");
+    return (m_file ? oui::utf8_of(m_file->filename()) : std::string{oui::translate("Dialogs", "New Plugin")}) + (modified() ? " *" : "");
 }
 
 void PluginWorkbench::set_open_images(std::vector<std::string> names,
@@ -258,7 +259,7 @@ void PluginWorkbench::set_loaded_image(std::string name, Image image)
 
 void PluginWorkbench::refresh_image_choices()
 {
-    std::vector<std::string> options{"Test Card"};
+    std::vector<std::string> options{oui::translate("Dialogs", "Test Card")};
     std::size_t selected{};
     for(std::size_t index{}; index < m_open_names.size(); ++ index)
     {
@@ -423,7 +424,7 @@ void PluginWorkbench::show(PluginTrial trial)
     {
         // Its first line says it; the rest is where it was called from.
         const auto first{trial.error->substr(0, trial.error->find('\n'))};
-        m_error->set_text(trial.error_line ? "Line " + std::to_string(*trial.error_line) + ": " + first : first);
+        m_error->set_text(trial.error_line ? oui::format_text(oui::translate("Dialogs", "Line {0}: {1}"), {std::to_string(*trial.error_line), first}) : first);
         m_error->set_visible(true);
         // What it made last stays, so a half-typed line does not blank the image.
     }

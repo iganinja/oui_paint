@@ -3,10 +3,15 @@
 #include "app/plugin_api.h"
 #include "app/tools.h"
 
+#include <oui/translation.h>
+
 #include <algorithm>
 
 namespace oui_paint
 {
+
+using olagarro::oui::format_text;
+using olagarro::oui::translate;
 
 std::vector<std::string_view> embedded_help();
 std::vector<std::string_view> embedded_help_names();
@@ -15,25 +20,44 @@ std::vector<std::string_view> embedded_notices();
 namespace
 {
 
+// A page of the help in the language installed, as "guide.es.md" for "guide.md", or in English when it has none.
 std::string text_of(std::string_view name)
 {
     const auto texts{embedded_help()};
     const auto names{embedded_help_names()};
+    std::vector<std::string_view> variants;
+    std::vector<std::string_view> variant_names;
+    const auto dot{name.rfind('.')};
     for(std::size_t index{}; index < names.size(); ++ index)
     {
-        if(names[index] == name)
+        const auto& candidate{names[index]};
+        const auto same_stem{dot != std::string_view::npos && candidate.size() > name.size() &&
+                             candidate.substr(0, dot + 1) == name.substr(0, dot + 1) &&
+                             candidate.substr(candidate.size() - (name.size() - dot)) == name.substr(dot)};
+        if(candidate == name)
         {
-            return std::string{texts[index]};
+            variants.insert(variants.begin(), texts[index]);
+            variant_names.insert(variant_names.begin(), candidate);
+        }
+        else if(same_stem)
+        {
+            variants.push_back(texts[index]);
+            variant_names.push_back(candidate);
         }
     }
-    return {};
+    if(variants.empty())
+    {
+        return {};
+    }
+    return std::string{olagarro::oui::text_for_language(variants, variant_names, olagarro::oui::installed_language())};
 }
 
 // The keys: the tools' letters, then every command bound to a key, under the menu it is in.
 std::string keys_markdown(const olagarro::oui::CommandRegistry& commands)
 {
-    std::string markdown{"# Keyboard\n\n## Tools\n\nPressing a tool's letter again goes to the next tool that shares "
-                         "it.\n\n| Key | Tool |\n|---|---|\n"};
+    std::string markdown{"# " + translate("Help", "Keyboard") + "\n\n## " + translate("Help", "Tools") + "\n\n" +
+                         translate("Help", "Pressing a tool's letter again goes to the next tool that shares it.") +
+                         "\n\n| " + translate("Help", "Key") + " | " + translate("Help", "Tool") + " |\n|---|---|\n"};
     std::vector<std::pair<char32_t, std::string>> letters;
     for(const auto& tool : all_tools())
     {
@@ -44,7 +68,7 @@ std::string keys_markdown(const olagarro::oui::CommandRegistry& commands)
         }
         else
         {
-            found->second += ", then " + tool.title;
+            found->second = format_text(translate("Help", "{0}, then {1}"), {found->second, tool.title});
         }
     }
     for(const auto& [key, names] : letters)
@@ -53,15 +77,15 @@ std::string keys_markdown(const olagarro::oui::CommandRegistry& commands)
     }
     // The menus by the first part of their commands' names, in the order the menus come.
     const std::vector<std::pair<std::string, std::vector<std::string>>> groups{
-        {"File", {"file."}},
-        {"Edit", {"edit."}},
-        {"View and images", {"view.", "window."}},
-        {"Image", {"image."}},
-        {"Palettes", {"palettes."}},
-        {"Layers", {"layers."}},
-        {"Adjustments and effects", {"effect.", "effects."}},
-        {"Colors and brush", {"colors.", "brush."}},
-        {"Help", {"help."}},
+        {translate("Help", "File"), {"file."}},
+        {translate("Help", "Edit"), {"edit."}},
+        {translate("Help", "View and images"), {"view.", "window."}},
+        {translate("Help", "Image"), {"image."}},
+        {translate("Help", "Palettes"), {"palettes."}},
+        {translate("Help", "Layers"), {"layers."}},
+        {translate("Help", "Adjustments and effects"), {"effect.", "effects."}},
+        {translate("Help", "Colors and brush"), {"colors.", "brush."}},
+        {translate("Help", "Help"), {"help."}},
     };
     const auto listed{commands.commands()};
     for(const auto& [heading, prefixes] : groups)
@@ -79,7 +103,8 @@ std::string keys_markdown(const olagarro::oui::CommandRegistry& commands)
         }
         if(!rows.empty())
         {
-            markdown += "\n## " + heading + "\n\n| Key | Command |\n|---|---|\n" + rows;
+            markdown += "\n## " + heading + "\n\n| " + translate("Help", "Key") + " | " + translate("Help", "Command") +
+                        " |\n|---|---|\n" + rows;
         }
     }
     return markdown;
@@ -94,9 +119,9 @@ std::string_view version()
 
 std::vector<HelpPage> help_pages(const olagarro::oui::CommandRegistry& commands)
 {
-    return {{"Guide", "guide.md", text_of("guide.md")},
-            {"Keyboard", "keys.md", keys_markdown(commands)},
-            {"Plugins", "plugins.md", with_image_methods(text_of("plugins.md"))}};
+    return {{translate("Help", "Guide"), "guide.md", text_of("guide.md")},
+            {translate("Help", "Keyboard"), "keys.md", keys_markdown(commands)},
+            {translate("Help", "Plugins"), "plugins.md", with_image_methods(text_of("plugins.md"))}};
 }
 
 std::optional<HelpPlace> help_place(const std::vector<HelpPage>& pages, std::string_view link)
@@ -115,11 +140,11 @@ std::optional<HelpPlace> help_place(const std::vector<HelpPage>& pages, std::str
 
 std::string about_markdown()
 {
-    return "# OUI Paint " + std::string{version()} +
-           "\n\nA raster image editor in the spirit of Paint.NET, built on OUI.\n\n"
-           "Free to use, change and pass on, under the zlib license:\n\n```\n" +
-           text_of("LICENSE") + "```\n\nIt carries other people's work, each under its own license: see Third-Party "
-                                "Notices.\n";
+    return "# OUI Paint " + std::string{version()} + "\n\n" +
+           translate("Help", "A raster image editor in the spirit of Paint.NET, built on OUI.") + "\n\n" +
+           translate("Help", "Free to use, change and pass on, under the zlib license:") + "\n\n```\n" + text_of("LICENSE") +
+           "```\n\n" + translate("Help", "It carries other people's work, each under its own license: see Third-Party Notices.") +
+           "\n";
 }
 
 std::string third_party_notices()

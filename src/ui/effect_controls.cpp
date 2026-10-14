@@ -1,5 +1,7 @@
 #include "ui/effect_controls.h"
 
+#include "app/translations.h"
+
 #include <oui/combo_box.h>
 #include <oui/label.h>
 #include <oui/line_edit.h>
@@ -19,11 +21,16 @@ std::vector<oui::NumberField*> add_effect_controls(oui::Grid& form, const Effect
     std::vector<oui::NumberField*> fields;
     for(const auto& parameter : effect.parameters)
     {
-        auto& label{oui::label(parameter.name + ":", form)};
+        auto& label{oui::label(plugin_text(parameter.name) + ":", form)};
         const auto value{values.try_emplace(parameter.id, parameter.value).first->second};
         if(!parameter.options.empty())
         {
-            auto& combo{form.add(std::make_unique<oui::ComboBox>(parameter.options,
+            std::vector<std::string> options;
+            for(const auto& option : parameter.options)
+            {
+                options.push_back(plugin_text(option));
+            }
+            auto& combo{form.add(std::make_unique<oui::ComboBox>(options,
                                                                  static_cast<std::size_t>(std::max(0.0, value))))};
             label.set_buddy(combo);
             oui::label("", form);

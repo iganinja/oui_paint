@@ -1,5 +1,7 @@
 #include "codecs/openraster.h"
 
+#include <oui/translation.h>
+
 #include "codecs/codecs.h"
 #include "codecs/palettes.h"
 #include "codecs/zip_api.h"
@@ -279,7 +281,7 @@ std::string write_openraster(const Document& document)
     auto file{zip_api::zip(entries)};
     if(!file)
     {
-        throw std::runtime_error{"OpenRaster: the zip could not be made."};
+        throw std::runtime_error{olagarro::oui::translate("Files", "OpenRaster: the zip could not be made.")};
     }
     return *file;
 }
@@ -289,26 +291,26 @@ std::optional<Document> read_openraster(std::string_view bytes, std::string& err
     const auto mimetype{zip_api::unzip(bytes, "mimetype")};
     if(!mimetype || mimetype->rfind("image/openraster", 0) != 0)
     {
-        error = "not an OpenRaster file";
+        error = olagarro::oui::translate("Files", "not an OpenRaster file");
         return std::nullopt;
     }
     const auto stack{zip_api::unzip(bytes, "stack.xml")};
     if(!stack)
     {
-        error = "an OpenRaster file without stack.xml";
+        error = olagarro::oui::translate("Files", "an OpenRaster file without stack.xml");
         return std::nullopt;
     }
     const auto images{elements(*stack, "image")};
     if(images.empty())
     {
-        error = "stack.xml names no image";
+        error = olagarro::oui::translate("Files", "stack.xml names no image");
         return std::nullopt;
     }
     const auto width{static_cast<int>(number(images.front(), "w", 0))};
     const auto height{static_cast<int>(number(images.front(), "h", 0))};
     if(width <= 0 || height <= 0)
     {
-        error = "stack.xml gives the image no size";
+        error = olagarro::oui::translate("Files", "stack.xml gives the image no size");
         return std::nullopt;
     }
     struct Read
@@ -338,7 +340,7 @@ std::optional<Document> read_openraster(std::string_view bytes, std::string& err
         const auto png{zip_api::unzip(bytes, source->second)};
         if(!png)
         {
-            error = "the OpenRaster file lacks " + source->second;
+            error = olagarro::oui::format_text(olagarro::oui::translate("Files", "the OpenRaster file lacks {0}"), {source->second});
             return std::nullopt;
         }
         std::optional<Image> image;
@@ -370,7 +372,7 @@ std::optional<Document> read_openraster(std::string_view bytes, std::string& err
     {
         const auto& [values, image]{read[index - 1]};
         const auto name{values.find("name")};
-        auto& layer{document.add_layer(name != values.end() ? name->second : "Layer")};
+        auto& layer{document.add_layer(name != values.end() ? name->second : olagarro::oui::translate("Layers", "Layer"))};
         layer.write(palettes ? image : converted(image, document.format()), static_cast<int>(number(values, "x", 0)),
                     static_cast<int>(number(values, "y", 0)));
         layer.set_opacity(number(values, "opacity", 1.0));
@@ -386,7 +388,7 @@ std::optional<Document> read_openraster(std::string_view bytes, std::string& err
     }
     if(document.layers().empty())
     {
-        document.add_layer("Background");
+        document.add_layer(olagarro::oui::translate("Layers", "Background"));
     }
     return document;
 }

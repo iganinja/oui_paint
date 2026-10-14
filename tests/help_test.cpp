@@ -1,4 +1,5 @@
 #include "app/help.h"
+#include "app/translations.h"
 
 #include <gtest/gtest.h>
 
@@ -67,4 +68,27 @@ TEST(Help, AboutSaysTheVersionAndTheLicenseAndTheNoticesNameEveryPiece)
         EXPECT_NE(notices.find(std::string{"## "} + piece), std::string::npos) << piece;
     }
     EXPECT_NE(notices.find("Permission is hereby granted"), std::string::npos) << "an MIT license's text";
+}
+
+TEST(Help, InSpanishTheGuideAndTheKeysAreInSpanishAndItsLinksLeadToPages)
+{
+    static_cast<void>(install_paint_language("es"));
+    olagarro::oui::CommandRegistry commands;
+    commands.register_command("file.save", olagarro::oui::translate("Commands", "&Save"), [] {});
+    commands.bind("file.save", olagarro::oui::Shortcut{U's', true});
+    const auto pages{help_pages(commands)};
+    olagarro::oui::remove_translations();
+    ASSERT_EQ(pages.size(), 3u);
+    EXPECT_EQ(pages[0].title, "Guía");
+    EXPECT_NE(pages[0].markdown.find("## La ventana"), std::string::npos);
+    EXPECT_NE(pages[1].markdown.find("## Archivo\n\n| Tecla | Orden |\n|---|---|\n| Ctrl+S | Guardar |"), std::string::npos)
+        << pages[1].markdown;
+    EXPECT_NE(pages[2].markdown.find("# Plugins"), std::string::npos) << "the plugins' page, which has no translation, in English";
+    const std::regex link{R"(\]\(([^)]*)\))"};
+    const auto& guide{pages[0].markdown};
+    for(std::sregex_iterator found{guide.begin(), guide.end(), link}; found != std::sregex_iterator{}; ++ found)
+    {
+        EXPECT_TRUE(help_place(pages, (*found)[1].str())) << (*found)[1].str();
+    }
+    EXPECT_EQ(help_pages(commands)[0].title, "Guide") << "and in English once the catalogs are gone";
 }

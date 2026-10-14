@@ -1,5 +1,7 @@
 #include "app/new_image.h"
 
+#include <oui/translation.h>
+
 namespace oui_paint
 {
 
@@ -11,7 +13,7 @@ Document make_document(const NewImage& request)
         // after the see-through index, or see-through.
         Document document{request.width, request.height, PixelFormat::gray_alpha8};
         document.set_palettes(PaletteSetup::greys(request.palettes, request.palette_size));
-        auto& layer{document.add_layer("Background")};
+        auto& layer{document.add_layer(olagarro::oui::translate("Layers", "Background"))};
         if(request.background != Background::transparent)
         {
             const auto index{request.background == Background::white ? request.palette_size - 1 : 1};
@@ -29,7 +31,7 @@ Document make_document(const NewImage& request)
     }
     const auto format{pixel_format(request.gray, request.bits)};
     Document document{request.width, request.height, format};
-    auto& layer{document.add_layer("Background")};
+    auto& layer{document.add_layer(olagarro::oui::translate("Layers", "Background"))};
     if(request.background == Background::transparent)
     {
         return document;

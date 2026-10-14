@@ -1,9 +1,11 @@
 #include "ui/effect_dialog.h"
 
+#include "app/translations.h"
 #include "ui/curves_dialog.h"
 #include "ui/effect_controls.h"
 #include "ui/levels_dialog.h"
 
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/combo_box.h>
 #include <oui/grid.h>
@@ -33,7 +35,7 @@ bool ask_effect(oui::Application& application, const Effect& effect, std::map<st
     {
         return ask_levels(application, values, changed, histogram);
     }
-    auto window{oui::window(effect.name)};
+    auto window{oui::window(plugin_text(effect.name))};
     auto& content{oui::column(*window)};
     content.set_gap(oui::Spacing::tight);
     auto& form{oui::grid(content)};
@@ -44,7 +46,7 @@ bool ask_effect(oui::Application& application, const Effect& effect, std::map<st
     buttons.set_gap(oui::Spacing::normal);
     auto& window_reference{*window};
     auto accepted{false};
-    oui::button("OK", buttons,
+    oui::button(oui::translate("Dialogs", "OK"), buttons,
                 [&]
                 {
                     for(auto* const field : fields)
@@ -54,7 +56,7 @@ bool ask_effect(oui::Application& application, const Effect& effect, std::map<st
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 }).set_default(true);
-    oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
     static_cast<void>(application.show_modal_and_keep(window));
     return accepted;
 }

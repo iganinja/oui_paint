@@ -3,6 +3,7 @@
 #include "ui/layers_panel.h"
 #include "ui/side_panel.h"
 
+#include <oui/translation.h>
 #include <oui/painter.h>
 #include <oui/theme.h>
 
@@ -102,7 +103,7 @@ void HistoryPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
                                    : undone ? theme.muted_text
                                             : theme.status_foreground,
                                    current ? theme.menu_selected_background : side_panel_color(theme)};
-        const auto name{*position == 0 ? std::string{"Original"} : m_history->steps()[*position - 1].name};
+        const auto name{*position == 0 ? std::string{oui::translate("Panels", "Original")} : m_history->steps()[*position - 1].name};
         painter.draw_label({line.x + 1, line.y}, name, style);
     }
     // Undo and redo under the steps, on a bar of their own; none without a document to undo in.
@@ -179,11 +180,11 @@ std::optional<std::string> HistoryPanel::tooltip_at(oui::Point point) const
     const auto column{point.x - m_bounds.x};
     if(column < 2)
     {
-        return std::string{"Undo"};
+        return std::string{oui::translate("Panels", "Undo")};
     }
     if(column < 4)
     {
-        return std::string{"Redo"};
+        return std::string{oui::translate("Panels", "Redo")};
     }
     return std::nullopt;
 }

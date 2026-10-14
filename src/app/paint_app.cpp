@@ -6,6 +6,7 @@
 #include "app/fonts.h"
 #include "app/recent_files.h"
 #include "app/tools.h"
+#include "app/translations.h"
 #include "codecs/codecs.h"
 #include "codecs/openraster.h"
 #include "codecs/palettes.h"
@@ -27,6 +28,8 @@
 #include "ui/main_frame.h"
 #include "ui/new_image_dialog.h"
 #include "ui/palettes_panel.h"
+#include "ui/preferences_dialog.h"
+#include "ui/shown_names.h"
 #include "ui/plugin_workbench.h"
 #include "ui/side_column.h"
 #include "ui/section.h"
@@ -129,14 +132,14 @@ void PaintApp::register_commands()
                        commands.register_command(id, title, std::forward<decltype(run)>(run));
                        commands.bind(id, shortcut);
                    }};
-    add("file.new", "&New...", [this] { new_image(); }, {U'n', true});
-    add("file.open", "&Open...", [this] { open_with_dialog(); }, {U'o', true});
-    add("file.save", "&Save", [this] { static_cast<void>(save(false)); }, {U's', true});
-    add("file.save_as", "Save &As...", [this] { static_cast<void>(save(true)); }, {U's', true, false, true});
-    add("file.save_all", "Save A&ll", [this] { save_all(); }, {U's', true, true});
-    add("file.close", "&Close", [this] { static_cast<void>(close(m_tabs->selected_index())); }, {U'w', true});
+    add("file.new", oui::translate("Commands", "&New..."), [this] { new_image(); }, {U'n', true});
+    add("file.open", oui::translate("Commands", "&Open..."), [this] { open_with_dialog(); }, {U'o', true});
+    add("file.save", oui::translate("Commands", "&Save"), [this] { static_cast<void>(save(false)); }, {U's', true});
+    add("file.save_as", oui::translate("Commands", "Save &As..."), [this] { static_cast<void>(save(true)); }, {U's', true, false, true});
+    add("file.save_all", oui::translate("Commands", "Save A&ll"), [this] { save_all(); }, {U's', true, true});
+    add("file.close", oui::translate("Commands", "&Close"), [this] { static_cast<void>(close(m_tabs->selected_index())); }, {U'w', true});
     commands.bind("file.close", oui::KeyShortcut{oui::Key::f4, true});
-    commands.register_command("file.quit", "E&xit", [this] { quit(); });
+    commands.register_command("file.quit", oui::translate("Commands", "E&xit"), [this] { quit(); });
     commands.bind("file.quit", {U'q', true});
     commands.bind("file.quit", oui::KeyShortcut{oui::Key::f4, false, true});
     const auto switch_tab{[this](int step)
@@ -152,16 +155,16 @@ void PaintApp::register_commands()
                                   }
                               };
                           }};
-    commands.register_command("window.next_image", "&Next Image", switch_tab(1));
+    commands.register_command("window.next_image", oui::translate("Commands", "&Next Image"), switch_tab(1));
     commands.bind("window.next_image", oui::KeyShortcut{oui::Key::tab, true});
     commands.bind("window.next_image", oui::KeyShortcut{oui::Key::page_down, true});
-    commands.register_command("window.previous_image", "&Previous Image", switch_tab(-1));
+    commands.register_command("window.previous_image", oui::translate("Commands", "&Previous Image"), switch_tab(-1));
     commands.bind("window.previous_image", oui::KeyShortcut{oui::Key::shift_tab, true});
     commands.bind("window.previous_image", oui::KeyShortcut{oui::Key::page_up, true});
     for(int number{1}; number <= 9; ++ number)
     {
         const auto id{"window.image_" + std::to_string(number)};
-        commands.register_command(id, "Image " + std::to_string(number),
+        commands.register_command(id, oui::format_text(oui::translate("Commands", "Image {0}"), {std::to_string(number)}),
                                   [this, number]
                                   {
                                       if(static_cast<std::size_t>(number) <= m_tabs->child_count())
@@ -171,17 +174,18 @@ void PaintApp::register_commands()
                                   });
         commands.bind(id, {static_cast<char32_t>(U'0' + number), false, true});
     }
-    add("edit.undo", "&Undo", [this] { if(!edit_text(TextAction::undo)) { undo(); } }, {U'z', true});
-    add("edit.redo", "&Redo", [this] { if(!edit_text(TextAction::redo)) { redo(); } }, {U'y', true});
-    add("colors.swap", "Swap Colors", [this] { m_color_panel->swap(); }, {U'x'});
+    add("edit.preferences", oui::translate("Commands", "Prefere&nces..."), [this] { show_preferences(); }, {U',', true});
+    add("edit.undo", oui::translate("Commands", "&Undo"), [this] { if(!edit_text(TextAction::undo)) { undo(); } }, {U'z', true});
+    add("edit.redo", oui::translate("Commands", "&Redo"), [this] { if(!edit_text(TextAction::redo)) { redo(); } }, {U'y', true});
+    add("colors.swap", oui::translate("Commands", "Swap Colors"), [this] { m_color_panel->swap(); }, {U'x'});
     // C, as in Paint.NET: whether a click on a palette sets the primary colour or the secondary one.
-    add("colors.toggle_editing", "Edit the Other Color", [this] { m_color_panel->toggle_editing(); }, {U'c'});
-    add("edit.cut", "Cu&t",
+    add("colors.toggle_editing", oui::translate("Commands", "Edit the Other Color"), [this] { m_color_panel->toggle_editing(); }, {U'c'});
+    add("edit.cut", oui::translate("Commands", "Cu&t"),
         [this]
         {
             if(!edit_text(TextAction::cut) && copy(false))
             {
-                change_layers("Cut",
+                change_layers(oui::translate("History", "Cut"),
                               [](Document& document)
                               {
                                   static_cast<void>(erase_selected(document.layers()[document.active_layer()],
@@ -190,7 +194,7 @@ void PaintApp::register_commands()
             }
         },
         {U'x', true});
-    add("edit.copy", "&Copy",
+    add("edit.copy", oui::translate("Commands", "&Copy"),
         [this]
         {
             if(!edit_text(TextAction::copy))
@@ -199,8 +203,8 @@ void PaintApp::register_commands()
             }
         },
         {U'c', true});
-    add("edit.copy_merged", "Copy M&erged", [this] { static_cast<void>(copy(true)); }, {U'c', true, false, true});
-    add("edit.paste", "&Paste",
+    add("edit.copy_merged", oui::translate("Commands", "Copy M&erged"), [this] { static_cast<void>(copy(true)); }, {U'c', true, false, true});
+    add("edit.paste", oui::translate("Commands", "&Paste"),
         [this]
         {
             if(!edit_text(TextAction::paste))
@@ -209,65 +213,65 @@ void PaintApp::register_commands()
             }
         },
         {U'v', true});
-    add("edit.paste_new_layer", "Paste into New &Layer", [this] { paste(PasteInto::new_layer); },
+    add("edit.paste_new_layer", oui::translate("Commands", "Paste into New &Layer"), [this] { paste(PasteInto::new_layer); },
         {U'v', true, false, true});
-    add("edit.paste_new_image", "Paste into New &Image", [this] { paste(PasteInto::new_image); }, {U'v', true, true});
-    commands.register_command("edit.flip_selection_horizontal", "Flip Selection &Horizontal",
+    add("edit.paste_new_image", oui::translate("Commands", "Paste into New &Image"), [this] { paste(PasteInto::new_image); }, {U'v', true, true});
+    commands.register_command("edit.flip_selection_horizontal", oui::translate("Commands", "Flip Selection &Horizontal"),
                               [this]
                               {
-                                  transform_selection("Flip Selection Horizontal",
+                                  transform_selection(oui::translate("History", "Flip Selection Horizontal"),
                                                       [](PieceTransform& t)
                                                       {
                                                           t.radians = -t.radians;
                                                           t.scale_x = -t.scale_x;
                                                       });
                               });
-    commands.register_command("edit.flip_selection_vertical", "Flip Selection &Vertical",
+    commands.register_command("edit.flip_selection_vertical", oui::translate("Commands", "Flip Selection &Vertical"),
                               [this]
                               {
-                                  transform_selection("Flip Selection Vertical",
+                                  transform_selection(oui::translate("History", "Flip Selection Vertical"),
                                                       [](PieceTransform& t)
                                                       {
                                                           t.radians = -t.radians;
                                                           t.scale_y = -t.scale_y;
                                                       });
                               });
-    commands.register_command("edit.rotate_selection_clockwise", "Rotate Selection 90° &Clockwise",
+    commands.register_command("edit.rotate_selection_clockwise", oui::translate("Commands", "Rotate Selection 90° &Clockwise"),
                               [this]
                               {
-                                  transform_selection("Rotate Selection 90° Clockwise",
+                                  transform_selection(oui::translate("History", "Rotate Selection 90° Clockwise"),
                                                       [](PieceTransform& t) { t.radians += quarter; });
                               });
-    commands.register_command("edit.rotate_selection_counter_clockwise", "Rotate Selection 90° C&ounter-clockwise",
+    commands.register_command("edit.rotate_selection_counter_clockwise", oui::translate("Commands", "Rotate Selection 90° C&ounter-clockwise"),
                               [this]
                               {
-                                  transform_selection("Rotate Selection 90° Counter-clockwise",
+                                  transform_selection(oui::translate("History", "Rotate Selection 90° Counter-clockwise"),
                                                       [](PieceTransform& t) { t.radians -= quarter; });
                               });
-    commands.register_command("edit.rotate_selection_180", "Rotate Selection &180°",
+    commands.register_command("edit.rotate_selection_180", oui::translate("Commands", "Rotate Selection &180°"),
                               [this]
                               {
-                                  transform_selection("Rotate Selection 180°",
+                                  transform_selection(oui::translate("History", "Rotate Selection 180°"),
                                                       [](PieceTransform& t) { t.radians += 2.0 * quarter; });
                               });
-    add("edit.select_all", "Select &All",
+    add("edit.select_all", oui::translate("Commands", "Select &All"),
         [this]
         {
             if(!edit_text(TextAction::select_all))
             {
-                change_layers("Select All", [](Document& document) { document.selection().select_all(); });
+                change_layers(oui::translate("History", "Select All"), [](Document& document) { document.selection().select_all(); });
             }
         },
         {U'a', true});
-    add("edit.deselect", "&Deselect",
-        [this] { change_layers("Deselect", [](Document& document) { document.selection().clear(); }); }, {U'd', true});
-    add("edit.invert_selection", "&Invert Selection",
-        [this] { change_layers("Invert Selection", [](Document& document) { document.selection().invert(); }); },
+    add("edit.deselect", oui::translate("Commands", "&Deselect"),
+        [this] { change_layers(oui::translate("History", "Deselect"), [](Document& document) { document.selection().clear(); }); }, {U'd', true});
+    add("edit.invert_selection", oui::translate("Commands", "&Invert Selection"),
+        [this] { change_layers(oui::translate("History", "Invert Selection"), [](Document& document) { document.selection().invert(); }); },
         {U'i', true});
-    commands.register_command("edit.erase_selection", "&Erase Selection",
+    commands.register_command("edit.erase_selection", oui::translate("Commands", "&Erase Selection"),
                               [this]
                               {
-                                  change_layers("Erase Selection",
+                                  change_layers(oui::translate("History", "Erase Selection"),
                                                 [](Document& document)
                                                 {
                                                     static_cast<void>(erase_selected(
@@ -276,11 +280,11 @@ void PaintApp::register_commands()
                                                 });
                               });
     commands.bind("edit.erase_selection", oui::KeyShortcut{oui::Key::delete_});
-    commands.register_command("edit.fill_selection", "&Fill Selection",
+    commands.register_command("edit.fill_selection", oui::translate("Commands", "&Fill Selection"),
                               [this]
                               {
                                   const auto color{m_color_panel->primary()};
-                                  change_layers("Fill Selection",
+                                  change_layers(oui::translate("History", "Fill Selection"),
                                                 [&color](Document& document)
                                                 {
                                                     static_cast<void>(fill_selected(
@@ -289,33 +293,33 @@ void PaintApp::register_commands()
                                                 });
                               });
     commands.bind("edit.fill_selection", oui::KeyShortcut{oui::Key::backspace});
-    add("brush.narrower", "Brush Width Down", [this] { m_tool_options->change_width(-1); }, {U'['});
-    add("brush.wider", "Brush Width Up", [this] { m_tool_options->change_width(1); }, {U']'});
-    add("brush.much_narrower", "Brush Width Down by 5", [this] { m_tool_options->change_width(-5); }, {U'[', true});
-    add("brush.much_wider", "Brush Width Up by 5", [this] { m_tool_options->change_width(5); }, {U']', true});
+    add("brush.narrower", oui::translate("Commands", "Brush Width Down"), [this] { m_tool_options->change_width(-1); }, {U'['});
+    add("brush.wider", oui::translate("Commands", "Brush Width Up"), [this] { m_tool_options->change_width(1); }, {U']'});
+    add("brush.much_narrower", oui::translate("Commands", "Brush Width Down by 5"), [this] { m_tool_options->change_width(-5); }, {U'[', true});
+    add("brush.much_wider", oui::translate("Commands", "Brush Width Up by 5"), [this] { m_tool_options->change_width(5); }, {U']', true});
     const auto active{[this] { return current() != nullptr ? current()->document().active_layer() : 0u; }};
-    add("layers.add", "&Add New Layer",
+    add("layers.add", oui::translate("Commands", "&Add New Layer"),
         [this]
         {
-            change_layers("Add New Layer",
+            change_layers(oui::translate("History", "Add New Layer"),
                           [](Document& document)
-                          { document.insert_layer_above("Layer " + std::to_string(document.layers().size() + 1)); });
+                          { document.insert_layer_above(oui::format_text(oui::translate("Layers", "Layer {0}"), {std::to_string(document.layers().size() + 1)})); });
         },
         {U'n', true, false, true});
-    add("layers.delete", "&Delete Layer",
-        [this, active] { change_layers("Delete Layer", [&](Document& document) { document.remove_layer(active()); }); },
+    add("layers.delete", oui::translate("Commands", "&Delete Layer"),
+        [this, active] { change_layers(oui::translate("History", "Delete Layer"), [&](Document& document) { document.remove_layer(active()); }); },
         oui::Shortcut{0, true, false, true, oui::Key::delete_});
-    add("layers.duplicate", "D&uplicate Layer",
+    add("layers.duplicate", oui::translate("Commands", "D&uplicate Layer"),
         [this, active]
-        { change_layers("Duplicate Layer", [&](Document& document) { document.duplicate_layer(active()); }); },
+        { change_layers(oui::translate("History", "Duplicate Layer"), [&](Document& document) { document.duplicate_layer(active()); }); },
         {U'd', true, false, true});
-    add("layers.merge_down", "&Merge Layer Down",
-        [this, active] { change_layers("Merge Layer Down", [&](Document& document) { document.merge_down(active()); }); },
+    add("layers.merge_down", oui::translate("Commands", "&Merge Layer Down"),
+        [this, active] { change_layers(oui::translate("History", "Merge Layer Down"), [&](Document& document) { document.merge_down(active()); }); },
         {U'm', true});
-    commands.register_command("layers.move_up", "Move Layer &Up",
+    commands.register_command("layers.move_up", oui::translate("Commands", "Move Layer &Up"),
                               [this, active]
                               {
-                                  change_layers("Move Layer Up",
+                                  change_layers(oui::translate("History", "Move Layer Up"),
                                                 [&](Document& document)
                                                 {
                                                     const auto index{active()};
@@ -325,10 +329,10 @@ void PaintApp::register_commands()
                                                     }
                                                 });
                               });
-    commands.register_command("layers.move_down", "Move Layer D&own",
+    commands.register_command("layers.move_down", oui::translate("Commands", "Move Layer D&own"),
                               [this, active]
                               {
-                                  change_layers("Move Layer Down",
+                                  change_layers(oui::translate("History", "Move Layer Down"),
                                                 [&](Document& document)
                                                 {
                                                     const auto index{active()};
@@ -338,10 +342,10 @@ void PaintApp::register_commands()
                                                     }
                                                 });
                               });
-    add("layers.toggle_visible", "Show or &Hide Layer",
+    add("layers.toggle_visible", oui::translate("Commands", "Show or &Hide Layer"),
         [this, active]
         {
-            change_layers("Layer Visibility",
+            change_layers(oui::translate("History", "Layer Visibility"),
                           [&](Document& document)
                           {
                               auto& layer{document.layers()[active()]};
@@ -349,17 +353,17 @@ void PaintApp::register_commands()
                           });
         },
         {U',', true});
-    add("layers.properties", "Layer &Properties...", [this] { layer_properties(); },
+    add("layers.properties", oui::translate("Commands", "Layer &Properties..."), [this] { layer_properties(); },
         oui::Shortcut{0, false, false, false, oui::Key::f4});
     // F6, as Paint.NET shows and hides its History window; kept for the next time.
-    add("view.history_panel", "&History Panel", [this] { show_history_panel(!m_history_section->is_visible()); },
+    add("view.history_panel", oui::translate("Commands", "&History Panel"), [this] { show_history_panel(!m_history_section->is_visible()); },
         oui::Shortcut{0, false, false, false, oui::Key::f6});
     // F7, as Paint.NET shows and hides its Layers window; kept for the next time.
-    add("view.layers_panel", "&Layers Panel", [this] { show_layers_panel(!m_frame->right()->is_visible()); },
+    add("view.layers_panel", oui::translate("Commands", "&Layers Panel"), [this] { show_layers_panel(!m_frame->right()->is_visible()); },
         oui::Shortcut{0, false, false, false, oui::Key::f7});
-    add("help.documentation", "&Documentation", [this] { show_help(m_application, help_pages(m_application.commands())); },
+    add("help.documentation", oui::translate("Commands", "&Documentation"), [this] { show_help(m_application, help_pages(m_application.commands())); },
         oui::Shortcut{0, false, false, false, oui::Key::f1});
-    commands.register_command("help.about", "&About OUI Paint", [this] { show_about(m_application); });
+    commands.register_command("help.about", oui::translate("Commands", "&About OUI Paint"), [this] { show_about(m_application); });
     const auto select_layer{[this](int step, bool to_end)
                             {
                                 return [this, step, to_end]
@@ -377,18 +381,18 @@ void PaintApp::register_commands()
                                     document.set_active_layer(static_cast<std::size_t>(index));
                                 };
                             }};
-    commands.register_command("layers.select_above", "Layer Above", select_layer(1, false));
+    commands.register_command("layers.select_above", oui::translate("Commands", "Layer Above"), select_layer(1, false));
     commands.bind("layers.select_above", oui::KeyShortcut{oui::Key::page_up, false, true});
-    commands.register_command("layers.select_below", "Layer Below", select_layer(-1, false));
+    commands.register_command("layers.select_below", oui::translate("Commands", "Layer Below"), select_layer(-1, false));
     commands.bind("layers.select_below", oui::KeyShortcut{oui::Key::page_down, false, true});
-    commands.register_command("layers.select_top", "Top Layer", select_layer(1, true));
+    commands.register_command("layers.select_top", oui::translate("Commands", "Top Layer"), select_layer(1, true));
     commands.bind("layers.select_top", oui::KeyShortcut{oui::Key::page_up, true, true});
-    commands.register_command("layers.select_bottom", "Bottom Layer", select_layer(-1, true));
+    commands.register_command("layers.select_bottom", oui::translate("Commands", "Bottom Layer"), select_layer(-1, true));
     commands.bind("layers.select_bottom", oui::KeyShortcut{oui::Key::page_down, true, true});
-    add("image.crop_to_selection", "Crop to &Selection",
-        [this] { change_layers("Crop to Selection", [](Document& document) { document.crop_to_selection(); }); },
+    add("image.crop_to_selection", oui::translate("Commands", "Crop to &Selection"),
+        [this] { change_layers(oui::translate("History", "Crop to Selection"), [](Document& document) { document.crop_to_selection(); }); },
         {U'x', true, false, true});
-    add("image.resize", "&Resize...",
+    add("image.resize", oui::translate("Commands", "&Resize..."),
         [this]
         {
             auto* const open{current()};
@@ -399,7 +403,7 @@ void PaintApp::register_commands()
             const auto& document{open->document()};
             if(const auto request{ask_resize(m_application, document.width(), document.height())})
             {
-                change_layers("Resize Image", [&request](Document& changed)
+                change_layers(oui::translate("History", "Resize Image"), [&request](Document& changed)
                               {
                                   changed.resize(request->width, request->height,
                                                  changed.indexed() ? Resampling::nearest : request->resampling);
@@ -407,7 +411,7 @@ void PaintApp::register_commands()
             }
         },
         {U'r', true});
-    add("image.canvas_size", "Canvas &Size...",
+    add("image.canvas_size", oui::translate("Commands", "Canvas &Size..."),
         [this]
         {
             auto* const open{current()};
@@ -418,35 +422,35 @@ void PaintApp::register_commands()
             const auto& document{open->document()};
             if(const auto request{ask_canvas_size(m_application, m_icons, document.width(), document.height())})
             {
-                change_layers("Canvas Size", [&request](Document& changed)
+                change_layers(oui::translate("History", "Canvas Size"), [&request](Document& changed)
                               { changed.resize_canvas(request->width, request->height, request->anchor); });
             }
         },
         {U'r', true, false, true});
-    commands.register_command("image.flip_horizontal", "Flip &Horizontal",
-                              [this] { change_layers("Flip Horizontal", [](Document& d) { d.flip(true); }); });
-    commands.register_command("image.flip_vertical", "Flip &Vertical",
-                              [this] { change_layers("Flip Vertical", [](Document& d) { d.flip(false); }); });
-    add("image.rotate_clockwise", "Rotate 90° &Clockwise",
-        [this] { change_layers("Rotate 90° Clockwise", [](Document& d) { d.rotate(1); }); }, {U'h', true});
-    add("image.rotate_counter_clockwise", "Rotate 90° C&ounter-clockwise",
-        [this] { change_layers("Rotate 90° Counter-clockwise", [](Document& d) { d.rotate(3); }); },
+    commands.register_command("image.flip_horizontal", oui::translate("Commands", "Flip &Horizontal"),
+                              [this] { change_layers(oui::translate("History", "Flip Horizontal"), [](Document& d) { d.flip(true); }); });
+    commands.register_command("image.flip_vertical", oui::translate("Commands", "Flip &Vertical"),
+                              [this] { change_layers(oui::translate("History", "Flip Vertical"), [](Document& d) { d.flip(false); }); });
+    add("image.rotate_clockwise", oui::translate("Commands", "Rotate 90° &Clockwise"),
+        [this] { change_layers(oui::translate("History", "Rotate 90° Clockwise"), [](Document& d) { d.rotate(1); }); }, {U'h', true});
+    add("image.rotate_counter_clockwise", oui::translate("Commands", "Rotate 90° C&ounter-clockwise"),
+        [this] { change_layers(oui::translate("History", "Rotate 90° Counter-clockwise"), [](Document& d) { d.rotate(3); }); },
         {U'g', true});
-    add("image.rotate_180", "Rotate &180°", [this] { change_layers("Rotate 180°", [](Document& d) { d.rotate(2); }); },
+    add("image.rotate_180", oui::translate("Commands", "Rotate &180°"), [this] { change_layers(oui::translate("History", "Rotate 180°"), [](Document& d) { d.rotate(2); }); },
         {U'j', true});
-    commands.register_command("layers.flip_horizontal", "Flip Layer &Horizontal",
+    commands.register_command("layers.flip_horizontal", oui::translate("Commands", "Flip Layer &Horizontal"),
                               [this, active]
                               {
-                                  change_layers("Flip Layer Horizontal",
+                                  change_layers(oui::translate("History", "Flip Layer Horizontal"),
                                                 [&](Document& d) { d.flip_layer(active(), true); });
                               });
-    commands.register_command("layers.flip_vertical", "Flip Layer &Vertical",
+    commands.register_command("layers.flip_vertical", oui::translate("Commands", "Flip Layer &Vertical"),
                               [this, active]
                               {
-                                  change_layers("Flip Layer Vertical",
+                                  change_layers(oui::translate("History", "Flip Layer Vertical"),
                                                 [&](Document& d) { d.flip_layer(active(), false); });
                               });
-    add("layers.rotate_zoom", "&Rotate / Zoom...",
+    add("layers.rotate_zoom", oui::translate("Commands", "&Rotate / Zoom..."),
         [this, active]
         {
             if(current() == nullptr)
@@ -455,7 +459,7 @@ void PaintApp::register_commands()
             }
             if(const auto request{ask_rotate_zoom(m_application)})
             {
-                change_layers("Rotate / Zoom",
+                change_layers(oui::translate("History", "Rotate / Zoom"),
                               [&](Document& d)
                               {
                                   d.rotate_zoom_layer(active(), request->degrees, request->zoom, request->pan_x,
@@ -465,8 +469,8 @@ void PaintApp::register_commands()
             }
         },
         {U'z', true, false, true});
-    add("image.flatten", "&Flatten",
-        [this] { change_layers("Flatten", [](Document& document) { document.flatten_layers(); }); },
+    add("image.flatten", oui::translate("Commands", "&Flatten"),
+        [this] { change_layers(oui::translate("History", "Flatten"), [](Document& document) { document.flatten_layers(); }); },
         {U'f', true, false, true});
     register_palette_commands();
     // Each tool's letter, and again for the next tool with the same letter.
@@ -497,12 +501,12 @@ void PaintApp::register_commands()
                             }
                         };
                     }};
-    add("view.zoom_in", "Zoom &In", view(&CanvasView::zoom_in), {U'+', true});
-    add("view.zoom_out", "Zoom &Out", view(&CanvasView::zoom_out), {U'-', true});
-    add("view.zoom_to_window", "Zoom to &Window", view(&CanvasView::zoom_to_fit), {U'b', true});
-    add("view.actual_size", "&Actual Size", view(&CanvasView::actual_size), {U'0', true});
+    add("view.zoom_in", oui::translate("Commands", "Zoom &In"), view(&CanvasView::zoom_in), {U'+', true});
+    add("view.zoom_out", oui::translate("Commands", "Zoom &Out"), view(&CanvasView::zoom_out), {U'-', true});
+    add("view.zoom_to_window", oui::translate("Commands", "Zoom to &Window"), view(&CanvasView::zoom_to_fit), {U'b', true});
+    add("view.actual_size", oui::translate("Commands", "&Actual Size"), view(&CanvasView::actual_size), {U'0', true});
     // What is selected as big as it fits, or the whole image when nothing is.
-    add("view.zoom_to_selection", "Zoom to &Selection",
+    add("view.zoom_to_selection", oui::translate("Commands", "Zoom to &Selection"),
         [this]
         {
             if(auto* const canvas{current_view()})
@@ -513,15 +517,15 @@ void PaintApp::register_commands()
         },
         {U'b', true, false, true});
     // The interface's text, bigger or smaller: Ctrl with plus and minus zoom the image, so Ctrl and Alt with them.
-    add("view.interface_bigger", "&Bigger Interface", [this] { static_cast<void>(m_application.zoom(1)); },
+    add("view.interface_bigger", oui::translate("Commands", "&Bigger Interface"), [this] { static_cast<void>(m_application.zoom(1)); },
         {U'=', true, true});
     commands.bind("view.interface_bigger", {U'+', true, true});
-    add("view.interface_smaller", "&Smaller Interface", [this] { static_cast<void>(m_application.zoom(-1)); },
+    add("view.interface_smaller", oui::translate("Commands", "&Smaller Interface"), [this] { static_cast<void>(m_application.zoom(-1)); },
         {U'-', true, true});
-    add("view.interface_reset", "&Interface Size as It Starts", [this] { static_cast<void>(m_application.zoom(0)); },
+    add("view.interface_reset", oui::translate("Commands", "&Interface Size as It Starts"), [this] { static_cast<void>(m_application.zoom(0)); },
         {U'0', true, true});
     // Ctrl and = zooms in too, as plus is Shift and = on many keyboards.
-    commands.register_command("view.zoom_in_equals", "Zoom In", view(&CanvasView::zoom_in));
+    commands.register_command("view.zoom_in_equals", oui::translate("Commands", "Zoom In"), view(&CanvasView::zoom_in));
     commands.bind("view.zoom_in_equals", {U'=', true});
 }
 
@@ -529,26 +533,26 @@ void PaintApp::build_window()
 {
     auto frame{std::make_unique<MainFrame>(m_application.commands())};
     m_frame = frame.get();
-    add_menu("&File", {"file.new", "file.open", oui::menu_submenu("Open &Recent", [this] { return recent_items(); }),
+    add_menu(oui::translate("Menus", "&File"), {"file.new", "file.open", oui::menu_submenu(oui::translate("Menus", "Open &Recent"), [this] { return recent_items(); }),
                        oui::menu_separator(), "file.save", "file.save_as", "file.save_all", oui::menu_separator(),
                        "file.close", "file.quit"});
-    add_menu("&Edit", {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy", "edit.copy_merged",
+    add_menu(oui::translate("Menus", "&Edit"), {"edit.undo", "edit.redo", oui::menu_separator(), "edit.cut", "edit.copy", "edit.copy_merged",
                        "edit.paste", "edit.paste_new_layer", "edit.paste_new_image", oui::menu_separator(),
                        "edit.erase_selection", "edit.fill_selection", oui::menu_separator(), "edit.select_all",
                        "edit.deselect", "edit.invert_selection", oui::menu_separator(),
                        "edit.flip_selection_horizontal", "edit.flip_selection_vertical",
                        "edit.rotate_selection_clockwise", "edit.rotate_selection_counter_clockwise",
-                       "edit.rotate_selection_180"});
-    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.zoom_to_selection",
+                       "edit.rotate_selection_180", oui::menu_separator(), "edit.preferences"});
+    add_menu(oui::translate("Menus", "&View"), {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.zoom_to_selection",
                        "view.actual_size",
                        oui::menu_separator(), "view.history_panel", "view.layers_panel", oui::menu_separator(),
                        "view.interface_bigger",
                        "view.interface_smaller", "view.interface_reset"});
-    add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size", oui::menu_separator(),
-                        oui::menu_submenu("&Mode", std::vector<oui::MenuItem>{"image.mode_color8", "image.mode_color16",
+    add_menu(oui::translate("Menus", "&Image"), {"image.crop_to_selection", "image.resize", "image.canvas_size", oui::menu_separator(),
+                        oui::menu_submenu(oui::translate("Menus", "&Mode"), std::vector<oui::MenuItem>{"image.mode_color8", "image.mode_color16",
                                                                              "image.mode_gray8", "image.mode_gray16",
                                                                              "image.convert_indexed"}),
-                        oui::menu_submenu("&Palettes",
+                        oui::menu_submenu(oui::translate("Menus", "&Palettes"),
                                           std::vector<oui::MenuItem>{
                                               "palettes.load_setup", "palettes.save_setup", oui::menu_separator(),
                                               "palettes.load_slot", "palettes.save_slot", oui::menu_separator(),
@@ -558,7 +562,7 @@ void PaintApp::build_window()
                         oui::menu_separator(), "image.flip_horizontal", "image.flip_vertical", oui::menu_separator(),
                         "image.rotate_clockwise", "image.rotate_counter_clockwise", "image.rotate_180",
                         oui::menu_separator(), "image.flatten"});
-    add_menu("&Layers", {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down", oui::menu_separator(),
+    add_menu(oui::translate("Menus", "&Layers"), {"layers.add", "layers.delete", "layers.duplicate", "layers.merge_down", oui::menu_separator(),
                          "layers.move_up", "layers.move_down", "layers.toggle_visible", oui::menu_separator(),
                          "layers.flip_horizontal", "layers.flip_vertical", "layers.rotate_zoom", oui::menu_separator(),
                          "layers.properties"});
@@ -589,7 +593,7 @@ void PaintApp::build_window()
     m_layers_panel->on_toggle_visible(
         [this](std::size_t index)
         {
-            change_layers("Layer Visibility",
+            change_layers(oui::translate("History", "Layer Visibility"),
                           [index](Document& document)
                           {
                               auto& layer{document.layers()[index]};
@@ -598,7 +602,7 @@ void PaintApp::build_window()
         });
     m_layers_panel->on_delete(
         [this](std::size_t index)
-        { change_layers("Delete Layer", [index](Document& document) { document.remove_layer(index); }); });
+        { change_layers(oui::translate("History", "Delete Layer"), [index](Document& document) { document.remove_layer(index); }); });
     m_layers_panel->on_action(
         [this](LayersPanel::Action action)
         {
@@ -617,7 +621,7 @@ void PaintApp::build_window()
                     run("layers.delete");
                     break;
                 }
-                change_layers(ticked.size() == 1 ? "Delete Layer" : "Delete Layers",
+                change_layers(ticked.size() == 1 ? oui::translate("History", "Delete Layer") : oui::translate("History", "Delete Layers"),
                               [&ticked](Document& document) { document.remove_layers(ticked); });
                 m_layers_panel->clear_ticks();
                 break;
@@ -681,7 +685,7 @@ void PaintApp::build_window()
             // The image shows the colour as it is chosen, as an effect does.
             auto chosen{start};
             static_cast<void>(change_with_preview(
-                "Edit Palette Color",
+                oui::translate("History", "Edit Palette Color"),
                 [&](Document& document)
                 {
                     auto setup{*document.palettes()};
@@ -693,7 +697,7 @@ void PaintApp::build_window()
                 [&](const std::function<std::string()>& show)
                 {
                     return ask_color(m_application,
-                                     "Palette " + std::to_string(slot + 1) + ", Color " + std::to_string(index), start,
+                                     oui::format_text(oui::translate("Dialogs", "Palette {0}, Color {1}"), {std::to_string(slot + 1), std::to_string(index)}), start,
                                      [&](const Color& color)
                                      {
                                          chosen = color;
@@ -705,7 +709,7 @@ void PaintApp::build_window()
     m_palettes_panel->on_slot(
         [this](int slot)
         {
-            change_layers("Layer Palette",
+            change_layers(oui::translate("History", "Layer Palette"),
                           [slot](Document& document) { document.layers()[document.active_layer()].set_palette_slot(slot); });
         });
     auto history{std::make_unique<HistoryPanel>(m_icons)};
@@ -713,11 +717,11 @@ void PaintApp::build_window()
     m_history_panel->on_choose([this](std::size_t position) { history_go_to(position); });
     m_history_panel->on_undo([this] { undo(); });
     m_history_panel->on_redo([this] { redo(); });
-    auto history_section{std::make_unique<Section>("History", std::move(history))};
+    auto history_section{std::make_unique<Section>(oui::translate("Panels", "History"), std::move(history))};
     m_history_section = history_section.get();
     m_frame->set_right(std::make_unique<SidePanel>(std::make_unique<SideColumn>(
-        std::move(history_section), std::make_unique<Section>("Layers", std::move(layers)),
-        std::make_unique<Section>("Palettes", std::move(palettes)))));
+        std::move(history_section), std::make_unique<Section>(oui::translate("Panels", "Layers"), std::move(layers)),
+        std::make_unique<Section>(oui::translate("Panels", "Palettes"), std::move(palettes)))));
     show_layers_panel(m_settings.bool_value("layers_panel", true));
     show_history_panel(m_settings.bool_value("history_panel", true));
     auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
@@ -752,9 +756,10 @@ void PaintApp::build_window()
             char zoom[32];
             std::snprintf(zoom, sizeof zoom, "%g%%", std::round(view->document().viewport().zoom() * 1000.0) / 10.0);
             text.right = std::to_string(document.width()) + " x " + std::to_string(document.height()) + "   " +
-                         (document.indexed() ? "Indexed, " + std::to_string(document.palettes()->count()) + " x " +
-                                                   std::to_string(document.palettes()->size) + " colors"
-                                             : std::string{describe(document.format())}) +
+                         (document.indexed() ? oui::format_text(oui::translate("Status", "Indexed, {0} x {1} colors"),
+                                                                {std::to_string(document.palettes()->count()),
+                                                                 std::to_string(document.palettes()->size)})
+                                             : shown_name(document.format())) +
                          "   " + zoom;
             return text;
         });
@@ -938,7 +943,7 @@ std::vector<oui::MenuItem> PaintApp::recent_items()
                                              std::error_code ignored;
                                              if(!std::filesystem::exists(file, ignored))
                                              {
-                                                 show_error("Open Recent", path + " is not there any more.");
+                                                 show_error(oui::translate("Messages", "Open Recent"), oui::format_text(oui::translate("Messages", "{0} is not there any more."), {path}));
                                                  auto kept{m_settings.list_value("recent_files")};
                                                  kept.erase(std::remove(kept.begin(), kept.end(), path), kept.end());
                                                  m_settings.set_list_value("recent_files", kept);
@@ -966,7 +971,7 @@ bool PaintApp::open(const std::filesystem::path& path)
     const auto bytes{read_file(path, error)};
     if(!bytes)
     {
-        show_error("Open", error);
+        show_error(oui::translate("Messages", "Open"), error);
         return false;
     }
     if(file_format_of(oui::utf8_of(path)) == FileFormat::openraster)
@@ -974,7 +979,7 @@ bool PaintApp::open(const std::filesystem::path& path)
         auto layered{read_openraster(*bytes, error)};
         if(!layered)
         {
-            show_error("Open", oui::utf8_of(path.filename()) + ": " + error);
+            show_error(oui::translate("Messages", "Open"), oui::utf8_of(path.filename()) + ": " + error);
             return false;
         }
         auto document{std::make_unique<OpenDocument>(std::move(*layered))};
@@ -989,8 +994,8 @@ bool PaintApp::open(const std::filesystem::path& path)
     {
         const auto guess{guess_raw16_size(bytes->size())};
         oui::PromptOptions options;
-        options.title = "Open Raw Heightmap";
-        options.label = "Size, as width x height:";
+        options.title = oui::translate("Dialogs", "Open Raw Heightmap");
+        options.label = oui::translate("Dialogs", "Size, as width x height:");
         options.text = guess ? std::to_string(guess->first) + " x " + std::to_string(guess->second) : "";
         options.validate = [&bytes](std::string_view text) -> std::optional<std::string>
         {
@@ -999,7 +1004,7 @@ bool PaintApp::open(const std::filesystem::path& path)
             if(std::sscanf(std::string{text}.c_str(), "%d x %d", &width, &height) != 2 || width <= 0 || height <= 0 ||
                static_cast<std::size_t>(width) * height * 2u != bytes->size())
             {
-                return "The file holds " + std::to_string(bytes->size() / 2) + " values.";
+                return oui::format_text(oui::translate("Dialogs", "The file holds {0} values."), {std::to_string(bytes->size() / 2)});
             }
             return std::nullopt;
         };
@@ -1021,7 +1026,7 @@ bool PaintApp::open(const std::filesystem::path& path)
             auto indexed{read_indexed_png(*bytes, error)};
             if(!indexed)
             {
-                show_error("Open", oui::utf8_of(path.filename()) + ": " + error);
+                show_error(oui::translate("Messages", "Open"), oui::utf8_of(path.filename()) + ": " + error);
                 return false;
             }
             auto document{std::make_unique<OpenDocument>(std::move(*indexed))};
@@ -1035,7 +1040,7 @@ bool PaintApp::open(const std::filesystem::path& path)
     }
     if(!image)
     {
-        show_error("Open", oui::utf8_of(path.filename()) + ": " + error);
+        show_error(oui::translate("Messages", "Open"), oui::utf8_of(path.filename()) + ": " + error);
         return false;
     }
     auto document{std::make_unique<OpenDocument>(Document::from_image(*image))};
@@ -1063,8 +1068,9 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
     const auto format{file_format_of(oui::utf8_of(path))};
     if(!format || !can_write(*format))
     {
-        show_error("Save", "OUI Paint cannot write " + oui::utf8_of(path.filename()) +
-                               ": name it .ora, .png, .jpg, .bmp, .tga or .r16.");
+        show_error(oui::translate("Messages", "Save"),
+                   oui::format_text(oui::translate("Messages", "OUI Paint cannot write {0}: name it .ora, .png, .jpg, .bmp, .tga or .r16."),
+                                    {oui::utf8_of(path.filename())}));
         return false;
     }
     if(*format == FileFormat::openraster)
@@ -1074,13 +1080,13 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
         {
             if(!write_file_atomically(path, write_openraster(document.document()), error))
             {
-                show_error("Save", error);
+                show_error(oui::translate("Messages", "Save"), error);
                 return false;
             }
         }
         catch(const std::exception& failure)
         {
-            show_error("Save", failure.what());
+            show_error(oui::translate("Messages", "Save"), failure.what());
             return false;
         }
         document.set_path(path);
@@ -1093,10 +1099,10 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
     }
     if(document.document().layers().size() > 1)
     {
-        const auto answer{oui::message_box(m_application, "Save",
-                                           "This file holds one layer: the image is saved flattened.\n"
-                                           "Its layers stay here, and in an .ora file if it is saved as one.",
-                                           {"&Flatten", "Cancel"})};
+        const auto answer{oui::message_box(m_application, oui::translate("Messages", "Save"),
+                                           oui::translate("Messages", "This file holds one layer: the image is saved flattened.\n"
+                                                                      "Its layers stay here, and in an .ora file if it is saved as one."),
+                                           {oui::translate("Messages", "&Flatten"), oui::translate("Dialogs", "Cancel")})};
         if(answer != 0u)
         {
             return false;
@@ -1107,9 +1113,10 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
         auto as_indices{false};
         if(*format == FileFormat::png)
         {
-            const auto answer{oui::message_box(m_application, "Save",
-                                               "Save as an indexed PNG, with every palette in order, or in colours?",
-                                               {"&Indexed", "In &Colors", "Cancel"})};
+            const auto answer{oui::message_box(m_application, oui::translate("Messages", "Save"),
+                                               oui::translate("Messages", "Save as an indexed PNG, with every palette in order, or in colours?"),
+                                               {oui::translate("Messages", "&Indexed"), oui::translate("Messages", "In &Colors"),
+                                                oui::translate("Dialogs", "Cancel")})};
             if(!answer || *answer == 2u)
             {
                 return false;
@@ -1125,13 +1132,13 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
                                                       *format)};
             if(!write_file_atomically(path, bytes, error))
             {
-                show_error("Save", error);
+                show_error(oui::translate("Messages", "Save"), error);
                 return false;
             }
         }
         catch(const std::exception& failure)
         {
-            show_error("Save", failure.what());
+            show_error(oui::translate("Messages", "Save"), failure.what());
             return false;
         }
         document.set_path(path);
@@ -1146,10 +1153,10 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
     const auto target{written_format(*format, pixels)};
     if(target != pixels)
     {
-        const auto answer{oui::message_box(m_application, "Save",
-                                           "The image is " + std::string{describe(pixels)} + ".\nThis file holds " +
-                                               std::string{describe(target)} + ": save it reduced?",
-                                           {"&Reduce", "Cancel"})};
+        const auto answer{oui::message_box(m_application, oui::translate("Messages", "Save"),
+                                           oui::format_text(oui::translate("Messages", "The image is {0}.\nThis file holds {1}: save it reduced?"),
+                                                            {shown_name(pixels), shown_name(target)}),
+                                           {oui::translate("Messages", "&Reduce"), oui::translate("Dialogs", "Cancel")})};
         if(answer != 0u)
         {
             return false;
@@ -1161,13 +1168,13 @@ bool PaintApp::write(OpenDocument& document, const std::filesystem::path& path)
         const auto bytes{write_image(converted(document.document().flatten(), target), *format)};
         if(!write_file_atomically(path, bytes, error))
         {
-            show_error("Save", error);
+            show_error(oui::translate("Messages", "Save"), error);
             return false;
         }
     }
     catch(const std::exception& failure)
     {
-        show_error("Save", failure.what());
+        show_error(oui::translate("Messages", "Save"), failure.what());
         return false;
     }
     document.set_path(path);
@@ -1187,7 +1194,7 @@ void PaintApp::tell_saved(const std::filesystem::path& path)
     }
     catch(const std::exception& failure)
     {
-        show_error("After Saving", failure.what());
+        show_error(oui::translate("Messages", "After Saving"), failure.what());
     }
 }
 
@@ -1227,8 +1234,10 @@ bool PaintApp::close(std::size_t index)
         if(workbench->modified())
         {
             m_tabs->select(index);
-            const auto answer{oui::message_box(m_application, "Close", "Save the plugin " + workbench->title() + "?",
-                                               {"&Save", "&Don't Save", "Cancel"})};
+            const auto answer{oui::message_box(m_application, oui::translate("Messages", "Close"),
+                                               oui::format_text(oui::translate("Messages", "Save the plugin {0}?"), {workbench->title()}),
+                                               {oui::translate("Messages", "&Save"), oui::translate("Messages", "&Don't Save"),
+                                                oui::translate("Dialogs", "Cancel")})};
             if(!answer || *answer == 2u || (*answer == 0u && !save_workbench(*workbench, false)))
             {
                 return false;
@@ -1251,8 +1260,10 @@ bool PaintApp::close(std::size_t index)
     if(document->modified())
     {
         m_tabs->select(index);
-        const auto answer{oui::message_box(m_application, "Close", "Save the changes to " + document->title() + "?",
-                                           {"&Save", "&Don't Save", "Cancel"})};
+        const auto answer{oui::message_box(m_application, oui::translate("Messages", "Close"),
+                                           oui::format_text(oui::translate("Messages", "Save the changes to {0}?"), {document->title()}),
+                                           {oui::translate("Messages", "&Save"), oui::translate("Messages", "&Don't Save"),
+                                            oui::translate("Dialogs", "Cancel")})};
         if(!answer || *answer == 2u || (*answer == 0u && !save(false)))
         {
             return false;
@@ -1407,7 +1418,7 @@ void PaintApp::use_tool(const ToolEvent& event)
         {
             m_selecting.reset();
             m_lasso.clear();
-            open->history().finish_step("Lasso Select", document);
+            open->history().finish_step(oui::translate("History", "Lasso Select"), document);
         }
         update_ants();
         return;
@@ -1423,7 +1434,7 @@ void PaintApp::use_tool(const ToolEvent& event)
         }
         open->history().begin_step(document);
         document.selection().add_coverage(fill_region(document, x, y, m_tool_options->fill()), selection_mode(event));
-        open->history().finish_step("Magic Wand", document);
+        open->history().finish_step(oui::translate("History", "Magic Wand"), document);
         update_ants();
         return;
     }
@@ -1441,7 +1452,7 @@ void PaintApp::use_tool(const ToolEvent& event)
         auto fill{m_tool_options->fill()};
         fill.exact = document.indexed();
         static_cast<void>(bucket_fill(document, x, y, ink(event.secondary), fill));
-        open->history().finish_step("Paint Bucket", document);
+        open->history().finish_step(oui::translate("History", "Paint Bucket"), document);
         open->refresh(changed_tiles(before, LayersState::of(document)));
         open->set_modified(true);
         refresh_titles();
@@ -1499,7 +1510,7 @@ void PaintApp::use_tool(const ToolEvent& event)
             if(!m_clone_source)
             {
                 open->history().cancel_step();
-                show_error("Clone Stamp", "Hold Ctrl and click where to copy from first.");
+                show_error(oui::translate("Messages", "Clone Stamp"), oui::translate("Messages", "Hold Ctrl and click where to copy from first."));
                 return;
             }
             if(!m_clone_offset)
@@ -1535,11 +1546,11 @@ void PaintApp::use_tool(const ToolEvent& event)
             m_stroke->line_to(event.at);
             open->refresh(m_stroke->take_changed());
             m_stroke.reset();
-            const auto title{tool == "eraser"        ? "Eraser"
-                             : tool == "pencil"      ? "Pencil"
-                             : tool == "clone_stamp" ? "Clone Stamp"
-                             : tool == "recolor"     ? "Recolor"
-                                                     : "Paintbrush"};
+            const auto title{tool == "eraser"        ? oui::translate("History", "Eraser")
+                             : tool == "pencil"      ? oui::translate("History", "Pencil")
+                             : tool == "clone_stamp" ? oui::translate("History", "Clone Stamp")
+                             : tool == "recolor"     ? oui::translate("History", "Recolor")
+                                                     : oui::translate("History", "Paintbrush")};
             open->history().finish_step(title, document);
             open->set_modified(true);
             refresh_titles();
@@ -1596,7 +1607,7 @@ void PaintApp::layer_properties()
     {
         return;
     }
-    change_layers("Layer Properties",
+    change_layers(oui::translate("History", "Layer Properties"),
                   [&changed](Document& document)
                   {
                       auto& target{document.layers()[document.active_layer()]};
@@ -1740,7 +1751,7 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
     if(event.phase == ToolEvent::Phase::release)
     {
         m_dragging.reset();
-        open->history().finish_step(tool == "gradient" ? "Gradient" : "Shapes", document);
+        open->history().finish_step(tool == "gradient" ? oui::translate("History", "Gradient") : oui::translate("History", "Shapes"), document);
         open->set_modified(true);
         refresh_titles();
     }
@@ -1766,7 +1777,7 @@ void PaintApp::finish_line()
     }
     auto& open{*m_line_edit->document};
     m_line_edit.reset();
-    open.history().finish_step("Line / Curve", open.document());
+    open.history().finish_step(oui::translate("History", "Line / Curve"), open.document());
     open.set_modified(true);
     refresh_titles();
 }
@@ -1851,7 +1862,7 @@ void PaintApp::select_shape(const ToolEvent& event, bool ellipse)
             selection.clear();
         }
         m_selecting.reset();
-        open->history().finish_step(ellipse ? "Ellipse Select" : "Rectangle Select", document);
+        open->history().finish_step(ellipse ? oui::translate("History", "Ellipse Select") : oui::translate("History", "Rectangle Select"), document);
     }
     update_ants();
 }
@@ -2054,7 +2065,7 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
     {
         const auto outline{m_moving->kind == Moving::Kind::outline};
         m_moving.reset();
-        open->history().finish_step(outline ? "Move Selection" : "Move Selected Pixels", document);
+        open->history().finish_step(outline ? oui::translate("History", "Move Selection") : oui::translate("History", "Move Selected Pixels"), document);
         if(!outline)
         {
             open->set_modified(true);
@@ -2092,7 +2103,7 @@ bool PaintApp::copy(bool merged)
     const auto bmp{write_image(converted(pixels, written_format(FileFormat::bmp, pixels.format)), FileFormat::bmp)};
     if(!m_application.clipboard().set_data({{"image/png", png}, {"image/bmp", bmp}}))
     {
-        show_error("Copy", "The clipboard did not take the image.");
+        show_error(oui::translate("Messages", "Copy"), oui::translate("Messages", "The clipboard did not take the image."));
         return false;
     }
     return true;
@@ -2126,7 +2137,7 @@ void PaintApp::paste(PasteInto into)
     auto image{clipboard_image()};
     if(!image)
     {
-        show_error("Paste", "The clipboard holds no image.");
+        show_error(oui::translate("Messages", "Paste"), oui::translate("Messages", "The clipboard holds no image."));
         return;
     }
     if(into == PasteInto::new_image || current() == nullptr)
@@ -2142,10 +2153,11 @@ void PaintApp::paste(PasteInto into)
     auto grow{false};
     if(pasted.width > document.width() || pasted.height > document.height())
     {
-        const auto answer{oui::message_box(m_application, "Paste",
-                                           "The image being pasted is bigger than the canvas.\n"
-                                           "Expand the canvas to fit it?",
-                                           {"&Expand Canvas", "&Keep Canvas Size", "Cancel"})};
+        const auto answer{oui::message_box(m_application, oui::translate("Messages", "Paste"),
+                                           oui::translate("Messages", "The image being pasted is bigger than the canvas.\n"
+                                                                      "Expand the canvas to fit it?"),
+                                           {oui::translate("Messages", "&Expand Canvas"), oui::translate("Messages", "&Keep Canvas Size"),
+                                            oui::translate("Dialogs", "Cancel")})};
         if(!answer || *answer == 2u)
         {
             return;
@@ -2169,7 +2181,7 @@ void PaintApp::paste(PasteInto into)
     }
     if(into == PasteInto::new_layer)
     {
-        document.insert_layer_above("Layer " + std::to_string(document.layers().size() + 1));
+        document.insert_layer_above(oui::format_text(oui::translate("Layers", "Layer {0}"), {std::to_string(document.layers().size() + 1)}));
     }
     auto& layer{document.layers()[document.active_layer()]};
     // A piece all of it selected, floating over the layer as it was.
@@ -2183,7 +2195,7 @@ void PaintApp::paste(PasteInto into)
     }
     m_floating = Floating{open, layer, FloatingPiece{pasted, mask, x, y}, {}};
     place_floating();
-    open->history().finish_step(into == PasteInto::new_layer ? "Paste into New Layer" : "Paste", document);
+    open->history().finish_step(into == PasteInto::new_layer ? oui::translate("History", "Paste into New Layer") : oui::translate("History", "Paste"), document);
     // What is pasted can be moved straight away.
     m_tool_panel->set_selected("move_pixels");
     m_tool_options->show_for("move_pixels");
@@ -2331,7 +2343,7 @@ void PaintApp::settle(bool keep_line)
         m_typing.reset();
         if(typed)
         {
-            open.history().finish_step("Text", open.document());
+            open.history().finish_step(oui::translate("History", "Text"), open.document());
             open.set_modified(true);
             refresh_titles();
         }
@@ -2428,7 +2440,7 @@ void PaintApp::register_palette_commands()
                                }
                                return std::move(picked->second);
                            }};
-    commands.register_command("palettes.load_setup", "&Load Palette Setup...",
+    commands.register_command("palettes.load_setup", oui::translate("Commands", "&Load Palette Setup..."),
                               [this, indexed, pick_file]
                               {
                                   if(!indexed())
@@ -2436,7 +2448,7 @@ void PaintApp::register_palette_commands()
                                       return;
                                   }
                                   const auto path{pick_file(oui::FileDialogMode::open_file,
-                                                            {{"Palette setup (*.json)", "*.json"}}, "")};
+                                                            {{oui::translate("Dialogs", "Palette setup (*.json)"), "*.json"}}, "")};
                                   if(!path)
                                   {
                                       return;
@@ -2450,12 +2462,12 @@ void PaintApp::register_palette_commands()
                                   }
                                   if(!setup)
                                   {
-                                      show_error("Palette Setup", oui::utf8_of(path->filename()) + ": " + error);
+                                      show_error(oui::translate("Messages", "Palette Setup"), oui::utf8_of(path->filename()) + ": " + error);
                                       return;
                                   }
-                                  change_palettes("Load Palette Setup", [&setup](PaletteSetup& changed) { changed = *setup; });
+                                  change_palettes(oui::translate("History", "Load Palette Setup"), [&setup](PaletteSetup& changed) { changed = *setup; });
                               });
-    commands.register_command("palettes.save_setup", "&Save Palette Setup...",
+    commands.register_command("palettes.save_setup", oui::translate("Commands", "&Save Palette Setup..."),
                               [this, indexed, pick_file]
                               {
                                   if(!indexed())
@@ -2463,15 +2475,15 @@ void PaintApp::register_palette_commands()
                                       return;
                                   }
                                   const auto path{pick_file(oui::FileDialogMode::save_file,
-                                                            {{"Palette setup (*.json)", "*.json"}}, "palettes.json")};
+                                                            {{oui::translate("Dialogs", "Palette setup (*.json)"), "*.json"}}, "palettes.json")};
                                   std::string error;
                                   if(path && !write_file_atomically(*path, write_palette_setup(*current()->document().palettes()),
                                                                     error))
                                   {
-                                      show_error("Palette Setup", error);
+                                      show_error(oui::translate("Messages", "Palette Setup"), error);
                                   }
                               });
-    commands.register_command("palettes.load_slot", "Load the Layer's &Palette...",
+    commands.register_command("palettes.load_slot", oui::translate("Commands", "Load the Layer's &Palette..."),
                               [this, indexed, read_colors]
                               {
                                   if(!indexed())
@@ -2485,7 +2497,7 @@ void PaintApp::register_palette_commands()
                                   }
                                   const auto& document{current()->document()};
                                   const auto slot{document.layers()[document.active_layer()].palette_slot()};
-                                  change_palettes("Load Palette",
+                                  change_palettes(oui::translate("History", "Load Palette"),
                                                   [&](PaletteSetup& setup)
                                                   {
                                                       auto loaded{*colors};
@@ -2493,7 +2505,7 @@ void PaintApp::register_palette_commands()
                                                       setup.palettes.at(static_cast<std::size_t>(slot)).colors = loaded;
                                                   });
                               });
-    commands.register_command("palettes.save_slot", "Save the Layer's Pa&lette...",
+    commands.register_command("palettes.save_slot", oui::translate("Commands", "Save the Layer's Pa&lette..."),
                               [this, indexed, pick_file, filters]
                               {
                                   if(!indexed())
@@ -2512,19 +2524,19 @@ void PaintApp::register_palette_commands()
                                                                     document.palettes()->palettes.at(static_cast<std::size_t>(slot)).colors),
                                                  error))
                                   {
-                                      show_error("Palette", error);
+                                      show_error(oui::translate("Messages", "Palette"), error);
                                   }
                               });
-    commands.register_command("palettes.add", "&Add Palette",
+    commands.register_command("palettes.add", oui::translate("Commands", "&Add Palette"),
                               [this, indexed]
                               {
                                   if(indexed())
                                   {
-                                      change_palettes("Add Palette",
+                                      change_palettes(oui::translate("History", "Add Palette"),
                                                       [](PaletteSetup& setup)
                                                       {
                                                           auto added{PaletteSetup::greys(1, setup.size).palettes.front()};
-                                                          added.name = "Palette " + std::to_string(setup.count() + 1);
+                                                          added.name = oui::format_text(oui::translate("Dialogs", "Palette {0}"), {std::to_string(setup.count() + 1)});
                                                           setup.palettes.push_back(std::move(added));
                                                       });
                                   }
@@ -2544,16 +2556,16 @@ void PaintApp::register_palette_commands()
                         {
                             return;
                         }
-                        change_palettes(step < 0 ? "Move Palette Up" : "Move Palette Down",
+                        change_palettes(step < 0 ? oui::translate("History", "Move Palette Up") : oui::translate("History", "Move Palette Down"),
                                         [slot, other](PaletteSetup& setup)
                                         {
                                             std::swap(setup.palettes.at(static_cast<std::size_t>(slot)),
                                                       setup.palettes.at(static_cast<std::size_t>(other)));
                                         });
                     }};
-    commands.register_command("palettes.move_up", "Move the Layer's Palette &Up", [move] { move(-1); });
-    commands.register_command("palettes.move_down", "Move the Layer's Palette &Down", [move] { move(1); });
-    commands.register_command("palettes.load_allowed", "Load Allowed &Colors...",
+    commands.register_command("palettes.move_up", oui::translate("Commands", "Move the Layer's Palette &Up"), [move] { move(-1); });
+    commands.register_command("palettes.move_down", oui::translate("Commands", "Move the Layer's Palette &Down"), [move] { move(1); });
+    commands.register_command("palettes.load_allowed", oui::translate("Commands", "Load Allowed &Colors..."),
                               [this, indexed, read_colors]
                               {
                                   if(!indexed())
@@ -2562,25 +2574,25 @@ void PaintApp::register_palette_commands()
                                   }
                                   if(const auto colors{read_colors()})
                                   {
-                                      change_palettes("Allowed Colors",
+                                      change_palettes(oui::translate("History", "Allowed Colors"),
                                                       [&colors](PaletteSetup& setup) { setup.allowed = *colors; });
                                   }
                               });
-    commands.register_command("palettes.clear_allowed", "Allow &Any Color",
+    commands.register_command("palettes.clear_allowed", oui::translate("Commands", "Allow &Any Color"),
                               [this, indexed]
                               {
                                   if(indexed())
                                   {
-                                      change_palettes("Allow Any Color", [](PaletteSetup& setup) { setup.allowed.clear(); });
+                                      change_palettes(oui::translate("History", "Allow Any Color"), [](PaletteSetup& setup) { setup.allowed.clear(); });
                                   }
                               });
-    commands.register_command("image.convert_indexed", "&Indexed", [this] { convert_to_indexed(); });
+    commands.register_command("image.convert_indexed", oui::translate("Commands", "&Indexed"), [this] { convert_to_indexed(); });
     // Image > Mode: the image's pixels as colour or grey, 8 or 16 bits a channel, every layer converted.
     for(const auto& [id, title, format] :
-        {std::tuple{"image.mode_color8", "&Color, 8 Bits per Channel", PixelFormat::rgba8},
-         std::tuple{"image.mode_color16", "Color, 1&6 Bits per Channel", PixelFormat::rgba16},
-         std::tuple{"image.mode_gray8", "&Grayscale, 8 Bits", PixelFormat::gray_alpha8},
-         std::tuple{"image.mode_gray16", "Grayscale, &16 Bits", PixelFormat::gray_alpha16}})
+        {std::tuple{"image.mode_color8", oui::translate("Commands", "&Color, 8 Bits per Channel"), PixelFormat::rgba8},
+         std::tuple{"image.mode_color16", oui::translate("Commands", "Color, 1&6 Bits per Channel"), PixelFormat::rgba16},
+         std::tuple{"image.mode_gray8", oui::translate("Commands", "&Grayscale, 8 Bits"), PixelFormat::gray_alpha8},
+         std::tuple{"image.mode_gray16", oui::translate("Commands", "Grayscale, &16 Bits"), PixelFormat::gray_alpha16}})
     {
         commands.register_command(id, title, [this, format{format}] { convert_to(format); });
     }
@@ -2593,10 +2605,10 @@ void PaintApp::convert_to(PixelFormat format)
     {
         return;
     }
-    const auto* const name{format == PixelFormat::rgba8          ? "Color, 8 Bits"
-                           : format == PixelFormat::rgba16       ? "Color, 16 Bits"
-                           : format == PixelFormat::gray_alpha8  ? "Grayscale, 8 Bits"
-                                                                 : "Grayscale, 16 Bits"};
+    const auto name{format == PixelFormat::rgba8          ? oui::translate("History", "Color, 8 Bits")
+                    : format == PixelFormat::rgba16       ? oui::translate("History", "Color, 16 Bits")
+                    : format == PixelFormat::gray_alpha8  ? oui::translate("History", "Grayscale, 8 Bits")
+                                                          : oui::translate("History", "Grayscale, 16 Bits")};
     const auto conversions{conversions_between(open->document().format(), open->document().indexed(), format)};
     if(conversions.empty())
     {
@@ -2642,12 +2654,13 @@ void PaintApp::convert_to(PixelFormat format)
         }
         if(names.empty())
         {
-            show_error(name, "No plugin converts to " + to + ".");
+            show_error(name, to == "grayscale" ? oui::translate("Messages", "No plugin converts to grayscale.")
+                                         : oui::translate("Messages", "No plugin converts to 8 bits."));
             return;
         }
         auto& choice{to == "grayscale" ? m_to_gray : m_to_8_bits};
         choice.offer(std::move(names), std::move(parameters));
-        asked.emplace_back(to == "grayscale" ? "To Grayscale" : "To 8 Bits", &choice);
+        asked.emplace_back(to == "grayscale" ? oui::translate("Dialogs", "To Grayscale") : oui::translate("Dialogs", "To 8 Bits"), &choice);
     }
     if(change_with_preview(
            name,
@@ -2662,7 +2675,7 @@ void PaintApp::convert_to(PixelFormat format)
                convert_document(*m_plugins, steps, format, document);
            },
            [&](const std::function<std::string()>& show)
-           { return ask_conversion(m_application, std::string{"Convert to "} + name, asked, show); }))
+           { return ask_conversion(m_application, oui::format_text(oui::translate("Dialogs", "Convert to {0}"), {name}), asked, show); }))
     {
         update_mode_checks();
     }
@@ -2699,12 +2712,12 @@ void PaintApp::convert_to_indexed()
     }
     if(offered.empty())
     {
-        show_error("Convert to Indexed", "No plugin makes an image indexed.");
+        show_error(oui::translate("Messages", "Convert to Indexed"), oui::translate("Messages", "No plugin makes an image indexed."));
         return;
     }
     m_indexing.method.offer(std::move(names), std::move(parameters));
     if(change_with_preview(
-           "Convert to Indexed",
+           oui::translate("History", "Convert to Indexed"),
            [&](Document& document)
            {
                const auto palette{m_indexing.into_loaded && m_indexing.loaded
@@ -2812,7 +2825,7 @@ std::optional<std::pair<std::string, std::vector<Color>>> PaintApp::pick_palette
     }
     if(!colors)
     {
-        show_error("Palette", name + ": " + error);
+        show_error(oui::translate("Messages", "Palette"), name + ": " + error);
         return std::nullopt;
     }
     return std::pair{name, std::move(*colors)};
@@ -2857,7 +2870,7 @@ void PaintApp::edit_color(bool primary)
                    }};
     const auto start{primary ? m_color_panel->primary() : m_color_panel->secondary()};
     // The panel shows the colour as it is chosen, and goes back when cancelled.
-    const auto chosen{ask_color(m_application, primary ? "Primary Color" : "Secondary Color", start, put)};
+    const auto chosen{ask_color(m_application, primary ? oui::translate("Dialogs", "Primary Color") : oui::translate("Dialogs", "Secondary Color"), start, put)};
     if(!chosen)
     {
         put(start);
@@ -2980,7 +2993,7 @@ void PaintApp::open_workbench(std::string source, std::optional<std::filesystem:
             }
             if(!image)
             {
-                show_error("Load Image", oui::utf8_of(chosen->filename()) + ": " + error);
+                show_error(oui::translate("Messages", "Load Image"), oui::utf8_of(chosen->filename()) + ": " + error);
                 return;
             }
             shown->set_loaded_image(oui::utf8_of(chosen->filename()), std::move(*image));
@@ -2998,8 +3011,8 @@ bool PaintApp::save_workbench(PluginWorkbench& workbench, bool ask_for_name)
     if(ask_for_name || !file)
     {
         oui::PromptOptions options;
-        options.title = "Save Plugin";
-        options.label = "Name, saved in the plugins folder:";
+        options.title = oui::translate("Dialogs", "Save Plugin");
+        options.label = oui::translate("Dialogs", "Name, saved in the plugins folder:");
         options.text = file ? oui::utf8_of(file->stem()) : std::string{"my_plugin"};
         options.validate = [](std::string_view text) -> std::optional<std::string>
         {
@@ -3026,7 +3039,7 @@ bool PaintApp::save_workbench(PluginWorkbench& workbench, bool ask_for_name)
     std::string error;
     if(!write_file_atomically(*file, workbench.code().text(), error))
     {
-        show_error("Save Plugin", error);
+        show_error(oui::translate("Messages", "Save Plugin"), error);
         return false;
     }
     workbench.saved(*file);
@@ -3125,7 +3138,7 @@ void PaintApp::load_plugins()
     for(const auto& effect : m_plugins->effects())
     {
         const auto id{"effect." + std::to_string(effect.index)};
-        const auto title{effect.parameters.empty() ? effect.name : effect.name + "..."};
+        const auto title{effect.parameters.empty() ? plugin_text(effect.name) : plugin_text(effect.name) + "..."};
         commands.register_command(id, title, [this, index{effect.index}] { run_effect(index, false); });
         if(const auto key{keys.find(effect.name)}; key != keys.end())
         {
@@ -3142,7 +3155,7 @@ void PaintApp::load_plugins()
     }
     if(first)
     {
-        commands.register_command("effects.repeat", "&Repeat Last Effect",
+        commands.register_command("effects.repeat", oui::translate("Commands", "&Repeat Last Effect"),
                                   [this]
                                   {
                                       if(m_last_effect)
@@ -3151,9 +3164,9 @@ void PaintApp::load_plugins()
                                       }
                                   });
         commands.bind("effects.repeat", {U'f', true});
-        commands.register_command("effects.manage", "&Manage Plugins...", [this] { manage_plugins(); });
+        commands.register_command("effects.manage", oui::translate("Commands", "&Manage Plugins..."), [this] { manage_plugins(); });
         // Ctrl+Space, as code editors have it: what the plugin's code can use, where its cursor is.
-        commands.register_command("edit.suggest", "Suggest",
+        commands.register_command("edit.suggest", oui::translate("Commands", "Suggest"),
                                   [this]
                                   {
                                       if(auto* const workbench{workbench_in_tab(m_tabs->selected_index())})
@@ -3179,19 +3192,19 @@ void PaintApp::load_plugins()
     std::vector<oui::MenuItem> effects{"effects.repeat", oui::menu_separator()};
     for(auto& [menu, items] : submenus)
     {
-        effects.push_back(oui::menu_submenu(menu, std::move(items)));
+        effects.push_back(oui::menu_submenu(plugin_text(menu), std::move(items)));
     }
     effects.push_back(oui::menu_separator());
     effects.emplace_back("effects.manage");
     if(first)
     {
         m_adjustments_menu = m_menu_count;
-        add_menu("&Adjustments", std::move(adjustments));
-        add_menu("Effe&cts", std::move(effects));
-        add_menu("&Help", {"help.documentation", oui::menu_separator(), "help.about"});
+        add_menu(oui::translate("Menus", "&Adjustments"), std::move(adjustments));
+        add_menu(oui::translate("Menus", "Effe&cts"), std::move(effects));
+        add_menu(oui::translate("Menus", "&Help"), {"help.documentation", oui::menu_separator(), "help.about"});
         if(!failures.empty())
         {
-            show_error("Plugins", "These plugins could not be loaded:\n" + failures);
+            show_error(oui::translate("Messages", "Plugins"), oui::translate("Messages", "These plugins could not be loaded:") + "\n" + failures);
         }
     }
     else
@@ -3354,7 +3367,7 @@ void PaintApp::run_effect(std::size_t index, bool again)
                                         [&](const std::string& problem)
                                         {
                                             failed = true;
-                                            show_error(effect.name, problem);
+                                            show_error(plugin_text(effect.name), problem);
                                         }};
             const auto accepted{ask_effect(
                 m_application, effect, values,
@@ -3392,10 +3405,10 @@ void PaintApp::run_effect(std::size_t index, bool again)
         layer = base;
         open->refresh(changed_tiles(before, LayersState::of(document)));
         open->history().cancel_step();
-        show_error(effect.name, failure.what());
+        show_error(plugin_text(effect.name), failure.what());
         return;
     }
-    open->history().finish_step(effect.name, document);
+    open->history().finish_step(plugin_text(effect.name), document);
     m_last_effect = index;
     open->set_modified(true);
     refresh_titles();
@@ -3424,6 +3437,16 @@ void PaintApp::save_all()
 
 void PaintApp::quit()
 {
+    // In the tabs' order, before closing them asks about what was not saved.
+    std::vector<std::string> session;
+    for(std::size_t index{}; index < m_tabs->child_count(); ++ index)
+    {
+        const auto* const document{document_in_tab(index)};
+        if(document != nullptr && document->path())
+        {
+            session.push_back(oui::utf8_of(*document->path()));
+        }
+    }
     while(m_tabs->child_count() > 0)
     {
         if(!close(m_tabs->child_count() - 1))
@@ -3431,7 +3454,44 @@ void PaintApp::quit()
             return;
         }
     }
+    m_settings.set_list_value("last_session", session);
     m_application.quit();
+}
+
+void PaintApp::open_last_session()
+{
+    if(!m_settings.bool_value("reopen_last_session", true))
+    {
+        return;
+    }
+    for(const auto& file : m_settings.list_value("last_session"))
+    {
+        const auto path{oui::path_from_utf8(file)};
+        std::error_code ignored;
+        if(std::filesystem::is_regular_file(path, ignored))
+        {
+            static_cast<void>(open(path));
+        }
+    }
+}
+
+void PaintApp::show_preferences()
+{
+    std::vector<std::pair<std::string, std::string>> languages{{"auto", oui::translate("Preferences", "System language")},
+                                                               {"en", "English"}};
+    for(const auto& translation : paint_translations())
+    {
+        languages.emplace_back(translation.language(), translation.name());
+    }
+    Preferences start;
+    start.language = std::string{m_settings.value("language", "auto")};
+    start.reopen_last_session = m_settings.bool_value("reopen_last_session", true);
+    if(const auto chosen{ask_preferences(m_application, start, languages)})
+    {
+        m_settings.set_value("language", chosen->language);
+        m_settings.set_bool_value("reopen_last_session", chosen->reopen_last_session);
+        static_cast<void>(m_settings.save());
+    }
 }
 
 } // namespace oui_paint

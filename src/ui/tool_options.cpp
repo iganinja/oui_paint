@@ -1,5 +1,8 @@
 #include "ui/tool_options.h"
 
+#include "ui/shown_names.h"
+
+#include <oui/translation.h>
 #include <oui/check_button.h>
 #include <oui/combo_box.h>
 #include <oui/label.h>
@@ -48,7 +51,7 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
     bar.set_gap(oui::Spacing::normal);
 
     m_width_group = &group(bar);
-    auto& width_label{oui::label("Brush &width:", *m_width_group)};
+    auto& width_label{oui::label(oui::translate("Tools", "Brush &width:"), *m_width_group)};
     m_width = &oui::number_field(*m_width_group);
     m_width->set_range(1, widest);
     m_width->set_value(m_settings.width);
@@ -58,7 +61,7 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
     m_width_slider->set_value(m_settings.width);
 
     m_hardness_group = &group(bar);
-    auto& hardness_label{oui::label("&Hardness:", *m_hardness_group)};
+    auto& hardness_label{oui::label(oui::translate("Tools", "&Hardness:"), *m_hardness_group)};
     m_hardness = &oui::number_field(*m_hardness_group);
     m_hardness->set_range(0, 100);
     m_hardness->set_value(m_settings.hardness * 100.0);
@@ -66,35 +69,35 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
     oui::label("%", *m_hardness_group);
 
     m_antialias_group = &group(bar);
-    m_antialias = &oui::check_button("&Antialiasing", *m_antialias_group);
+    m_antialias = &oui::check_button(oui::translate("Tools", "&Antialiasing"), *m_antialias_group);
     m_antialias->set_checked(m_settings.antialias);
 
     m_fill_group = &group(bar);
-    m_flood_mode = &choice(*m_fill_group, "&Flood mode:", {"Contiguous", "Global"});
-    auto& tolerance_label{oui::label("&Tolerance:", *m_fill_group)};
+    m_flood_mode = &choice(*m_fill_group, oui::translate("Tools", "&Flood mode:"), {oui::translate("Tools", "Contiguous"), oui::translate("Tools", "Global")});
+    auto& tolerance_label{oui::label(oui::translate("Tools", "&Tolerance:"), *m_fill_group)};
     m_tolerance = &oui::number_field(*m_fill_group);
     m_tolerance->set_range(0, 100);
     m_tolerance->set_value(50);
     tolerance_label.set_buddy(m_tolerance->text_field());
     oui::label("%", *m_fill_group);
-    m_sampling = &choice(*m_fill_group, "&Sampling:", {"Layer", "Image"});
+    m_sampling = &choice(*m_fill_group, oui::translate("Tools", "&Sampling:"), {oui::translate("Tools", "Layer"), oui::translate("Tools", "Image")});
 
     m_gradient_group = &group(bar);
     std::vector<std::string> kinds;
     for(const auto kind : all_gradient_kinds())
     {
-        kinds.emplace_back(gradient_name(kind));
+        kinds.push_back(shown_name(kind));
     }
-    m_gradient_kind = &choice(*m_gradient_group, "&Gradient:", kinds);
-    m_gradient_mode = &choice(*m_gradient_group, "&Mode:", {"Color", "Transparency"});
+    m_gradient_kind = &choice(*m_gradient_group, oui::translate("Tools", "&Gradient:"), kinds);
+    m_gradient_mode = &choice(*m_gradient_group, oui::translate("Tools", "&Mode:"), {oui::translate("Tools", "Color"), oui::translate("Tools", "Transparency")});
 
     m_line_group = &group(bar);
-    m_arrow_start = &oui::check_button("Arrow at &start", *m_line_group);
-    m_arrow_end = &oui::check_button("Arrow at &end", *m_line_group);
+    m_arrow_start = &oui::check_button(oui::translate("Tools", "Arrow at &start"), *m_line_group);
+    m_arrow_end = &oui::check_button(oui::translate("Tools", "Arrow at &end"), *m_line_group);
 
     m_shape_group = &group(bar);
-    m_shape_kind = &choice(*m_shape_group, "&Shape:", {"Rectangle", "Rounded Rectangle", "Ellipse"});
-    m_shape_style = &choice(*m_shape_group, "St&yle:", {"Outline", "Filled", "Filled with Outline"});
+    m_shape_kind = &choice(*m_shape_group, oui::translate("Tools", "&Shape:"), {oui::translate("Tools", "Rectangle"), oui::translate("Tools", "Rounded Rectangle"), oui::translate("Tools", "Ellipse")});
+    m_shape_style = &choice(*m_shape_group, oui::translate("Tools", "St&yle:"), {oui::translate("Tools", "Outline"), oui::translate("Tools", "Filled"), oui::translate("Tools", "Filled with Outline")});
 
     m_text_group = &group(bar);
     std::vector<std::string> names;
@@ -112,9 +115,9 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
     {
         names.emplace_back("(no fonts)");
     }
-    m_font = &choice(*m_text_group, "&Font:", names);
+    m_font = &choice(*m_text_group, oui::translate("Tools", "&Font:"), names);
     m_font->set_selected(chosen);
-    auto& size_label{oui::label("Si&ze:", *m_text_group)};
+    auto& size_label{oui::label(oui::translate("Tools", "Si&ze:"), *m_text_group)};
     m_font_size = &oui::number_field(*m_text_group);
     m_font_size->set_range(4, 1000);
     m_font_size->set_value(32);

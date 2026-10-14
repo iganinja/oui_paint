@@ -3,6 +3,8 @@
 #include "core/json.h"
 #include "effects/indexing.h"
 
+#include <oui/translation.h>
+
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
@@ -229,7 +231,7 @@ PluginHost::PluginHost()
                         const auto& spec{arguments.at(0)};
                         Effect effect;
                         effect.name = spec.get("name").to_string();
-                        effect.menu = spec.get("menu").is_undefined() ? std::string{"Other"}
+                        effect.menu = spec.get("menu").is_undefined() ? oui::translate("Plugins", "Other")
                                                                       : spec.get("menu").to_string();
                         effect.index = m_effects.size();
                         effect.by_rows = spec.get("row").is_function();

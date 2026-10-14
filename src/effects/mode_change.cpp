@@ -1,5 +1,7 @@
 #include "effects/mode_change.h"
 
+#include <oui/translation.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -79,7 +81,7 @@ void index_document(PluginHost& host, const Indexer& indexer, const std::map<std
     const auto first{see_through ? 1 : 0};
 
     PaletteSetup setup;
-    Palette made{"Palette 1", {}, std::nullopt};
+    Palette made{olagarro::oui::format_text(olagarro::oui::translate("Dialogs", "Palette {0}"), {"1"}), {}, std::nullopt};
     if(see_through)
     {
         made.colors.push_back(Color{0, 0, 0, 1});

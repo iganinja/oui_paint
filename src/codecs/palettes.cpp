@@ -1,5 +1,7 @@
 #include "codecs/palettes.h"
 
+#include <oui/translation.h>
+
 #include "codecs/codecs.h"
 #include "core/json.h"
 
@@ -126,7 +128,7 @@ std::optional<std::vector<Color>> read_palette_file(std::string_view name, std::
     auto image{read_image(bytes, error)};
     if(!image)
     {
-        error = "neither a palette file nor an image";
+        error = olagarro::oui::translate("Files", "neither a palette file nor an image");
         return std::nullopt;
     }
     const auto colors8{converted(*image, PixelFormat::rgba8)};
@@ -222,14 +224,14 @@ std::optional<PaletteSetup> read_palette_setup(std::string_view text, std::strin
     const auto json{parse_json(text)};
     if(!json || json->kind != Json::Kind::object)
     {
-        error = "not a palette setup";
+        error = olagarro::oui::translate("Files", "not a palette setup");
         return std::nullopt;
     }
     PaletteSetup setup;
     setup.size = static_cast<int>((*json)["size"].number);
     if(setup.size <= 0 || setup.size > 256)
     {
-        error = "a palette holds 1 to 256 colours";
+        error = olagarro::oui::translate("Files", "a palette holds 1 to 256 colours");
         return std::nullopt;
     }
     const auto colors_of{[&error](const Json& list) -> std::optional<std::vector<Color>>
@@ -240,7 +242,7 @@ std::optional<PaletteSetup> read_palette_setup(std::string_view text, std::strin
                                  const auto color{from_hex(item.text)};
                                  if(!color)
                                  {
-                                     error = "not a colour: " + item.text;
+                                     error = olagarro::oui::format_text(olagarro::oui::translate("Files", "not a colour: {0}"), {item.text});
                                      return std::nullopt;
                                  }
                                  colors.push_back(*color);
@@ -271,7 +273,7 @@ std::optional<PaletteSetup> read_palette_setup(std::string_view text, std::strin
     setup.allowed = std::move(*allowed);
     if(setup.palettes.empty())
     {
-        error = "a palette setup has at least one palette";
+        error = olagarro::oui::translate("Files", "a palette setup has at least one palette");
         return std::nullopt;
     }
     return setup;
@@ -283,7 +285,7 @@ std::string write_indexed_png(const Document& document)
     const auto entries{setup.count() * setup.size};
     if(entries > 256)
     {
-        throw std::runtime_error{"An indexed PNG holds 256 colours; these palettes have " + std::to_string(entries) + "."};
+        throw std::runtime_error{olagarro::oui::format_text(olagarro::oui::translate("Files", "An indexed PNG holds 256 colours; these palettes have {0}."), {std::to_string(entries)})};
     }
     lodepng::State state;
     state.info_raw.colortype = LCT_PALETTE;
@@ -359,7 +361,7 @@ std::optional<Document> read_indexed_png(std::string_view bytes, std::string& er
         error = failure != 0 ? lodepng_error_text(failure) : "not a PNG with a palette of 8 bits";
         return std::nullopt;
     }
-    Palette palette{"Palette 1", {}, std::nullopt};
+    Palette palette{olagarro::oui::format_text(olagarro::oui::translate("Dialogs", "Palette {0}"), {"1"}), {}, std::nullopt};
     for(std::size_t index{}; index < state.info_png.color.palettesize; ++ index)
     {
         const auto* const entry{&state.info_png.color.palette[index * 4]};
@@ -384,7 +386,7 @@ std::optional<Document> read_indexed_png(std::string_view bytes, std::string& er
                             GrayAlpha8{{index, static_cast<std::uint8_t>(palette.transparent == index ? 0 : 255)}});
         }
     }
-    document.add_layer("Background").write(image, 0, 0);
+    document.add_layer(olagarro::oui::translate("Layers", "Background")).write(image, 0, 0);
     return document;
 }
 

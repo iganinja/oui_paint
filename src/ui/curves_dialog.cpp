@@ -2,6 +2,7 @@
 
 #include "ui/curve_editor.h"
 
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/check_button.h>
 #include <oui/combo_box.h>
@@ -23,21 +24,21 @@ bool ask_curves(oui::Application& application, std::map<std::string, double>& va
     struct Channel
     {
         const char* name;
-        const char* label;
+        std::string label;
         std::uint32_t color;
         const std::array<double, 256>* histogram;
     };
-    const std::array<Channel, 3> channels{{{"r", "&Red", 0xE04848, &histogram.red},
-                                           {"g", "&Green", 0x48C048, &histogram.green},
-                                           {"b", "&Blue", 0x5878F0, &histogram.blue}}};
+    const std::array<Channel, 3> channels{{{"r", oui::translate("Dialogs", "&Red"), 0xE04848, &histogram.red},
+                                           {"g", oui::translate("Dialogs", "&Green"), 0x48C048, &histogram.green},
+                                           {"b", oui::translate("Dialogs", "&Blue"), 0x5878F0, &histogram.blue}}};
 
-    auto window{oui::window("Curves")};
+    auto window{oui::window(oui::translate("Dialogs", "Curves"))};
     auto& content{oui::column(*window)};
     content.set_gap(oui::Spacing::tight);
     auto& top{oui::row(content)};
     top.set_gap(oui::Spacing::tight);
-    auto& map_label{oui::label("&Transfer map:", top)};
-    auto& map{top.add(std::make_unique<oui::ComboBox>(std::vector<std::string>{"Luminosity", "RGB"},
+    auto& map_label{oui::label(oui::translate("Dialogs", "&Transfer map:"), top)};
+    auto& map{top.add(std::make_unique<oui::ComboBox>(std::vector<std::string>{oui::translate("Dialogs", "Luminosity"), "RGB"},
                                                       values["mode"] == 1.0 ? 1u : 0u))};
     map_label.set_buddy(map);
     std::array<oui::CheckButton*, 3> ticks{};
@@ -47,7 +48,7 @@ bool ask_curves(oui::Application& application, std::map<std::string, double>& va
         ticks[index]->set_checked(true);
     }
     auto& editor{content.add(std::make_unique<CurveEditor>())};
-    oui::label("Click to add a point and drag to move it;", content);
+    oui::label(oui::translate("Dialogs", "Click to add a point and drag to move it;"), content);
     oui::label("a right click, or dragging it far off, takes it away.", content);
 
     // The curves edited: luminosity's, or those of the colours ticked.
@@ -129,7 +130,7 @@ bool ask_curves(oui::Application& application, std::map<std::string, double>& va
     buttons.set_gap(oui::Spacing::normal);
     auto& window_reference{*window};
     auto accepted{false};
-    oui::button("Re&set", buttons,
+    oui::button(oui::translate("Dialogs", "Re&set"), buttons,
                 [&]
                 {
                     for(const auto* const name : {"l", "r", "g", "b"})
@@ -139,13 +140,13 @@ bool ask_curves(oui::Application& application, std::map<std::string, double>& va
                     show();
                     changed(values);
                 });
-    oui::button("OK", buttons,
+    oui::button(oui::translate("Dialogs", "OK"), buttons,
                 [&]
                 {
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 }).set_default(true);
-    oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
     show();
     static_cast<void>(application.show_modal_and_keep(window));
     return accepted;

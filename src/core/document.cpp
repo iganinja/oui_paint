@@ -1,5 +1,7 @@
 #include "core/document.h"
 
+#include <oui/translation.h>
+
 #include <algorithm>
 #include <functional>
 
@@ -24,7 +26,7 @@ Document::Document(int width, int height, PixelFormat format)
 Document Document::from_image(const Image& image)
 {
     Document document{image.width, image.height, image.format};
-    document.add_layer("Background").write(image, 0, 0);
+    document.add_layer(olagarro::oui::translate("Layers", "Background")).write(image, 0, 0);
     return document;
 }
 

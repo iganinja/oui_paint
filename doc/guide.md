@@ -93,7 +93,7 @@ In an indexed image each pixel does not hold a color: it holds a number, the pla
 - **The palettes panel**, under the layers, shows each palette as a row of colors. The palette of the layer being
   worked on is marked with ">"; clicking another palette's number gives it to the layer.
 - **Clicking a color** picks it to paint with, the left button for the primary and the right one for the secondary.
-  Double-clicking it changes the color: every pixel using it changes with it.
+  Double-clicking it changes the color, which the image shows as it is chosen: every pixel using it changes with it.
 - **The see-through color** is shown with "/". Painting with it erases.
 - **Painting with any other color** uses the palette's nearest color: an indexed image never gets colors outside its
   palettes, and is never smoothed.
@@ -134,7 +134,7 @@ Copy and paste work with other programs both ways. File > Open Recent lists the 
 ## Effects
 
 Adjustments and Effects run on the selection, or on the whole layer when nothing is selected; their dialogs show the
-change as the values move.
+change as the values move, and never wait for it: the image catches up as soon as the effect is made.
 
 - **Curves** (Ctrl+Shift+M) draws what each level becomes over the image's histogram: a click adds a point, a drag
   moves it, a right click or dragging it far off takes it away. The transfer map is luminosity, which keeps the
@@ -146,6 +146,9 @@ change as the values move.
 Effects > Manage Plugins writes and tries them beside an image; see [Plugins](plugins.md).
 
 ## Settings
+
+Edit > Preferences (Ctrl+,) chooses the language, the system's or another, which changes when OUI Paint starts again,
+and whether the images open when it last closed open again when it starts with none given.
 
 OUI Paint keeps its settings in `oui_paint.ini`: beside the program when its folder can be written to, in the user's
 configuration folder when not. The `plugins` folder beside it holds the plugins added.

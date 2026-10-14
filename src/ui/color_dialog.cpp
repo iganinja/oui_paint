@@ -3,6 +3,7 @@
 #include "tools/color_math.h"
 #include "ui/color_panel.h"
 
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/grid.h>
 #include <oui/label.h>
@@ -222,12 +223,12 @@ std::optional<Color> ask_color(oui::Application& application, const std::string&
     // 65535; each takes any value between, so 16-bit colours keep their precision.
     struct Field
     {
-        const char* name;
+        std::string name;
         double maximum;
     };
-    for(const auto& [name, maximum] : {Field{"&Red:", 255}, Field{"&Green:", 255}, Field{"&Blue:", 255},
-                                       Field{"&Alpha:", 255}, Field{"H&ue:", 360}, Field{"&Saturation:", 100},
-                                       Field{"&Value:", 100}, Field{"Gray, &16 bits:", 65535}})
+    for(const auto& [name, maximum] : {Field{oui::translate("Dialogs", "&Red:"), 255}, Field{oui::translate("Dialogs", "&Green:"), 255}, Field{oui::translate("Dialogs", "&Blue:"), 255},
+                                       Field{oui::translate("Dialogs", "&Alpha:"), 255}, Field{oui::translate("Dialogs", "H&ue:"), 360}, Field{oui::translate("Dialogs", "&Saturation:"), 100},
+                                       Field{oui::translate("Dialogs", "&Value:"), 100}, Field{oui::translate("Dialogs", "Gray, &16 bits:"), 65535}})
     {
         auto& label{oui::label(name, form)};
         auto& field{oui::number_field(form)};
@@ -322,13 +323,13 @@ std::optional<Color> ask_color(oui::Application& application, const std::string&
     buttons.set_gap(oui::Spacing::normal);
     auto& window_reference{*window};
     auto accepted{false};
-    oui::button("OK", buttons,
+    oui::button(oui::translate("Dialogs", "OK"), buttons,
                 [&]
                 {
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 }).set_default(true);
-    oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
     static_cast<void>(application.show_modal_and_keep(window));
     if(!accepted)
     {

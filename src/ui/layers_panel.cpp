@@ -2,6 +2,7 @@
 
 #include "ui/side_panel.h"
 
+#include <oui/translation.h>
 #include <oui/painter.h>
 #include <oui/theme.h>
 
@@ -52,13 +53,13 @@ std::uint32_t screen_pixel(const Layer& layer, int x, int y)
 
 LayersPanel::LayersPanel(Icons& icons) : m_icons{icons}
 {
-    m_buttons = {{Action::add, "Add", "Add New Layer (Ctrl+Shift+N)"},
-                 {Action::remove, "Remove", "Delete Layer (Ctrl+Shift+Delete)"},
-                 {Action::duplicate, "Duplicate", "Duplicate Layer (Ctrl+Shift+D)"},
-                 {Action::merge_down, "MergeDown", "Merge Layer Down (Ctrl+M)"},
-                 {Action::move_up, "MoveUp", "Move Layer Up"},
-                 {Action::move_down, "MoveDown", "Move Layer Down"},
-                 {Action::properties, "Tools", "Layer Properties (F4)"}};
+    m_buttons = {{Action::add, "Add", oui::translate("Panels", "Add New Layer (Ctrl+Shift+N)")},
+                 {Action::remove, "Remove", oui::translate("Panels", "Delete Layer (Ctrl+Shift+Delete)")},
+                 {Action::duplicate, "Duplicate", oui::translate("Panels", "Duplicate Layer (Ctrl+Shift+D)")},
+                 {Action::merge_down, "MergeDown", oui::translate("Panels", "Merge Layer Down (Ctrl+M)")},
+                 {Action::move_up, "MoveUp", oui::translate("Panels", "Move Layer Up")},
+                 {Action::move_down, "MoveDown", oui::translate("Panels", "Move Layer Down")},
+                 {Action::properties, "Tools", oui::translate("Panels", "Layer Properties (F4)")}};
 }
 
 void LayersPanel::set_document(const Document* document)
@@ -341,11 +342,11 @@ std::optional<std::string> LayersPanel::tooltip_at(oui::Point point) const
         switch(part_at(point.x - m_bounds.x))
         {
         case Part::tick:
-            return std::string{"Tick layers to delete them together"};
+            return std::string{oui::translate("Panels", "Tick layers to delete them together")};
         case Part::eye:
-            return std::string{"Show or hide the layer"};
+            return std::string{oui::translate("Panels", "Show or hide the layer")};
         case Part::remove:
-            return std::string{"Delete the layer"};
+            return std::string{oui::translate("Panels", "Delete the layer")};
         case Part::name:
             break;
         }

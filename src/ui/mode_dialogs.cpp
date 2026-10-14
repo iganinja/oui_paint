@@ -2,6 +2,7 @@
 
 #include "ui/effect_controls.h"
 
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/combo_box.h>
 #include <oui/grid.h>
@@ -107,7 +108,7 @@ class MethodControls
     MethodControls(oui::Grid& form, MethodChoice& choice, std::function<void()> changed)
         : m_choice{choice}, m_changed{std::move(changed)}, m_form{&form}, m_first{form.child_count() + 3}
     {
-        auto& label{oui::label("&Method:", *m_form)};
+        auto& label{oui::label(oui::translate("Dialogs", "&Method:"), *m_form)};
         auto& methods{m_form->add(oui::combo_box(choice.names, choice.chosen))};
         label.set_buddy(methods);
         oui::label("", *m_form);
@@ -176,14 +177,14 @@ bool add_buttons_and_show(oui::Application& application, std::unique_ptr<oui::Wi
     }
     auto& window_reference{*window};
     auto accepted{false};
-    oui::button("OK", buttons,
+    oui::button(oui::translate("Dialogs", "OK"), buttons,
                 [&]
                 {
                     commit();
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 }).set_default(true);
-    oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
     static_cast<void>(application.show_modal_and_keep(window));
     return accepted;
 }
@@ -194,25 +195,25 @@ bool ask_indexing(oui::Application& application, IndexingChoice& choice,
                   const std::function<std::optional<std::pair<std::string, std::vector<Color>>>()>& load,
                   const std::function<std::string()>& changed)
 {
-    auto window{oui::window("Convert to Indexed")};
+    auto window{oui::window(oui::translate("Dialogs", "Convert to Indexed"))};
     auto& content{oui::column(*window)};
     content.set_gap(oui::Spacing::tight);
 
     auto& form{form_in(content)};
     const auto palette_names{[&choice]
                              {
-                                 std::vector<std::string> names{"Make one"};
+                                 std::vector<std::string> names{oui::translate("Dialogs", "Make one")};
                                  if(choice.loaded)
                                  {
                                      names.push_back(choice.loaded->first);
                                  }
                                  return names;
                              }};
-    auto& palette_label{oui::label("&Palette:", form)};
+    auto& palette_label{oui::label(oui::translate("Dialogs", "&Palette:"), form)};
     auto& palettes{form.add(oui::combo_box(palette_names(), choice.into_loaded && choice.loaded ? 1 : 0))};
     palette_label.set_buddy(palettes);
     oui::label("", form);
-    auto& count_label{oui::label("&Colors:", form)};
+    auto& count_label{oui::label(oui::translate("Dialogs", "&Colors:"), form)};
     auto& count{oui::number_field(form)};
     count.set_range(2, 256);
     count.set_step(1);
@@ -262,7 +263,7 @@ bool ask_indexing(oui::Application& application, IndexingChoice& choice,
                                     count.commit();
                                     method.commit();
                                 },
-                                [&](oui::Container& buttons) { oui::button("&Load Palette...", buttons, load_palette); });
+                                [&](oui::Container& buttons) { oui::button(oui::translate("Dialogs", "&Load Palette..."), buttons, load_palette); });
 }
 
 bool ask_conversion(oui::Application& application, const std::string& title,

@@ -1,5 +1,6 @@
 #include "ui/new_image_dialog.h"
 
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/combo_box.h>
 #include <oui/grid.h>
@@ -19,7 +20,7 @@ namespace oui_paint
 
 std::optional<NewImage> ask_new_image(oui::Application& application, const NewImage& start)
 {
-    auto window{oui::window("New Image")};
+    auto window{oui::window(oui::translate("Dialogs", "New Image"))};
     auto& content{oui::column(*window)};
     content.set_gap(oui::Spacing::tight);
     // A label, what it names and what comes after it, a row each.
@@ -42,29 +43,29 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
                          oui::label(after, form);
                          return added;
                      }};
-    auto& width{field("&Width:", oui::number_field(), "pixels")};
+    auto& width{field(oui::translate("Dialogs", "&Width:"), oui::number_field(), oui::translate("Dialogs", "pixels"))};
     width.set_range(1, 65535);
     width.set_value(start.width);
-    auto& height{field("&Height:", oui::number_field(), "pixels")};
+    auto& height{field(oui::translate("Dialogs", "&Height:"), oui::number_field(), oui::translate("Dialogs", "pixels"))};
     height.set_range(1, 65535);
     height.set_value(start.height);
-    auto& depth{field("&Depth:",
+    auto& depth{field(oui::translate("Dialogs", "&Depth:"),
                       std::make_unique<oui::ComboBox>(
                           std::vector<std::string>{"8 bits per channel", "16 bits per channel"}, start.bits == 16 ? 1u : 0u),
                       "")};
-    auto& color{field("&Color:",
-                      std::make_unique<oui::ComboBox>(std::vector<std::string>{"Color", "Grayscale", "Indexed"},
+    auto& color{field(oui::translate("Dialogs", "&Color:"),
+                      std::make_unique<oui::ComboBox>(std::vector<std::string>{oui::translate("Dialogs", "Color"), oui::translate("Dialogs", "Grayscale"), oui::translate("Dialogs", "Indexed")},
                                                       start.indexed ? 2u : start.gray ? 1u : 0u),
                       "")};
     // For an indexed image: how many palettes, of how many colours.
-    auto& palettes{field("&Palettes:", oui::number_field(), "of")};
+    auto& palettes{field(oui::translate("Dialogs", "&Palettes:"), oui::number_field(), oui::translate("Dialogs", "of"))};
     palettes.set_range(1, 64);
     palettes.set_value(start.palettes);
-    auto& palette_size{field("Colors &each:", oui::number_field(), "colors")};
+    auto& palette_size{field(oui::translate("Dialogs", "Colors &each:"), oui::number_field(), oui::translate("Dialogs", "colors"))};
     palette_size.set_range(2, 256);
     palette_size.set_value(start.palette_size);
-    auto& background{field("&Background:",
-                           std::make_unique<oui::ComboBox>(std::vector<std::string>{"White", "Black", "Transparent"},
+    auto& background{field(oui::translate("Dialogs", "&Background:"),
+                           std::make_unique<oui::ComboBox>(std::vector<std::string>{oui::translate("Dialogs", "White"), oui::translate("Dialogs", "Black"), oui::translate("Dialogs", "Transparent")},
                                                            static_cast<std::size_t>(start.background)),
                            "")};
 
@@ -72,7 +73,7 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
     buttons.set_gap(oui::Spacing::normal);
     auto& window_reference{*window};
     auto accepted{false};
-    oui::button("OK", buttons,
+    oui::button(oui::translate("Dialogs", "OK"), buttons,
                 [&]
                 {
                     width.commit();
@@ -82,7 +83,7 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 }).set_default(true);
-    oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
 
     application.focus(width.text_field());
     width.text_field().select_all();

@@ -2,6 +2,9 @@
 
 #include "ui/anchor_grid.h"
 
+#include "ui/shown_names.h"
+
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/check_button.h>
 #include <oui/combo_box.h>
@@ -84,7 +87,7 @@ class Form
         buttons.set_gap(oui::Spacing::normal);
         auto& window{*m_window};
         auto accepted{false};
-        oui::button("OK", buttons,
+        oui::button(oui::translate("Dialogs", "OK"), buttons,
                     [&]
                     {
                         if(before)
@@ -94,7 +97,7 @@ class Form
                         accepted = true;
                         window.close(oui::DialogResult::accepted);
                     }).set_default(true);
-        oui::button("Cancel", buttons, [&] { window.close(oui::DialogResult::cancelled); });
+        oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window.close(oui::DialogResult::cancelled); });
         static_cast<void>(application.show_modal_and_keep(m_window));
         return accepted;
     }
@@ -110,7 +113,7 @@ std::vector<std::string> resampling_names()
     std::vector<std::string> names;
     for(const auto resampling : all_resamplings())
     {
-        names.emplace_back(resampling_name(resampling));
+        names.push_back(shown_name(resampling));
     }
     return names;
 }
@@ -145,12 +148,12 @@ void keep_proportions(oui::NumberField& width, oui::NumberField& height, oui::Ch
 
 std::optional<ResizeRequest> ask_resize(oui::Application& application, int width, int height)
 {
-    Form form{"Resize Image"};
-    auto& resampling{form.choice("&Resampling:", resampling_names())};
-    auto& percent{form.number("By &percentage:", 1, 10000, 100, "%")};
-    auto& keep{form.check("&Maintain aspect ratio", true)};
-    auto& new_width{form.number("&Width:", 1, 65535, width, "pixels")};
-    auto& new_height{form.number("&Height:", 1, 65535, height, "pixels")};
+    Form form{oui::translate("Dialogs", "Resize Image")};
+    auto& resampling{form.choice(oui::translate("Dialogs", "&Resampling:"), resampling_names())};
+    auto& percent{form.number(oui::translate("Dialogs", "By &percentage:"), 1, 10000, 100, "%")};
+    auto& keep{form.check(oui::translate("Dialogs", "&Maintain aspect ratio"), true)};
+    auto& new_width{form.number(oui::translate("Dialogs", "&Width:"), 1, 65535, width, oui::translate("Dialogs", "pixels"))};
+    auto& new_height{form.number(oui::translate("Dialogs", "&Height:"), 1, 65535, height, oui::translate("Dialogs", "pixels"))};
     auto updating{false};
     keep_proportions(new_width, new_height, keep, static_cast<double>(width) / height, updating);
     static_cast<void>(percent.on_changed(
@@ -180,15 +183,15 @@ std::optional<ResizeRequest> ask_resize(oui::Application& application, int width
 
 std::optional<CanvasRequest> ask_canvas_size(oui::Application& application, Icons& icons, int width, int height)
 {
-    Form form{"Canvas Size"};
-    auto& keep{form.check("&Maintain aspect ratio", false)};
-    auto& new_width{form.number("&Width:", 1, 65535, width, "pixels")};
-    auto& new_height{form.number("&Height:", 1, 65535, height, "pixels")};
+    Form form{oui::translate("Dialogs", "Canvas Size")};
+    auto& keep{form.check(oui::translate("Dialogs", "&Maintain aspect ratio"), false)};
+    auto& new_width{form.number(oui::translate("Dialogs", "&Width:"), 1, 65535, width, oui::translate("Dialogs", "pixels"))};
+    auto& new_height{form.number(oui::translate("Dialogs", "&Height:"), 1, 65535, height, oui::translate("Dialogs", "pixels"))};
     auto updating{false};
     keep_proportions(new_width, new_height, keep, static_cast<double>(width) / height, updating);
-    auto& anchor{form.choice("&Anchor:",
-                             {"Top Left", "Top", "Top Right", "Left", "Middle", "Right", "Bottom Left", "Bottom",
-                              "Bottom Right"},
+    auto& anchor{form.choice(oui::translate("Dialogs", "&Anchor:"),
+                             {oui::translate("Dialogs", "Top Left"), oui::translate("Dialogs", "Top"), oui::translate("Dialogs", "Top Right"), oui::translate("Dialogs", "Left"), oui::translate("Dialogs", "Middle"), oui::translate("Dialogs", "Right"), oui::translate("Dialogs", "Bottom Left"), oui::translate("Dialogs", "Bottom"),
+                              oui::translate("Dialogs", "Bottom Right")},
                              4)};
     // The anchor as Paint.NET shows it too: the image in its square, arrows where the canvas grows; each follows the
     // other.
@@ -211,13 +214,13 @@ std::optional<CanvasRequest> ask_canvas_size(oui::Application& application, Icon
 
 std::optional<RotateZoomRequest> ask_rotate_zoom(oui::Application& application)
 {
-    Form form{"Rotate / Zoom Layer"};
-    auto& angle{form.number("&Angle:", -180, 180, 0, "degrees")};
+    Form form{oui::translate("Dialogs", "Rotate / Zoom Layer")};
+    auto& angle{form.number(oui::translate("Dialogs", "&Angle:"), -180, 180, 0, oui::translate("Dialogs", "degrees"))};
     angle.set_step(0);
-    auto& zoom{form.number("&Zoom:", 1, 10000, 100, "%")};
+    auto& zoom{form.number(oui::translate("Dialogs", "&Zoom:"), 1, 10000, 100, "%")};
     zoom.set_step(0);
-    auto& pan_x{form.number("Pan &X:", -65535, 65535, 0, "pixels")};
-    auto& pan_y{form.number("Pan &Y:", -65535, 65535, 0, "pixels")};
+    auto& pan_x{form.number(oui::translate("Dialogs", "Pan &X:"), -65535, 65535, 0, oui::translate("Dialogs", "pixels"))};
+    auto& pan_y{form.number(oui::translate("Dialogs", "Pan &Y:"), -65535, 65535, 0, oui::translate("Dialogs", "pixels"))};
     if(!form.ask(application,
                  [&]
                  {

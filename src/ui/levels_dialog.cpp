@@ -2,6 +2,7 @@
 
 #include "ui/levels_bar.h"
 
+#include <oui/translation.h>
 #include <oui/button.h>
 #include <oui/check_button.h>
 #include <oui/grid.h>
@@ -59,21 +60,21 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
     struct Channel
     {
         const char* name;
-        const char* label;
+        std::string label;
         const std::array<double, 256>* histogram;
     };
-    const std::array<Channel, 3> channels{{{"r", "&Red", &histogram.red},
-                                           {"g", "G&reen", &histogram.green},
-                                           {"b", "Bl&ue", &histogram.blue}}};
+    const std::array<Channel, 3> channels{{{"r", oui::translate("Dialogs", "&Red"), &histogram.red},
+                                           {"g", oui::translate("Dialogs", "G&reen"), &histogram.green},
+                                           {"b", oui::translate("Dialogs", "Bl&ue"), &histogram.blue}}};
     const std::array<const char*, 5> ids{"inputLow", "inputHigh", "gamma", "outputLow", "outputHigh"};
 
-    auto window{oui::window("Levels")};
+    auto window{oui::window(oui::translate("Dialogs", "Levels"))};
     auto& content{oui::column(*window)};
     content.set_gap(oui::Spacing::tight);
 
     auto& heading{oui::row(content)};
     heading.set_gap(oui::Spacing::tight);
-    oui::label("Input", heading);
+    oui::label(oui::translate("Dialogs", "Input"), heading);
     std::array<oui::CheckButton*, 3> ticks{};
     for(std::size_t index{}; index < channels.size(); ++ index)
     {
@@ -81,7 +82,7 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
         ticks[index]->set_checked(true);
     }
     auto& input{content.add(std::make_unique<LevelsBar>(6))};
-    oui::label("Output", content);
+    oui::label(oui::translate("Dialogs", "Output"), content);
     auto& output{content.add(std::make_unique<LevelsBar>(2))};
 
     auto& form{oui::grid(content)};
@@ -90,16 +91,16 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
     struct Field
     {
         const char* id;
-        const char* label;
+        std::string label;
         double minimum;
         double maximum;
         int decimals;
     };
-    const std::array<Field, 5> described{{{"inputLow", "Input &black:", 0, 255, 0},
-                                          {"inputHigh", "Input &white:", 0, 255, 0},
-                                          {"gamma", "&Gamma:", 0.1, 10, 2},
-                                          {"outputLow", "Output b&lack:", 0, 255, 0},
-                                          {"outputHigh", "Output w&hite:", 0, 255, 0}}};
+    const std::array<Field, 5> described{{{"inputLow", oui::translate("Dialogs", "Input &black:"), 0, 255, 0},
+                                          {"inputHigh", oui::translate("Dialogs", "Input &white:"), 0, 255, 0},
+                                          {"gamma", oui::translate("Dialogs", "&Gamma:"), 0.1, 10, 2},
+                                          {"outputLow", oui::translate("Dialogs", "Output b&lack:"), 0, 255, 0},
+                                          {"outputHigh", oui::translate("Dialogs", "Output w&hite:"), 0, 255, 0}}};
     std::map<std::string, oui::NumberField*> fields;
     for(const auto& field : described)
     {
@@ -211,7 +212,7 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
     buttons.set_gap(oui::Spacing::normal);
     auto& window_reference{*window};
     auto accepted{false};
-    oui::button("&Auto", buttons,
+    oui::button(oui::translate("Dialogs", "&Auto"), buttons,
                 [&]
                 {
                     // Each colour ticked stretched by its own histogram.
@@ -226,7 +227,7 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
                     show();
                     changed(values);
                 });
-    oui::button("Re&set", buttons,
+    oui::button(oui::translate("Dialogs", "Re&set"), buttons,
                 [&]
                 {
                     for(const auto& channel : channels)
@@ -244,7 +245,7 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
                     show();
                     changed(values);
                 });
-    oui::button("OK", buttons,
+    oui::button(oui::translate("Dialogs", "OK"), buttons,
                 [&]
                 {
                     for(auto& [id, field] : fields)
@@ -254,7 +255,7 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
                 }).set_default(true);
-    oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
+    oui::button(oui::translate("Dialogs", "Cancel"), buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
     show();
     static_cast<void>(application.show_modal_and_keep(window));
     return accepted;

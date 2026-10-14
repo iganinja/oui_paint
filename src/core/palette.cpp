@@ -1,5 +1,7 @@
 #include "core/palette.h"
 
+#include <oui/translation.h>
+
 #include <cmath>
 
 namespace oui_paint
@@ -25,7 +27,7 @@ PaletteSetup PaletteSetup::greys(int count, int size)
     setup.size = size;
     for(int slot{}; slot < count; ++ slot)
     {
-        Palette palette{"Palette " + std::to_string(slot + 1), {}, 0};
+        Palette palette{olagarro::oui::format_text(olagarro::oui::translate("Dialogs", "Palette {0}"), {std::to_string(slot + 1)}), {}, 0};
         for(int index{}; index < size; ++ index)
         {
             const auto value{size > 1 ? static_cast<double>(index) / (size - 1) : 0.0};

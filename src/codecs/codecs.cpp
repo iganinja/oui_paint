@@ -1,5 +1,7 @@
 #include "codecs/codecs.h"
 
+#include <oui/translation.h>
+
 #include "codecs/stb_api.h"
 
 #include <lodepng.h>
@@ -171,7 +173,7 @@ std::optional<Image> read_image(std::string_view bytes, std::string& error)
     bool sixteen{};
     if(!stb_api::inspect(bytes, channels, sixteen))
     {
-        error = "not an image this program can read";
+        error = olagarro::oui::translate("Files", "not an image this program can read");
         return std::nullopt;
     }
     const auto gray{channels <= 2};
