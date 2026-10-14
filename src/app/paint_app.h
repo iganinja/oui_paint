@@ -195,6 +195,8 @@ class PaintApp
     LayersPanel* m_layers_panel{};
     PalettesPanel* m_palettes_panel{};
     HistoryPanel* m_history_panel{};
+    // The history under its title, which F6 hides and shows.
+    olagarro::oui::Widget* m_history_section{};
     // In an indexed image, the indices picked as primary and secondary; none when a colour was picked, whose nearest
     // index of the layer's palette is used.
     std::optional<int> m_primary_index;

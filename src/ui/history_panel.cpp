@@ -105,8 +105,13 @@ void HistoryPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
         const auto name{*position == 0 ? std::string{"Original"} : m_history->steps()[*position - 1].name};
         painter.draw_label({line.x + 1, line.y}, name, style);
     }
-    // Undo and redo under the steps.
+    // Undo and redo under the steps, on a bar of their own; none without a document to undo in.
+    if(m_history == nullptr || m_bounds.height < 2)
+    {
+        return;
+    }
     const auto bottom{m_bounds.y + m_bounds.height - 1};
+    painter.draw_divider({m_bounds.x, bottom, m_bounds.width, 1}, theme);
     for(const auto& [column, icon] : {std::pair<int, const char*>{0, "RotateLeft"}, {2, "RotateRight"}})
     {
         const oui::Rect cell{m_bounds.x + column, bottom, 2, 1};

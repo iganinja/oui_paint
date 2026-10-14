@@ -184,7 +184,13 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             painter.draw_label({line.x + eye_width + picture_width + 1, line.y}, layer.name(), style);
         }
     }
+    // The buttons on a bar of their own, as a toolbar; none without a document to work on.
+    if(m_document == nullptr || m_bounds.height < 2)
+    {
+        return;
+    }
     const auto bottom{m_bounds.y + m_bounds.height - 1};
+    painter.draw_divider({m_bounds.x, bottom, m_bounds.width, 1}, theme);
     for(std::size_t index{}; index < m_buttons.size(); ++ index)
     {
         const oui::Rect cell{m_bounds.x + static_cast<int>(index) * 2, bottom, 2, 1};

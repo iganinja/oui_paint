@@ -27,6 +27,7 @@
 #include "ui/palettes_panel.h"
 #include "ui/plugin_workbench.h"
 #include "ui/side_column.h"
+#include "ui/section.h"
 #include "ui/side_panel.h"
 #include "ui/tool_options.h"
 #include "ui/tool_panel.h"
@@ -349,7 +350,7 @@ void PaintApp::register_commands()
     add("layers.properties", "Layer &Properties...", [this] { layer_properties(); },
         oui::Shortcut{0, false, false, false, oui::Key::f4});
     // F6, as Paint.NET shows and hides its History window; kept for the next time.
-    add("view.history_panel", "&History Panel", [this] { show_history_panel(!m_history_panel->is_visible()); },
+    add("view.history_panel", "&History Panel", [this] { show_history_panel(!m_history_section->is_visible()); },
         oui::Shortcut{0, false, false, false, oui::Key::f6});
     // F7, as Paint.NET shows and hides its Layers window; kept for the next time.
     add("view.layers_panel", "&Layers Panel", [this] { show_layers_panel(!m_frame->right()->is_visible()); },
@@ -558,10 +559,14 @@ void PaintApp::build_window()
                        "view.interface_bigger",
                        "view.interface_smaller", "view.interface_reset"});
     auto left{oui::column()};
-    m_tool_panel = &left->add(std::make_unique<ToolPanel>(tool_buttons(), m_icons));
+    auto tools{std::make_unique<ToolPanel>(tool_buttons(), m_icons)};
+    m_tool_panel = tools.get();
+    left->add(std::make_unique<Section>("", std::move(tools)));
     m_tool_panel->set_selected("brush");
     m_tool_panel->on_picked([this](const std::string& tool) { select_tool(tool); });
-    m_color_panel = &left->add(std::make_unique<ColorPanel>());
+    auto colors{std::make_unique<ColorPanel>()};
+    m_color_panel = colors.get();
+    left->add(std::make_unique<Section>("", std::move(colors)));
     m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
     // A colour picked from the colour panel's palette is used as the nearest index, not one picked before.
     m_color_panel->on_picked(
@@ -678,8 +683,11 @@ void PaintApp::build_window()
     m_history_panel->on_choose([this](std::size_t position) { history_go_to(position); });
     m_history_panel->on_undo([this] { undo(); });
     m_history_panel->on_redo([this] { redo(); });
-    m_frame->set_right(std::make_unique<SidePanel>(
-        std::make_unique<SideColumn>(std::move(history), std::move(layers), std::move(palettes))));
+    auto history_section{std::make_unique<Section>("History", std::move(history))};
+    m_history_section = history_section.get();
+    m_frame->set_right(std::make_unique<SidePanel>(std::make_unique<SideColumn>(
+        std::move(history_section), std::make_unique<Section>("Layers", std::move(layers)),
+        std::make_unique<Section>("Palettes", std::move(palettes)))));
     show_layers_panel(m_settings.bool_value("layers_panel", true));
     show_history_panel(m_settings.bool_value("history_panel", true));
     auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
@@ -3000,7 +3008,7 @@ void PaintApp::load_plugins()
 
 void PaintApp::show_history_panel(bool shown)
 {
-    m_history_panel->set_visible(shown);
+    m_history_section->set_visible(shown);
     m_application.commands().set_checked("view.history_panel", shown);
     m_settings.set_bool_value("history_panel", shown);
     static_cast<void>(m_settings.save());
