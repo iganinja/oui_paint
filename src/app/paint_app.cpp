@@ -696,12 +696,7 @@ void PaintApp::build_window()
     m_frame->set_top(std::move(options));
     auto tabs{std::make_unique<oui::TabView>()};
     m_tabs = tabs.get();
-    m_tabs->set_highlight_predicate(
-        [this](std::size_t index)
-        {
-            const auto* const document{document_in_tab(index)};
-            return document != nullptr && document->modified();
-        });
+    // A changed image says so with the asterisk in its tab's title, and keeps its close mark.
     static_cast<void>(m_tabs->on_close_requested([this](std::size_t index) { static_cast<void>(close(index)); }));
     // A tab says the whole path of its file, which its title leaves out; nothing for what has none yet.
     m_tabs->set_tooltip_provider(
