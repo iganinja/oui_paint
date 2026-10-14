@@ -70,6 +70,11 @@ void CanvasView::zoom_out()
     changed();
 }
 
+void CanvasView::start_at(double zoom, Position centre)
+{
+    m_start = std::pair{zoom, centre};
+}
+
 void CanvasView::zoom_to_fit()
 {
     m_document.viewport().zoom_to_fit();
@@ -104,8 +109,15 @@ void CanvasView::paint(oui::Painter& painter, const oui::Theme&) const
     viewport.set_view_size(m_pixels->width, m_pixels->height);
     if(!m_fitted)
     {
-        // A document opens as big as fits, never above actual size.
-        viewport.zoom_to_fit();
+        // A document opens as big as fits, never above actual size, unless told where to start.
+        if(m_start)
+        {
+            viewport.look_at(m_start->first, m_start->second);
+        }
+        else
+        {
+            viewport.zoom_to_fit();
+        }
         m_fitted = true;
     }
     m_buffer.resize(static_cast<std::size_t>(m_pixels->width) * m_pixels->height);

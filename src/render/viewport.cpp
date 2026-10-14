@@ -24,6 +24,18 @@ void Viewport::set_view_size(int width, int height)
     keep_in_bounds();
 }
 
+void Viewport::look_at(double zoom, Position centre)
+{
+    m_zoom = std::clamp(zoom, zoom_steps[0], zoom_steps[std::size(zoom_steps) - 1]);
+    m_origin = {m_view_width / 2.0 - centre.x * m_zoom, m_view_height / 2.0 - centre.y * m_zoom};
+    keep_in_bounds();
+}
+
+Position Viewport::centre() const
+{
+    return image_at({m_view_width / 2.0, m_view_height / 2.0});
+}
+
 void Viewport::set_zoom(double zoom, Position anchor)
 {
     const auto under{image_at(anchor)};

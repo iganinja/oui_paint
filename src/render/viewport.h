@@ -35,6 +35,10 @@ class Viewport
     // the image's edges allow, as Zoom to Selection shows it.
     void zoom_to(double x, double y, double width, double height);
     void scroll_by(double dx, double dy);
+    // At `zoom`, with the point `centre` of the image in the middle of the view, as far as the image's edges allow.
+    void look_at(double zoom, Position centre);
+    // The point of the image in the middle of the view.
+    [[nodiscard]] Position centre() const;
 
     // Where the image's top left corner is in the view.
     [[nodiscard]] Position origin() const { return m_origin; }

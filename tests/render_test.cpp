@@ -34,6 +34,25 @@ TEST(Viewport, ZoomingKeepsThePointUnderThePointerWhereItIs)
     EXPECT_DOUBLE_EQ(viewport.zoom(), 0.66);
 }
 
+TEST(Viewport, ItShowsAPointOfTheImageInTheMiddleAtAZoomAndSaysWhichItShows)
+{
+    Viewport viewport;
+    viewport.set_view_size(200, 100);
+    viewport.set_image_size(1000, 1000);
+    viewport.look_at(2.0, {300, 400});
+    EXPECT_DOUBLE_EQ(viewport.zoom(), 2.0);
+    EXPECT_DOUBLE_EQ(viewport.centre().x, 300);
+    EXPECT_DOUBLE_EQ(viewport.centre().y, 400);
+    // A bigger view later, as a window opened bigger: the same point stays in its middle.
+    viewport.set_view_size(400, 300);
+    EXPECT_DOUBLE_EQ(viewport.centre().x, 300);
+    EXPECT_DOUBLE_EQ(viewport.centre().y, 400);
+    // No further than the image's edges, as scrolling.
+    viewport.look_at(1.0, {0, 0});
+    EXPECT_DOUBLE_EQ(viewport.origin().x, 0);
+    EXPECT_DOUBLE_EQ(viewport.origin().y, 0);
+}
+
 TEST(Viewport, ABigImageScrollsNoFurtherThanItsEdges)
 {
     Viewport viewport;

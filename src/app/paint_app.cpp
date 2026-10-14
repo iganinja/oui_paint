@@ -4084,15 +4084,35 @@ void PaintApp::save_all()
 
 void PaintApp::quit()
 {
-    // In the tabs' order, before closing them asks about what was not saved.
+    // In the tabs' order, before closing them asks about what was not saved: each image's file, how it was seen, as
+    // its zoom and the point of it in the middle of the view, and which was in front.
     std::vector<std::string> session;
+    std::vector<std::string> views;
+    auto in_front{0};
     for(std::size_t index{}; index < m_tabs->child_count(); ++ index)
     {
-        const auto* const document{document_in_tab(index)};
-        if(document != nullptr && document->path())
+        auto* const document{document_in_tab(index)};
+        if(document == nullptr || !document->path())
         {
-            session.push_back(oui::utf8_of(*document->path()));
+            continue;
         }
+        if(index == m_tabs->selected_index())
+        {
+            in_front = static_cast<int>(session.size());
+        }
+        session.push_back(oui::utf8_of(*document->path()));
+        const auto* const view{m_tabs->content_at<CanvasView>(index)};
+        // "-" for one never shown, which opens as big as fits: a list keeps no empty entries.
+        std::string seen{"-"};
+        if(view != nullptr && view->shown())
+        {
+            const auto& viewport{document->viewport()};
+            const auto centre{viewport.centre()};
+            std::array<char, 96> text{};
+            std::snprintf(text.data(), text.size(), "%.17g %.17g %.17g", viewport.zoom(), centre.x, centre.y);
+            seen = text.data();
+        }
+        views.push_back(seen);
     }
     while(m_tabs->child_count() > 0)
     {
@@ -4102,6 +4122,8 @@ void PaintApp::quit()
         }
     }
     m_settings.set_list_value("last_session", session);
+    m_settings.set_list_value("last_session_views", views);
+    m_settings.set_int_value("last_session_front", in_front);
     m_application.quit();
 }
 
@@ -4111,14 +4133,34 @@ void PaintApp::open_last_session()
     {
         return;
     }
-    for(const auto& file : m_settings.list_value("last_session"))
+    // Each as it was seen, and the one that was in front in front again.
+    const auto files{m_settings.list_value("last_session")};
+    const auto views{m_settings.list_value("last_session_views")};
+    const auto in_front{static_cast<std::size_t>(std::max(0, m_settings.int_value("last_session_front", 0)))};
+    std::optional<std::size_t> front_tab;
+    for(std::size_t index{}; index < files.size(); ++ index)
     {
-        const auto path{oui::path_from_utf8(file)};
+        const auto path{oui::path_from_utf8(files[index])};
         std::error_code ignored;
-        if(std::filesystem::is_regular_file(path, ignored))
+        if(!std::filesystem::is_regular_file(path, ignored) || !open(path))
         {
-            static_cast<void>(open(path));
+            continue;
         }
+        double zoom{};
+        Position centre;
+        if(auto* const view{current_view()}; view != nullptr && index < views.size() &&
+           std::sscanf(views[index].c_str(), "%lf %lf %lf", &zoom, &centre.x, &centre.y) == 3)
+        {
+            view->start_at(zoom, centre);
+        }
+        if(index == in_front)
+        {
+            front_tab = m_tabs->selected_index();
+        }
+    }
+    if(front_tab)
+    {
+        m_tabs->select(*front_tab);
     }
 }
 

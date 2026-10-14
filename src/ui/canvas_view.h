@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace oui_paint
@@ -65,6 +66,11 @@ class CanvasView final : public olagarro::oui::Widget
 
     void zoom_in();
     void zoom_out();
+    // Starts at `zoom` with `centre`, a point of the image, in its middle, rather than as big as fits, as a session
+    // reopened shows each image as it was left.
+    void start_at(double zoom, Position centre);
+    // Whether it has been shown, and so has a view of the image to keep.
+    [[nodiscard]] bool shown() const { return m_fitted; }
     void zoom_to_fit();
     // As big as the area of the image from x, y fits, in the middle.
     void zoom_to(int x, int y, int width, int height);
@@ -102,6 +108,8 @@ class CanvasView final : public olagarro::oui::Widget
     bool m_panning_with_key{false};
     std::function<bool()> m_pan_key;
     mutable bool m_fitted{false};
+    // Where it starts instead of as big as fits: its zoom and the point of the image in its middle.
+    std::optional<std::pair<double, Position>> m_start;
     int m_ants_phase{0};
     // Where it was last painted, in the window's pixels, and what it painted.
     mutable std::optional<olagarro::oui::Rect> m_pixels;
