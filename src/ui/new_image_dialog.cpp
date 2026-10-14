@@ -51,7 +51,7 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
     height.set_value(start.height);
     auto& depth{field(oui::translate("Dialogs", "&Depth:"),
                       std::make_unique<oui::ComboBox>(
-                          std::vector<std::string>{"8 bits per channel", "16 bits per channel"}, start.bits == 16 ? 1u : 0u),
+                          std::vector<std::string>{oui::translate("Dialogs", "8 bits per channel"), oui::translate("Dialogs", "16 bits per channel")}, start.bits == 16 ? 1u : 0u),
                       "")};
     auto& color{field(oui::translate("Dialogs", "&Color:"),
                       std::make_unique<oui::ComboBox>(std::vector<std::string>{oui::translate("Dialogs", "Color"), oui::translate("Dialogs", "Grayscale"), oui::translate("Dialogs", "Indexed")},

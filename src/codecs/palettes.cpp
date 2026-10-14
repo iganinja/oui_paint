@@ -358,7 +358,7 @@ std::optional<Document> read_indexed_png(std::string_view bytes, std::string& er
                                        reinterpret_cast<const unsigned char*>(bytes.data()), bytes.size())};
     if(failure != 0 || state.info_png.color.colortype != LCT_PALETTE || state.info_png.color.bitdepth != 8)
     {
-        error = failure != 0 ? lodepng_error_text(failure) : "not a PNG with a palette of 8 bits";
+        error = failure != 0 ? std::string{lodepng_error_text(failure)} : olagarro::oui::translate("Files", "not a PNG with a palette of 8 bits");
         return std::nullopt;
     }
     Palette palette{olagarro::oui::format_text(olagarro::oui::translate("Dialogs", "Palette {0}"), {"1"}), {}, std::nullopt};

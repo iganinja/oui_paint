@@ -113,7 +113,7 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
     }
     if(names.empty())
     {
-        names.emplace_back("(no fonts)");
+        names.push_back(oui::translate("Tools", "(no fonts)"));
     }
     m_font = &choice(*m_text_group, oui::translate("Tools", "&Font:"), names);
     m_font->set_selected(chosen);

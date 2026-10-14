@@ -192,8 +192,14 @@ class PaintApp
                              const std::function<bool(const std::function<std::string()>& show)>& ask);
     // A palette file the user picks, by its name, and its colours; none when given up or unreadable, having said why.
     [[nodiscard]] std::optional<std::pair<std::string, std::vector<Color>>> pick_palette_file();
-    // Asks for the primary or the secondary colour as hexadecimal.
+    // Asks for the primary or the secondary colour; in an indexed image, when it was picked from the palette, for
+    // that colour of the palette.
     void edit_color(bool primary);
+    // Asks for a colour of an indexed image's palette, the image showing it as it is chosen.
+    void edit_palette_color(int slot, int index);
+    // The primary and secondary colours picked from an indexed image's palette shown as the palette has them now, as
+    // after one of its colours changed or another layer, with another palette, was chosen.
+    void show_picked_colors();
     void build_window();
     [[nodiscard]] CanvasView* current_view();
     void refresh_titles();

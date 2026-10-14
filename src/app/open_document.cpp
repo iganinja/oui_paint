@@ -53,13 +53,13 @@ std::optional<std::string> read_file(const std::filesystem::path& path, std::str
     std::ifstream file{path, std::ios::binary};
     if(!file)
     {
-        error = "cannot open " + olagarro::oui::utf8_of(path);
+        error = olagarro::oui::format_text(olagarro::oui::translate("Files", "cannot open {0}"), {olagarro::oui::utf8_of(path)});
         return std::nullopt;
     }
     std::string bytes{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
     if(file.bad())
     {
-        error = "cannot read " + olagarro::oui::utf8_of(path);
+        error = olagarro::oui::format_text(olagarro::oui::translate("Files", "cannot read {0}"), {olagarro::oui::utf8_of(path)});
         return std::nullopt;
     }
     return bytes;
@@ -73,14 +73,14 @@ bool write_file_atomically(const std::filesystem::path& path, std::string_view b
         std::ofstream file{temporary, std::ios::binary | std::ios::trunc};
         if(!file)
         {
-            error = "cannot write " + olagarro::oui::utf8_of(temporary);
+            error = olagarro::oui::format_text(olagarro::oui::translate("Files", "cannot write {0}"), {olagarro::oui::utf8_of(temporary)});
             return false;
         }
         file.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
         file.flush();
         if(!file)
         {
-            error = "cannot write " + olagarro::oui::utf8_of(temporary);
+            error = olagarro::oui::format_text(olagarro::oui::translate("Files", "cannot write {0}"), {olagarro::oui::utf8_of(temporary)});
             std::error_code ignored;
             std::filesystem::remove(temporary, ignored);
             return false;
@@ -90,7 +90,7 @@ bool write_file_atomically(const std::filesystem::path& path, std::string_view b
     std::filesystem::rename(temporary, path, failure);
     if(failure)
     {
-        error = "cannot replace " + olagarro::oui::utf8_of(path) + ": " + failure.message();
+        error = olagarro::oui::format_text(olagarro::oui::translate("Files", "cannot replace {0}: {1}"), {olagarro::oui::utf8_of(path), failure.message()});
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
         return false;

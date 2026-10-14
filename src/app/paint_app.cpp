@@ -670,42 +670,7 @@ void PaintApp::build_window()
                 m_color_panel->set_primary(shown);
             }
         });
-    m_palettes_panel->on_edit(
-        [this](int slot, int index)
-        {
-            auto* const open{current()};
-            if(open == nullptr)
-            {
-                return;
-            }
-            const auto& setup{*open->document().palettes()};
-            const auto& palette{setup.palettes.at(static_cast<std::size_t>(slot))};
-            auto start{palette.colors.at(static_cast<std::size_t>(index))};
-            start.alpha = 1.0;
-            // The image shows the colour as it is chosen, as an effect does.
-            auto chosen{start};
-            static_cast<void>(change_with_preview(
-                oui::translate("History", "Edit Palette Color"),
-                [&](Document& document)
-                {
-                    auto setup{*document.palettes()};
-                    auto color{setup.nearest_allowed(chosen)};
-                    color.alpha = 1.0;
-                    setup.palettes.at(static_cast<std::size_t>(slot)).colors.at(static_cast<std::size_t>(index)) = color;
-                    document.set_palettes(std::move(setup));
-                },
-                [&](const std::function<std::string()>& show)
-                {
-                    return ask_color(m_application,
-                                     oui::format_text(oui::translate("Dialogs", "Palette {0}, Color {1}"), {std::to_string(slot + 1), std::to_string(index)}), start,
-                                     [&](const Color& color)
-                                     {
-                                         chosen = color;
-                                         static_cast<void>(show());
-                                     })
-                        .has_value();
-                }));
-        });
+    m_palettes_panel->on_edit([this](int slot, int index) { edit_palette_color(slot, index); });
     m_palettes_panel->on_slot(
         [this](int slot)
         {
@@ -816,6 +781,7 @@ void PaintApp::refresh_titles()
     }
     refresh_workbench_images();
     update_mode_checks();
+    show_picked_colors();
 }
 
 void PaintApp::refresh_workbench_images()
@@ -969,7 +935,7 @@ std::vector<oui::MenuItem> PaintApp::recent_items()
     }
     if(items.empty())
     {
-        items.push_back(oui::menu_action("(none yet)", [] {}, false));
+        items.push_back(oui::menu_action(oui::translate("Menus", "(none yet)"), [] {}, false));
     }
     return items;
 }
@@ -1640,6 +1606,7 @@ void PaintApp::show_layers()
     m_history_panel->set_history(open != nullptr ? &open->history() : nullptr);
     m_palettes_panel->set_document(open != nullptr ? &open->document() : nullptr);
     update_ants();
+    show_picked_colors();
 }
 
 void PaintApp::select_tool(const std::string& tool)
@@ -2794,6 +2761,7 @@ bool PaintApp::change_with_preview(std::string name, const std::function<void(Do
                             problem = failure.what();
                         }
                         refresh(before, LayersState::of(document));
+                        show_picked_colors();
                         return problem;
                     }};
     open->history().begin_step(document);
@@ -2869,8 +2837,75 @@ void PaintApp::redo()
     }
 }
 
+void PaintApp::edit_palette_color(int slot, int index)
+{
+    auto* const open{current()};
+    if(open == nullptr || !open->document().indexed())
+    {
+        return;
+    }
+    const auto& setup{*open->document().palettes()};
+    auto start{setup.palettes.at(static_cast<std::size_t>(slot)).colors.at(static_cast<std::size_t>(index))};
+    start.alpha = 1.0;
+    // The image shows the colour as it is chosen, as an effect does.
+    auto chosen{start};
+    static_cast<void>(change_with_preview(
+        oui::translate("History", "Edit Palette Color"),
+        [&](Document& document)
+        {
+            auto changed{*document.palettes()};
+            auto color{changed.nearest_allowed(chosen)};
+            color.alpha = 1.0;
+            changed.palettes.at(static_cast<std::size_t>(slot)).colors.at(static_cast<std::size_t>(index)) = color;
+            document.set_palettes(std::move(changed));
+        },
+        [&](const std::function<std::string()>& show)
+        {
+            return ask_color(m_application,
+                             oui::format_text(oui::translate("Dialogs", "Palette {0}, Color {1}"),
+                                              {std::to_string(slot + 1), std::to_string(index)}),
+                             start,
+                             [&](const Color& color)
+                             {
+                                 chosen = color;
+                                 static_cast<void>(show());
+                             })
+                .has_value();
+        }));
+    show_picked_colors();
+}
+
+void PaintApp::show_picked_colors()
+{
+    const auto* const open{current()};
+    if(open == nullptr || !open->document().indexed())
+    {
+        return;
+    }
+    const auto& document{open->document()};
+    const auto slot{document.layers()[document.active_layer()].palette_slot()};
+    if(m_primary_index)
+    {
+        m_color_panel->set_primary(document.palettes()->color(slot, *m_primary_index));
+    }
+    if(m_secondary_index)
+    {
+        m_color_panel->set_secondary(document.palettes()->color(slot, *m_secondary_index));
+    }
+}
+
 void PaintApp::edit_color(bool primary)
 {
+    // In an indexed image a colour picked from the palette is its index: editing it edits the palette.
+    if(const auto* const open{current()}; open != nullptr && open->document().indexed())
+    {
+        if(const auto& picked{primary ? m_primary_index : m_secondary_index})
+        {
+            const auto& document{open->document()};
+            edit_palette_color(document.layers()[document.active_layer()].palette_slot(), *picked);
+            return;
+        }
+    }
     const auto put{[this, primary](const Color& color)
                    {
                        if(primary)
@@ -3032,7 +3067,7 @@ bool PaintApp::save_workbench(PluginWorkbench& workbench, bool ask_for_name)
         {
             if(text.empty() || text.find_first_of("/\\:*?\"<>|") != std::string_view::npos)
             {
-                return std::string{"A name without / \\ : * ? \" < > |"};
+                return oui::translate("Dialogs", "A name without / \\ : * ? \" < > |");
             }
             return std::nullopt;
         };

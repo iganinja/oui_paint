@@ -49,7 +49,7 @@ bool ask_curves(oui::Application& application, std::map<std::string, double>& va
     }
     auto& editor{content.add(std::make_unique<CurveEditor>())};
     oui::label(oui::translate("Dialogs", "Click to add a point and drag to move it;"), content);
-    oui::label("a right click, or dragging it far off, takes it away.", content);
+    oui::label(oui::translate("Dialogs", "a right click, or dragging it far off, takes it away."), content);
 
     // The curves edited: luminosity's, or those of the colours ticked.
     const auto edited{[&]

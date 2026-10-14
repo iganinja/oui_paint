@@ -164,7 +164,8 @@ std::string third_party_notices()
     names.insert(names.end(), {"mingw-w64 runtime", "winpthreads"});
 #endif
     const auto texts{embedded_notices()};
-    std::string markdown{"# Third-party notices\n\nOUI Paint carries these pieces, under these licenses.\n"};
+    std::string markdown{"# " + translate("Help", "Third-party notices") + "\n\n" +
+                         translate("Help", "OUI Paint carries these pieces, under these licenses.") + "\n"};
     for(std::size_t index{}; index < texts.size(); ++ index)
     {
         markdown += "\n## " + (index < names.size() ? names[index] : std::string{"?"}) + "\n\n```\n" +
