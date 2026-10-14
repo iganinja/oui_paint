@@ -97,3 +97,15 @@ TEST(Arc, AnArcIsDrawnOnlyWhereItTurnsWithRoundEnds)
         EXPECT_EQ(alpha_at(whole, x, y), 255) << x << ", " << y << ": a whole turn is the circle";
     }
 }
+
+TEST(Arc, SnappingKeepsTheRadiusLineToStepsOf15DegreesToo)
+{
+    ArcGesture arc;
+    static_cast<void>(arc.click({50, 50}, false));
+    arc.move(round_at(0.2), true);
+    const auto pointer{arc.pointer()};
+    EXPECT_NEAR(std::atan2(pointer.y - 50.0, pointer.x - 50.0), pi / 12.0, 1e-9) << "the line at 15 degrees";
+    EXPECT_NEAR(std::hypot(pointer.x - 50.0, pointer.y - 50.0), 20.0, 1e-9) << "as long as the pointer is far";
+    arc.move(round_at(0.2), false);
+    EXPECT_NEAR(std::atan2(arc.pointer().y - 50.0, arc.pointer().x - 50.0), 0.2, 1e-9) << "and free without";
+}

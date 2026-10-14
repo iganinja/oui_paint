@@ -292,10 +292,17 @@ std::vector<TilePoint> draw_arc(Layer& layer, const Selection& selection, Positi
     const auto reach{radius + width};
     std::set<TilePoint> touched;
     paint(layer, selection, center.x - reach, center.y - reach, center.x + reach, center.y + reach, color, antialias,
-          [&](double x, double y)
+          [&, near{std::max(0.0, radius - width / 2.0 - 1.0)}, far{radius + width / 2.0 + 1.0}](double x, double y)
           {
               const auto dx{x - center.x};
               const auto dy{y - center.y};
+              // Off the band round the circle that the arc and its round ends lie in: nothing, without the sums below,
+              // which most pixels of the box are.
+              const auto squared{dx * dx + dy * dy};
+              if(squared < near * near || squared > far * far)
+              {
+                  return 0.0;
+              }
               // To the circle where the pixel's direction is within the arc; to the nearer end, rounded, where not.
               const auto distance{within(std::atan2(dy, dx))
                                       ? std::abs(std::hypot(dx, dy) - radius)

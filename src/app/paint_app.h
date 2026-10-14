@@ -141,6 +141,8 @@ class PaintApp
     void use_arc(const ToolEvent& event);
     // An arc not finished left out, as Esc does, the layer as it was.
     void cancel_arc();
+    // The arc drawn again as it is now, over the layer as it was before it.
+    void redraw_arc();
     // The canvas stops taking keys first once nothing between clicks or typing needs them.
     void release_keys();
     // Ends bending the line: it stays as it is, one step.
@@ -323,6 +325,8 @@ class PaintApp
         bool secondary{false};
     };
     std::optional<ArcDrawing> m_arc;
+    // The arc is drawn again once a frame, as the pointer is by then: a move each time would fall behind.
+    bool m_arc_redraw_posted{false};
     // Text being typed with the Text tool: where, what, and the layer before it.
     struct Typing
     {

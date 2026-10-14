@@ -827,9 +827,9 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
     view->on_overlay(
         [this](std::uint32_t* pixels, int width, int height)
         {
-            // The radius of an arc being drawn: a line from its centre to the pointer, in dashes of black and white
-            // that show on any colour.
-            if(m_arc && m_arc->document == current() && m_arc->gesture.step() == ArcGesture::Step::radius)
+            // An arc being drawn, as a compass: its centre, the circle it is on, and the arm from the centre to where
+            // the pointer sets the radius or the arc reaches, in dashes of black and white that show on any colour.
+            if(m_arc && m_arc->document == current())
             {
                 const auto& viewport{m_arc->document->viewport()};
                 const auto in_view{[&](Position at)
@@ -837,18 +837,41 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
                                        return Position{viewport.origin().x + at.x * viewport.zoom(),
                                                        viewport.origin().y + at.y * viewport.zoom()};
                                    }};
-                const auto from{in_view(m_arc->gesture.center())};
-                const auto to{in_view(m_arc->gesture.pointer())};
-                const auto steps{static_cast<int>(std::ceil(std::max(std::abs(to.x - from.x), std::abs(to.y - from.y))))};
+                const auto put{[&](double x, double y, std::uint32_t color)
+                               {
+                                   const auto px{static_cast<int>(std::lround(x))};
+                                   const auto py{static_cast<int>(std::lround(y))};
+                                   if(px >= 0 && py >= 0 && px < width && py < height)
+                                   {
+                                       pixels[static_cast<std::ptrdiff_t>(py) * width + px] = color;
+                                   }
+                               }};
+                const auto dash{[](int step) { return (step / 4) % 2 == 0 ? 0x000000u : 0xffffffu; }};
+                const auto& gesture{m_arc->gesture};
+                const auto center{in_view(gesture.center())};
+                const auto& arc{gesture.arc()};
+                const auto sweeping{gesture.step() == ArcGesture::Step::sweep};
+                const auto reach{sweeping ? in_view({arc.center.x + std::cos(arc.start + arc.sweep) * arc.radius,
+                                                     arc.center.y + std::sin(arc.start + arc.sweep) * arc.radius})
+                                          : in_view(gesture.pointer())};
+                const auto radius{std::hypot(reach.x - center.x, reach.y - center.y)};
+                const auto steps{static_cast<int>(std::ceil(radius))};
                 for(int step{}; step <= steps; ++ step)
                 {
                     const auto along{steps == 0 ? 0.0 : static_cast<double>(step) / steps};
-                    const auto x{static_cast<int>(std::lround(from.x + (to.x - from.x) * along))};
-                    const auto y{static_cast<int>(std::lround(from.y + (to.y - from.y) * along))};
-                    if(x >= 0 && y >= 0 && x < width && y < height)
-                    {
-                        pixels[static_cast<std::ptrdiff_t>(y) * width + x] = (step / 4) % 2 == 0 ? 0x000000u : 0xffffffu;
-                    }
+                    put(center.x + (reach.x - center.x) * along, center.y + (reach.y - center.y) * along, dash(step));
+                }
+                const auto around{static_cast<int>(std::ceil(2.0 * 3.14159265358979323846 * radius))};
+                for(int step{}; step < around; ++ step)
+                {
+                    const auto angle{2.0 * 3.14159265358979323846 * step / around};
+                    put(center.x + std::cos(angle) * radius, center.y + std::sin(angle) * radius, dash(step));
+                }
+                for(int offset{-5}; offset <= 5; ++ offset)
+                {
+                    const auto color{std::abs(offset) <= 1 ? 0xffffffu : 0x000000u};
+                    put(center.x + offset, center.y, color);
+                    put(center.x, center.y + offset, color);
                 }
             }
             const auto moving{m_tool_panel->selected() == "move_pixels"};
@@ -1810,18 +1833,23 @@ void PaintApp::use_arc(const ToolEvent& event)
             view->claim_keys(true);
         }
     }
-    const auto done{event.phase == ToolEvent::Phase::press ? m_arc->gesture.click(event.at, event.shift)
-                                                           : (m_arc->gesture.move(event.at, event.shift), false)};
-    if(m_arc->gesture.step() == ArcGesture::Step::sweep)
+    if(event.phase != ToolEvent::Phase::press)
     {
-        const auto before{LayersState::of(document)};
-        layer = m_arc->base;
-        auto brush{m_tool_options->settings()};
-        const auto& arc{m_arc->gesture.arc()};
-        static_cast<void>(draw_arc(layer, document.selection(), arc.center, arc.radius, arc.start, arc.sweep,
-                                   ink(m_arc->secondary), brush.width, brush.antialias && !document.indexed()));
-        open->refresh(changed_tiles(before, LayersState::of(document)));
+        m_arc->gesture.move(event.at, event.shift);
+        if(!m_arc_redraw_posted)
+        {
+            m_arc_redraw_posted = true;
+            m_application.post(
+                [this]
+                {
+                    m_arc_redraw_posted = false;
+                    redraw_arc();
+                });
+        }
+        return;
     }
+    const auto done{m_arc->gesture.click(event.at, event.shift)};
+    redraw_arc();
     if(done)
     {
         m_arc.reset();
@@ -1830,6 +1858,24 @@ void PaintApp::use_arc(const ToolEvent& event)
         open->set_modified(true);
         refresh_titles();
     }
+}
+
+void PaintApp::redraw_arc()
+{
+    if(!m_arc || m_arc->gesture.step() != ArcGesture::Step::sweep)
+    {
+        return;
+    }
+    auto& open{*m_arc->document};
+    auto& document{open.document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    const auto before{LayersState::of(document)};
+    layer = m_arc->base;
+    const auto brush{m_tool_options->settings()};
+    const auto& arc{m_arc->gesture.arc()};
+    static_cast<void>(draw_arc(layer, document.selection(), arc.center, arc.radius, arc.start, arc.sweep,
+                               ink(m_arc->secondary), brush.width, brush.antialias && !document.indexed()));
+    open.refresh(changed_tiles(before, LayersState::of(document)));
 }
 
 void PaintApp::release_keys()

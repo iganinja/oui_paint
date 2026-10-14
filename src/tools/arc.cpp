@@ -53,6 +53,13 @@ bool ArcGesture::click(Position at, bool snap)
 void ArcGesture::move(Position at, bool snap)
 {
     m_pointer = at;
+    if(m_step == Step::radius && snap)
+    {
+        // The radius's line in steps of 15 degrees, as long as the pointer is far from the centre.
+        const auto angle{snapped(std::atan2(at.y - m_arc.center.y, at.x - m_arc.center.x), true)};
+        const auto length{std::hypot(at.x - m_arc.center.x, at.y - m_arc.center.y)};
+        m_pointer = {m_arc.center.x + std::cos(angle) * length, m_arc.center.y + std::sin(angle) * length};
+    }
     if(m_step != Step::sweep)
     {
         return;
