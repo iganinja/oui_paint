@@ -31,3 +31,25 @@ TEST(Icons, AnIconIsDrawnAtAWholeMultipleOfItsSizeInTheMiddle)
     EXPECT_EQ(icons.picture("Bucket", 24, 26), picture) << "drawn once and kept";
     EXPECT_EQ(icons.picture("NoSuchIcon", 24, 24), nullptr);
 }
+
+TEST(Icons, OnADarkInterfaceTheyAreDrawnLighterAsGodotDrawsThem)
+{
+    // The mean brightness of what an icon covers.
+    const auto brightness{[](const olagarro::oui::Picture& picture)
+                          {
+                              double total{};
+                              double covered{};
+                              for(const auto pixel : picture.pixels)
+                              {
+                                  const auto alpha{(pixel >> 24u) / 255.0};
+                                  total += alpha * (((pixel >> 16u) & 0xffu) + ((pixel >> 8u) & 0xffu) + (pixel & 0xffu)) / 3.0;
+                                  covered += alpha;
+                              }
+                              return total / covered;
+                          }};
+    oui_paint::Icons icons;
+    const auto light{brightness(*icons.picture("Bucket", 16, 16))};
+    icons.set_dark_interface(true);
+    const auto dark{brightness(*icons.picture("Bucket", 16, 16))};
+    EXPECT_GT(dark, light + 60.0) << light << " on a light interface, " << dark << " on a dark one";
+}

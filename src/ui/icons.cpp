@@ -108,6 +108,15 @@ std::string for_light_interface(std::string_view svg)
     return result;
 }
 
+void Icons::set_dark_interface(bool dark)
+{
+    if(dark != m_dark)
+    {
+        m_dark = dark;
+        m_drawn.clear();
+    }
+}
+
 const oui::Picture* Icons::picture(std::string_view name, int width, int height)
 {
     const auto key{std::make_tuple(std::string{name}, width, height)};
@@ -124,7 +133,7 @@ const oui::Picture* Icons::picture(std::string_view name, int width, int height)
     constexpr int native{16};
     const auto room{std::min(width, height)};
     const auto side{room >= native ? room / native * native : room};
-    auto drawn{oui::draw_svg(for_light_interface(*source), side, side)};
+    auto drawn{oui::draw_svg(m_dark ? std::string{*source} : for_light_interface(*source), side, side)};
     if(!drawn)
     {
         return nullptr;

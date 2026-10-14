@@ -74,6 +74,8 @@ class PaintApp
     void open_last_session();
     // Asks for the preferences and keeps them.
     void show_preferences();
+    // Shows everything in one of OUI's graphical themes, by its id.
+    void use_theme(std::string_view id);
 
   private:
     void register_commands();

@@ -526,6 +526,7 @@
     "Preferences": {
       "&Language:": "&Idioma:",
       "&Open the images of the last session at start": "&Al empezar abrir las imágenes de la última sesión",
+      "&Theme:": "&Tema:",
       "Preferences": "Preferencias",
       "System language": "Idioma del sistema",
       "The language changes when OUI Paint starts again.": "El idioma cambia cuando OUI Paint vuelve a empezar."

@@ -147,8 +147,9 @@ Effects > Manage Plugins writes and tries them beside an image; see [Plugins](pl
 
 ## Settings
 
-Edit > Preferences (Ctrl+,) chooses the language, the system's or another, which changes when OUI Paint starts again,
-and whether the images open when it last closed open again when it starts with none given.
+Edit > Preferences (Ctrl+,) chooses the language, the system's or another, which changes when OUI Paint starts again;
+the theme, Classic, Ocean or Night, which shows as it is chosen; and whether the images open when it last closed open
+again when it starts with none given.
 
 OUI Paint keeps its settings in `oui_paint.ini`: beside the program when its folder can be written to, in the user's
 configuration folder when not. The `plugins` folder beside it holds the plugins added.

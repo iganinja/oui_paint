@@ -106,6 +106,8 @@ PaintApp::PaintApp(oui::Application& application, oui::PixelBackend& window, oui
 {
     std::error_code ignored;
     m_last_folder = std::filesystem::current_path(ignored);
+    // The look chosen in the preferences, before anything shows.
+    use_theme(m_settings.value("theme", "classic"));
     register_commands();
     build_window();
     load_plugins();
@@ -3532,14 +3534,41 @@ void PaintApp::show_preferences()
     {
         languages.emplace_back(translation.language(), translation.name());
     }
+    std::vector<std::pair<std::string, std::string>> themes;
+    for(const auto& theme : oui::graphical_themes())
+    {
+        themes.emplace_back(theme.id, theme.name);
+    }
     Preferences start;
     start.language = std::string{m_settings.value("language", "auto")};
     start.reopen_last_session = m_settings.bool_value("reopen_last_session", true);
-    if(const auto chosen{ask_preferences(m_application, start, languages)})
+    start.theme = std::string{m_settings.value("theme", "classic")};
+    // A theme chosen shows at once, and goes back if the preferences are cancelled.
+    const auto chosen{ask_preferences(m_application, start, languages, themes, [this](const std::string& id) { use_theme(id); })};
+    if(!chosen)
     {
-        m_settings.set_value("language", chosen->language);
-        m_settings.set_bool_value("reopen_last_session", chosen->reopen_last_session);
-        static_cast<void>(m_settings.save());
+        use_theme(start.theme);
+        return;
+    }
+    m_settings.set_value("language", chosen->language);
+    m_settings.set_bool_value("reopen_last_session", chosen->reopen_last_session);
+    m_settings.set_value("theme", chosen->theme);
+    static_cast<void>(m_settings.save());
+    use_theme(chosen->theme);
+}
+
+void PaintApp::use_theme(std::string_view id)
+{
+    for(const auto& theme : oui::graphical_themes())
+    {
+        if(theme.id == id)
+        {
+            m_window.set_style(theme.style);
+            m_application.set_theme(oui::theme_for(theme.style));
+            // Godot's icons are drawn for a dark interface, and made darker for a light one.
+            const auto& face{theme.style.face};
+            m_icons.set_dark_interface(0.299 * face.red + 0.587 * face.green + 0.114 * face.blue < 128.0);
+        }
     }
 }
 

@@ -18,7 +18,9 @@ namespace oui_paint
 {
 
 std::optional<Preferences> ask_preferences(oui::Application& application, const Preferences& start,
-                                           const std::vector<std::pair<std::string, std::string>>& languages)
+                                           const std::vector<std::pair<std::string, std::string>>& languages,
+                                           const std::vector<std::pair<std::string, std::string>>& themes,
+                                           const std::function<void(const std::string& theme)>& theme_chosen)
 {
     auto window{oui::window(oui::translate("Preferences", "Preferences"))};
     auto& content{oui::column(*window)};
@@ -42,6 +44,21 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
     language_label.set_buddy(language);
     oui::label("", form);
     oui::label(oui::translate("Preferences", "The language changes when OUI Paint starts again."), form);
+
+    std::vector<std::string> theme_names;
+    std::size_t theme_chosen_index{};
+    for(const auto& [id, name] : themes)
+    {
+        if(id == start.theme)
+        {
+            theme_chosen_index = theme_names.size();
+        }
+        theme_names.push_back(name);
+    }
+    auto& theme_label{oui::label(oui::translate("Preferences", "&Theme:"), form)};
+    auto& theme{form.add(std::make_unique<oui::ComboBox>(theme_names, theme_chosen_index))};
+    theme_label.set_buddy(theme);
+    static_cast<void>(theme.on_selected([&](std::size_t index) { theme_chosen(themes.at(index).first); }));
 
     oui::label("", form);
     auto& reopen{oui::check_button(oui::translate("Preferences", "&Open the images of the last session at start"), form)};
@@ -67,6 +84,7 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
     Preferences chosen_preferences;
     chosen_preferences.language = languages.at(language.selected()).first;
     chosen_preferences.reopen_last_session = reopen.is_checked();
+    chosen_preferences.theme = themes.at(theme.selected()).first;
     return chosen_preferences;
 }
 
