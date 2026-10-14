@@ -158,6 +158,7 @@ if(OUI_PAINT_BUILD_TESTS)
     find_package(GTest REQUIRED)
     include(GoogleTest)
     add_executable(oui_paint_tests
+        tests/anchor_grid_test.cpp
         tests/codecs_test.cpp
         tests/color_panel_test.cpp
         tests/color_math_test.cpp
