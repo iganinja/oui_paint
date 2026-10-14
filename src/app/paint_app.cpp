@@ -736,6 +736,20 @@ void PaintApp::build_window()
             return document != nullptr && document->modified();
         });
     static_cast<void>(m_tabs->on_close_requested([this](std::size_t index) { static_cast<void>(close(index)); }));
+    // A tab says the whole path of its file, which its title leaves out; nothing for what has none yet.
+    m_tabs->set_tooltip_provider(
+        [this](std::size_t index) -> std::optional<std::string>
+        {
+            if(const auto* const document{document_in_tab(index)}; document != nullptr && document->path())
+            {
+                return oui::utf8_of(*document->path());
+            }
+            if(const auto* const workbench{workbench_in_tab(index)}; workbench != nullptr && workbench->file())
+            {
+                return oui::utf8_of(*workbench->file());
+            }
+            return std::nullopt;
+        });
     static_cast<void>(m_tabs->on_selection_changed([this](auto&&...) { show_layers(); }));
     m_frame->set_center(std::move(tabs));
     m_frame->status_bar().set_provider(
