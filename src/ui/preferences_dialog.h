@@ -18,6 +18,8 @@ struct Preferences
     std::string language{"auto"};
     // At start, with no images given, the ones open when OUI Paint last closed open again.
     bool reopen_last_session{true};
+    // Each text the Text tool types goes on a new layer of its own, named after it.
+    bool text_on_new_layer{false};
     // The look, by the id of one of OUI's graphical themes.
     std::string theme{"classic"};
 };

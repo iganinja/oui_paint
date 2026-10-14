@@ -1681,8 +1681,17 @@ void PaintApp::use_tool(const ToolEvent& event)
         // A click puts down what was typed and starts typing anew where it is.
         settle();
         open->history().begin_step(document);
+        // Each text on a layer of its own, above the one in use, when the preferences say so.
+        const auto own_layer{m_settings.bool_value("text_on_new_layer", false)};
+        if(own_layer)
+        {
+            const auto slot{document.layers()[document.active_layer()].palette_slot()};
+            document.insert_layer_above(oui::translate("Layers", "Text")).set_palette_slot(slot);
+            m_layers_panel->set_document(&document);
+        }
         m_typing = Typing{open, {std::floor(event.at.x), std::floor(event.at.y)}, {},
                           document.layers()[document.active_layer()]};
+        m_typing->own_layer = own_layer;
         if(auto* const view{current_view()})
         {
             view->claim_keys(true);
@@ -2836,6 +2845,21 @@ bool PaintApp::type_key(const oui::Event& event)
     return true;
 }
 
+std::string PaintApp::shortened(std::string_view text, std::size_t most)
+{
+    // Whole characters, to the last that fits in `most` bytes, and an ellipsis after them.
+    if(text.size() <= most)
+    {
+        return std::string{text};
+    }
+    auto end{most};
+    while(end > 0 && (static_cast<unsigned char>(text[end]) & 0xc0u) == 0x80u)
+    {
+        -- end;
+    }
+    return std::string{text.substr(0, end)} + "...";
+}
+
 void PaintApp::settle(bool keep_line)
 {
     if(!keep_line)
@@ -2851,16 +2875,31 @@ void PaintApp::settle(bool keep_line)
         // What was typed stays, without its cursor, as one step.
         show_typing(false);
         auto& open{*m_typing->document};
+        auto& document{open.document()};
         const auto typed{!m_typing->typed.text.empty()};
+        const auto own_layer{m_typing->own_layer};
+        const auto first_line{m_typing->typed.text.substr(0, m_typing->typed.text.find('\n'))};
         m_typing.reset();
         if(typed)
         {
-            open.history().finish_step(oui::translate("History", "Text"), open.document());
+            // A text's own layer is named after it: its first line, or as much of it as reads as a name.
+            if(own_layer && !first_line.empty())
+            {
+                document.layers()[document.active_layer()].set_name(shortened(first_line, 32));
+                m_layers_panel->set_document(&document);
+            }
+            open.history().finish_step(oui::translate("History", "Text"), document);
             open.set_modified(true);
             refresh_titles();
         }
         else
         {
+            // Nothing typed leaves nothing, not even the layer made for it.
+            if(own_layer)
+            {
+                document.remove_layer(document.active_layer());
+                m_layers_panel->set_document(&document);
+            }
             open.history().cancel_step();
         }
     }
@@ -4099,6 +4138,7 @@ void PaintApp::show_preferences()
     Preferences start;
     start.language = std::string{m_settings.value("language", "auto")};
     start.reopen_last_session = m_settings.bool_value("reopen_last_session", true);
+    start.text_on_new_layer = m_settings.bool_value("text_on_new_layer", false);
     start.theme = std::string{m_settings.value("theme", "classic")};
     // A theme chosen shows at once, and goes back if the preferences are cancelled.
     const auto chosen{ask_preferences(m_application, start, languages, themes, [this](const std::string& id) { use_theme(id); })};
@@ -4109,6 +4149,7 @@ void PaintApp::show_preferences()
     }
     m_settings.set_value("language", chosen->language);
     m_settings.set_bool_value("reopen_last_session", chosen->reopen_last_session);
+    m_settings.set_bool_value("text_on_new_layer", chosen->text_on_new_layer);
     m_settings.set_value("theme", chosen->theme);
     static_cast<void>(m_settings.save());
     use_theme(chosen->theme);

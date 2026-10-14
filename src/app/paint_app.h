@@ -198,6 +198,8 @@ class PaintApp
     // Puts floating pixels down where they are, and text being typed.
     // `keep_line`: but the line being bent, which Line / Curve itself goes on with.
     void settle(bool keep_line = false);
+    // `text` in at most `most` bytes, whole characters, with "..." when cut.
+    [[nodiscard]] static std::string shortened(std::string_view text, std::size_t most);
     // Starts or stops the marching ants as the current document has a selection or not.
     void update_ants();
     void undo();
@@ -361,6 +363,8 @@ class PaintApp
         Layer base;
         // Turned round `at`, clockwise.
         double radians{0.0};
+        // On a layer made for it, as the preferences can ask.
+        bool own_layer{false};
     };
     std::optional<Typing> m_typing;
     // A sign of the text being typed being dragged: turning it or moving it, from where, and the text as it was.

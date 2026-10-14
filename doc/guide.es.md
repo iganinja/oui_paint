@@ -162,8 +162,9 @@ escribe y los prueba junto a una imagen; mira [Plugins](plugins.md), que está e
 ## Ajustes
 
 Edición > Preferencias (Ctrl+,) elige el idioma, el del sistema u otro, que cambia cuando OUI Paint vuelve a empezar;
-el tema, Clásico, Océano o Noche, que se ve en cuanto se elige; y si al empezar sin ninguna imagen dada se vuelven a
-abrir las que estaban abiertas al cerrarlo.
+el tema, Clásico, Océano o Noche, que se ve en cuanto se elige; si al empezar sin ninguna imagen dada se vuelven a
+abrir las que estaban abiertas al cerrarlo; y si cada texto que escribe la herramienta Texto va a una capa nueva para
+él, con su nombre.
 
 OUI Paint guarda sus ajustes en `oui_paint.ini`: junto al programa cuando se puede escribir en su carpeta, y en la
 carpeta de configuración del usuario cuando no. La carpeta `plugins` de su lado guarda los plugins añadidos.

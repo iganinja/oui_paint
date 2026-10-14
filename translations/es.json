@@ -363,7 +363,8 @@
       "Background": "Fondo",
       "Layer": "Capa",
       "Layer {0}": "Capa {0}",
-      "Palette {0}": "Paleta {0}"
+      "Palette {0}": "Paleta {0}",
+      "Text": "Texto"
     },
     "Menus": {
       "&Adjustments": "A&justes",
@@ -531,6 +532,7 @@
       "&Open the images of the last session at start": "&Al empezar abrir las imágenes de la última sesión",
       "&Theme:": "&Tema:",
       "Preferences": "Preferencias",
+      "Put each text on a &new layer": "Poner cada texto en una capa &nueva",
       "System language": "Idioma del sistema",
       "The language changes when OUI Paint starts again.": "El idioma cambia cuando OUI Paint vuelve a empezar."
     },

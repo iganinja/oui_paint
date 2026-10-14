@@ -63,6 +63,9 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
     oui::label("", form);
     auto& reopen{oui::check_button(oui::translate("Preferences", "&Open the images of the last session at start"), form)};
     reopen.set_checked(start.reopen_last_session);
+    oui::label("", form);
+    auto& text_layer{oui::check_button(oui::translate("Preferences", "Put each text on a &new layer"), form)};
+    text_layer.set_checked(start.text_on_new_layer);
 
     auto& buttons{oui::row(content)};
     buttons.set_gap(oui::Spacing::normal);
@@ -84,6 +87,7 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
     Preferences chosen_preferences;
     chosen_preferences.language = languages.at(language.selected()).first;
     chosen_preferences.reopen_last_session = reopen.is_checked();
+    chosen_preferences.text_on_new_layer = text_layer.is_checked();
     chosen_preferences.theme = themes.at(theme.selected()).first;
     return chosen_preferences;
 }
