@@ -132,15 +132,24 @@ paint.effect({
         {id: "outputLow", name: "Output black", min: 0, max: 255, value: 0},
         {id: "outputHigh", name: "Output white", min: 0, max: 255, value: 255},
     ],
+    // Each colour can have levels of its own, as "inputLow_r": what the dialog sets for the colours ticked.
     render(image, values) {
-        const inLow = values.inputLow / 255;
-        const inHigh = Math.max(inLow + 1 / 255, values.inputHigh / 255);
-        const outLow = values.outputLow / 255;
-        const outHigh = values.outputHigh / 255;
-        return image.lookup(table((x) => {
-            const stretched = Math.min(1, Math.max(0, (x - inLow) / (inHigh - inLow)));
-            return outLow + Math.pow(stretched, 1 / values.gamma) * (outHigh - outLow);
-        }, 1024));
+        const channel = (name) => {
+            const value = (id) => {
+                const own = values[id + "_" + name];
+                return own === undefined ? values[id] : own;
+            };
+            const inLow = value("inputLow") / 255;
+            const inHigh = Math.max(inLow + 1 / 255, value("inputHigh") / 255);
+            const outLow = value("outputLow") / 255;
+            const outHigh = value("outputHigh") / 255;
+            const gamma = value("gamma");
+            return table((x) => {
+                const stretched = Math.min(1, Math.max(0, (x - inLow) / (inHigh - inLow)));
+                return outLow + Math.pow(stretched, 1 / gamma) * (outHigh - outLow);
+            }, 1024);
+        };
+        return image.lookup(channel("r"), channel("g"), channel("b"));
     },
 });
 

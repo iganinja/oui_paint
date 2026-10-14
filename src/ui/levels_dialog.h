@@ -13,8 +13,9 @@ namespace oui_paint
 
 // The Levels adjustment's dialog, as Paint.NET's: what goes in over the image's histogram, with markers for black,
 // grey and white to drag, and what comes out over a gradient, with markers for black and white; their numbers beside,
-// Auto to stretch what the histogram has from black to white. The values are the Levels plugin's: inputLow,
-// inputHigh, gamma, outputLow and outputHigh; `changed` hears every change, so the image shows it. True when accepted.
+// Auto to stretch what the histogram has from black to white. Red, green and blue ticked are edited together, each
+// keeping levels of its own. The values are the Levels plugin's: inputLow, inputHigh, gamma, outputLow and outputHigh,
+// and each colour's own, as inputLow_r; `changed` hears every change, so the image shows it. True when accepted.
 [[nodiscard]] bool ask_levels(olagarro::oui::Application& application, std::map<std::string, double>& values,
                               const std::function<void(const std::map<std::string, double>&)>& changed,
                               const Histogram& histogram);

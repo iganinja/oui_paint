@@ -123,3 +123,18 @@ TEST(Plugins, AParallelEffectRunsItsRowsOnEveryCoreAndGivesTheSameAsOne)
     }
     EXPECT_NEAR(result.at(32, 150)[1], 0.5, 1e-6);
 }
+
+TEST(Plugins, LevelsCanGiveEachColourLevelsOfItsOwn)
+{
+    PluginHost host;
+    for(const auto& [source, name] : built_in_plugins())
+    {
+        host.load(source, name);
+    }
+    const std::map<std::string, double> values{{"inputLow", 0},  {"inputHigh", 255},  {"gamma", 1},
+                                               {"outputLow", 0}, {"outputHigh", 255}, {"inputLow_r", 128}};
+    const auto result{host.apply(named(host, "Levels"), gray(2, 2, 160.0f / 255.0f), values, {})};
+    EXPECT_NEAR(result.at(0, 0)[0], 0.25f, 0.01f) << "red stretched from 128 up: 160 comes out at a quarter";
+    EXPECT_NEAR(result.at(0, 0)[1], 160.0f / 255.0f, 1e-3f) << "green as it was";
+    EXPECT_NEAR(result.at(0, 0)[2], 160.0f / 255.0f, 1e-3f);
+}

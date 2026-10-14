@@ -96,3 +96,4 @@ TEST(PluginTrial, ANewPluginWorksOnTheTestCardAsItStarts)
     ASSERT_TRUE(tried.made);
     EXPECT_NE(tried.made->pixel<Rgba8>(2, 300).value, card.pixel<Rgba8>(2, 300).value) << "the lines softened";
 }
+

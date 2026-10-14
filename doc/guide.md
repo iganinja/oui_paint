@@ -129,7 +129,8 @@ change as the values move.
   moves it, a right click or dragging it far off takes it away. The transfer map is luminosity, which keeps the
   colours' hues, or red, green and blue, the ones ticked edited together.
 - **Levels** (Ctrl+L) has the histogram of what goes in, with markers for black, grey and white, and what comes out
-  under it; Auto stretches what the image has from black to white.
+  under it; Auto stretches what the image has from black to white. Red, green and blue ticked are edited together,
+  each keeping levels of its own, as with all three ticked they share them.
  Ctrl+F repeats the last effect. Every effect is a plugin, and more can be added:
 Effects > Manage Plugins writes and tries them beside an image; see [Plugins](plugins.md).
 
