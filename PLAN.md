@@ -213,8 +213,6 @@ and load. Missing ones are drawn in the same style.
 
 ## Wanted
 
-- A changed image's tab keeps its close button: the asterisk in its title already says it is changed, and the circle
-  in place of the close button says it twice.
 - Text with an outline, a drop shadow, a glow and the like, which Paint.NET's text tool lacks.
 - Every shape drawn by construction, as the Arc tool draws: a square with one side here, a circle with its centre
   there, each click fixing one thing and a guide showing the rest.
