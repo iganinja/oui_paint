@@ -149,7 +149,9 @@ if(WIN32)
         third_party/olagarro/licenses/winpthreads.txt)
 endif()
 olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_notices FILES ${OUI_PAINT_NOTICES})
-target_compile_definitions(oui_paint_core PRIVATE OUI_PAINT_VERSION="${PROJECT_VERSION}")
+# The version About shows: a release's, from its tag, or the project's.
+set(OUI_PAINT_VERSION "${PROJECT_VERSION}" CACHE STRING "The version OUI Paint shows")
+target_compile_definitions(oui_paint_core PRIVATE OUI_PAINT_VERSION="${OUI_PAINT_VERSION}")
 
 add_executable(oui_paint src/main.cpp)
 target_link_libraries(oui_paint PRIVATE oui_paint_core olagarro::OUIWindow)

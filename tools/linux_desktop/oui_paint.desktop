@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=OUI Paint
+GenericName=Image Editor
+GenericName[es]=Editor de imágenes
+Comment=Edit images with layers, palettes and effects
+Comment[es]=Edita imágenes con capas, paletas y efectos
+Exec=oui_paint %F
+Icon=oui_paint
+Terminal=false
+Categories=Graphics;2DGraphics;RasterGraphics;
+MimeType=image/png;image/jpeg;image/bmp;image/gif;image/x-tga;image/openraster;
+StartupWMClass=oui_paint

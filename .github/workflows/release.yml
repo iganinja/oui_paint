@@ -1,0 +1,147 @@
+# Makes a release from a version's tag, as v0.1.0: the tests first, on x86-64 and ARM64 Linux and on Apple's and
+# Intel's Macs, then the program of each system and processor with tools/build_portable.sh, each on GitHub's machines of
+# that system and processor, then the release's files with tools/package_release.sh, published as the tag's release.
+# Started by hand from the Actions tab, it does the same and leaves the files as the run's artifact instead of
+# publishing them. A tag's Debian packages then go to the APT repository on GitHub Pages, made and signed by
+# tools/apt_repository.sh with the key in the APT_SIGNING_KEY secret.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Tests (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # Every system's tests to the end, though one fails: each shows its failures, and nothing is built either way.
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - name: macos-arm64
+            runner: macos-15
+          - name: macos-x86_64
+            runner: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Install what the build needs
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y cmake ninja-build g++ libgtest-dev libgmock-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev \
+            libxkbcommon-dev libwayland-dev libwayland-bin wayland-protocols libegl-dev libgl-dev libdrm-dev \
+            libgbm-dev
+      - name: Install what the build needs on a Mac
+        if: runner.os == 'macOS'
+        run: brew install ninja googletest
+      - name: Build and test
+        run: tools/build.sh
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: test
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+            options: ""
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+            options: ""
+          - name: macos-arm64
+            runner: macos-15
+            options: ""
+          - name: macos-x86_64
+            runner: macos-15-intel
+            options: ""
+          - name: windows-x86_64
+            runner: ubuntu-24.04
+            options: --windows
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Install what the build needs on a Mac
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - name: Build the program
+        env:
+          # The version it shows: the tag's, or the project's in a run started by hand.
+          OUI_PAINT_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+        run: tools/build_portable.sh ${{ matrix.options }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.name }}
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          # The whole history and its tags: the Debian package takes its version from git describe.
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+      - name: Make the release's files
+        run: tools/package_release.sh
+      - name: Publish the tag's release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/release/* --title "$GITHUB_REF_NAME" --generate-notes
+      - name: Keep the files of a run started by hand
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: dist/release
+
+  apt-repository:
+    name: APT repository
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Take the release's Debian packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$GITHUB_REF_NAME" --pattern "*.deb" --dir debs
+      - name: Make the signed repository
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import
+          tools/apt_repository.sh debs site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5
