@@ -879,6 +879,45 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
             {
                 return;
             }
+            // The moving and turning signs beside the piece, each an icon on a square with an edge, as Paint.NET has them.
+            if(moving)
+            {
+                if(const auto gizmos{floating_gizmos()})
+                {
+                    const auto side{static_cast<int>(gizmo_size)};
+                    const auto& face{m_icons.dark_interface() ? 0x303030u : 0xf4f4f4u};
+                    for(const auto& [gizmo, name] : {std::pair{gizmos->first, "ToolMove"}, std::pair{gizmos->second, "RotateRight"}})
+                    {
+                        const auto left{static_cast<int>(std::lround(gizmo.x)) - side / 2};
+                        const auto top{static_cast<int>(std::lround(gizmo.y)) - side / 2};
+                        const auto* const picture{m_icons.picture(name, side - 4, side - 4)};
+                        for(int y{}; y < side; ++ y)
+                        {
+                            for(int x{}; x < side; ++ x)
+                            {
+                                const auto px{left + x};
+                                const auto py{top + y};
+                                if(px < 0 || py < 0 || px >= width || py >= height)
+                                {
+                                    continue;
+                                }
+                                auto color{x == 0 || y == 0 || x == side - 1 || y == side - 1 ? 0x808080u : face};
+                                if(picture != nullptr && x >= 2 && y >= 2 && x < side - 2 && y < side - 2)
+                                {
+                                    const auto pixel{picture->pixels[static_cast<std::size_t>((y - 2) * picture->width + x - 2)]};
+                                    const auto alpha{pixel >> 24u};
+                                    const auto mix{[alpha](std::uint32_t top_part, std::uint32_t bottom_part)
+                                                   { return (top_part * alpha + bottom_part * (255u - alpha) + 127u) / 255u; }};
+                                    color = mix(pixel >> 16u & 0xffu, color >> 16u & 0xffu) << 16u |
+                                            mix(pixel >> 8u & 0xffu, color >> 8u & 0xffu) << 8u |
+                                            mix(pixel & 0xffu, color & 0xffu);
+                                }
+                                pixels[static_cast<std::ptrdiff_t>(py) * width + px] = color;
+                            }
+                        }
+                    }
+                }
+            }
             // Squares of nine pixels, white with a black edge, where the handles are.
             for(const auto& handle : moving ? floating_handles() : line_handles())
             {
@@ -2056,15 +2095,45 @@ void PaintApp::transform_selection(std::string name, const std::function<void(Pi
     refresh_titles();
 }
 
+std::optional<std::pair<Position, Position>> PaintApp::floating_gizmos()
+{
+    const auto handles{floating_handles()};
+    if(handles.empty())
+    {
+        return std::nullopt;
+    }
+    // Beyond the bottom right corner as it shows, clear of its handle: moving, then turning.
+    const auto& corner{handles[2]};
+    return std::pair{Position{corner.x + gizmo_size, corner.y + gizmo_size},
+                     Position{corner.x + gizmo_size * 2.0 + 4.0, corner.y + gizmo_size}};
+}
+
 std::vector<Position> PaintApp::floating_handles()
 {
     std::vector<Position> handles;
     auto* const open{current()};
-    if(!m_floating || m_floating->document != open)
+    if(open == nullptr)
     {
         return handles;
     }
-    const auto corners{piece_corners(m_floating->piece, m_floating->transform)};
+    std::array<Position, 4> corners;
+    if(m_floating && m_floating->document == open)
+    {
+        corners = piece_corners(m_floating->piece, m_floating->transform);
+    }
+    else if(m_tool_panel->selected() == "move_pixels" && open->document().selection().active())
+    {
+        // Nothing lifted yet: where the selection is, which is what a press lifts, so the handles show at once.
+        const auto area{open->document().selection().bounds()};
+        corners = {Position{static_cast<double>(area.x), static_cast<double>(area.y)},
+                   Position{static_cast<double>(area.x + area.width), static_cast<double>(area.y)},
+                   Position{static_cast<double>(area.x + area.width), static_cast<double>(area.y + area.height)},
+                   Position{static_cast<double>(area.x), static_cast<double>(area.y + area.height)}};
+    }
+    else
+    {
+        return handles;
+    }
     for(const auto& corner : corners)
     {
         handles.push_back(open->viewport().view_at(corner));
@@ -2092,8 +2161,18 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
             m_moving = Moving{Moving::Kind::outline, event.at, {}, 0, selection.mask()};
             return;
         }
-        // A handle pressed scales; the right button turns; anything else moves.
+        // A handle pressed scales; the turning sign, or the right button, turns; anything else, and the moving
+        // sign, moves.
         auto kind{event.secondary ? Moving::Kind::rotate : Moving::Kind::move};
+        if(const auto gizmos{floating_gizmos()}; gizmos && !event.secondary)
+        {
+            const auto on{[&](Position gizmo)
+                          {
+                              return std::abs(gizmo.x - event.in_view.x) <= gizmo_size / 2.0 &&
+                                     std::abs(gizmo.y - event.in_view.y) <= gizmo_size / 2.0;
+                          }};
+            kind = on(gizmos->second) ? Moving::Kind::rotate : kind;
+        }
         auto handle{0};
         const auto handles{floating_handles()};
         for(std::size_t index{}; index < handles.size() && !event.secondary; ++ index)

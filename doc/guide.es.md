@@ -50,8 +50,9 @@ herramientas y los efectos. Mientras se arrastra:
 Ctrl+A lo selecciona todo, Ctrl+D anula la selección, Ctrl+I la invierte. Supr borra lo seleccionado y Retroceso lo
 rellena con el color primario.
 
-**Mover píxeles seleccionados** (M) levanta lo seleccionado para poder arrastrarlo, escalarlo con sus asas y girarlo
-arrastrando con el botón derecho; Mayús mantiene sus proporciones al escalar y lo gira de 15 en 15 grados. **Mover
+**Mover píxeles seleccionados** (M) muestra en seguida las asas de la selección y levanta lo seleccionado para poder
+arrastrarlo, escalarlo con sus asas y girarlo; los dos iconos tras su esquina inferior derecha lo mueven y lo giran, y
+arrastrar con el botón derecho en cualquier sitio también lo gira; Mayús mantiene sus proporciones al escalar y lo gira de 15 en 15 grados. **Mover
 selección** (M otra vez) mueve solo el contorno. Edición > Espejar selección y Girar selección espejan y giran lo
 seleccionado en su sitio.
 

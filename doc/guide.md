@@ -47,8 +47,9 @@ on. While dragging:
 Ctrl+A selects everything, Ctrl+D deselects, Ctrl+I inverts. Delete erases what is selected and Backspace
 fills it with the primary color.
 
-**Move Selected Pixels** (M) lifts what is selected so it can be dragged, scaled by its handles and turned by
-dragging with the right button; Shift keeps its proportions while scaling and turns it in steps of 15 degrees. **Move Selection** (M again) moves only the outline.
+**Move Selected Pixels** (M) shows the selection's handles at once and lifts what is selected so it can be
+dragged, scaled by its handles and turned; the two signs beyond its bottom right corner move and turn it, and dragging
+with the right button anywhere turns it too; Shift keeps its proportions while scaling and turns it in steps of 15 degrees. **Move Selection** (M again) moves only the outline.
 Edit > Flip Selection and Rotate Selection flip and turn what is selected in place.
 
 ## Painting

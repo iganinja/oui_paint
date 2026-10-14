@@ -175,6 +175,10 @@ class PaintApp
     void transform_selection(std::string name, const std::function<void(PieceTransform&)>& change);
     // The floating piece's eight handles in the view: the corners, then the middles of the edges.
     [[nodiscard]] std::vector<Position> floating_handles();
+    // Where the moving and turning signs show beside the piece, in the view's pixels: what dragging them does is clear
+    // from them, as the right button turning is not.
+    [[nodiscard]] std::optional<std::pair<Position, Position>> floating_gizmos();
+    static constexpr double gizmo_size{20.0};
     // Puts floating pixels down where they are, and text being typed.
     // `keep_line`: but the line being bent, which Line / Curve itself goes on with.
     void settle(bool keep_line = false);
