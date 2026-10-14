@@ -195,6 +195,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/background_effect_test.cpp
         tests/layers_panel_test.cpp
         tests/levels_test.cpp
+        tests/light_dialog_test.cpp
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
         tests/palettes_test.cpp

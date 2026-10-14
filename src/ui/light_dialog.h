@@ -26,6 +26,8 @@ class LightDial final : public olagarro::oui::Widget
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override;
     void paint(olagarro::oui::Painter& painter, const olagarro::oui::Theme& theme) const override;
     bool handle_event(const olagarro::oui::Event& event) override;
+    // Every move of a drag, not only those from one cell to another: the sun follows the pointer smoothly.
+    [[nodiscard]] bool takes_raw_pointer() const override { return true; }
 
   private:
     double m_degrees;
