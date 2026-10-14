@@ -1,5 +1,7 @@
 # OUI Paint
 
+![OUI Paint editing an indexed image with four palettes, one of its colours changing as it is chosen](doc/images/oui_paint.png)
+
 A raster image editor in the spirit of Paint.NET, built on OUI: layers, selections that can be moved, turned and
 scaled, Paint.NET's tools, effects and keys, 8 and 16 bits per channel, indexed images with palettes, OpenRaster,
 the system clipboard both ways, and plugins in JavaScript. See [PLAN.md](PLAN.md), the keys in
