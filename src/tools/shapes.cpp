@@ -270,6 +270,42 @@ std::vector<Position> curve_through(const std::array<Position, 4>& through, int 
     return along;
 }
 
+std::vector<TilePoint> draw_arc(Layer& layer, const Selection& selection, Position center, double radius, double start,
+                                double sweep, const Color& color, double width, bool antialias)
+{
+    constexpr auto turn{2.0 * 3.14159265358979323846};
+    const auto whole{std::abs(sweep) >= turn - 1e-9};
+    const auto end{start + sweep};
+    const Position first{center.x + std::cos(start) * radius, center.y + std::sin(start) * radius};
+    const Position last{center.x + std::cos(end) * radius, center.y + std::sin(end) * radius};
+    // Whether a direction from the centre lies within the arc: how far round from its start, the way it turns.
+    const auto within{[&](double angle)
+                      {
+                          if(whole)
+                          {
+                              return true;
+                          }
+                          const auto from_start{sweep >= 0.0 ? angle - start : start - angle};
+                          const auto round{from_start - std::floor(from_start / turn) * turn};
+                          return round <= std::abs(sweep);
+                      }};
+    const auto reach{radius + width};
+    std::set<TilePoint> touched;
+    paint(layer, selection, center.x - reach, center.y - reach, center.x + reach, center.y + reach, color, antialias,
+          [&](double x, double y)
+          {
+              const auto dx{x - center.x};
+              const auto dy{y - center.y};
+              // To the circle where the pixel's direction is within the arc; to the nearer end, rounded, where not.
+              const auto distance{within(std::atan2(dy, dx))
+                                      ? std::abs(std::hypot(dx, dy) - radius)
+                                      : std::min(std::hypot(x - first.x, y - first.y), std::hypot(x - last.x, y - last.y))};
+              return inside(distance - width / 2.0, antialias);
+          },
+          touched);
+    return {touched.begin(), touched.end()};
+}
+
 std::vector<TilePoint> draw_curve(Layer& layer, const Selection& selection, const std::array<Position, 4>& through,
                                   const Color& color, double width, bool antialias, const LineSettings& settings)
 {

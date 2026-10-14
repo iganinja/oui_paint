@@ -262,6 +262,11 @@ bool CanvasView::handle_event(const oui::Event& event)
             m_tool_button.reset();
             m_tool(tool);
         }
+        else if(!m_tool_button && mouse->hover)
+        {
+            tool.phase = ToolEvent::Phase::hover;
+            m_tool(tool);
+        }
     }
     if(at)
     {

@@ -20,6 +20,8 @@ struct ToolEvent
         press,
         move,
         release,
+        // The pointer moving with no button down, which only a tool between clicks, as Arc, hears of.
+        hover,
     };
     Phase phase{Phase::press};
     // In the image's pixels, between whole ones too: (0.5, 0.5) is the middle of the top left pixel.

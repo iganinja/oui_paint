@@ -827,6 +827,30 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
     view->on_overlay(
         [this](std::uint32_t* pixels, int width, int height)
         {
+            // The radius of an arc being drawn: a line from its centre to the pointer, in dashes of black and white
+            // that show on any colour.
+            if(m_arc && m_arc->document == current() && m_arc->gesture.step() == ArcGesture::Step::radius)
+            {
+                const auto& viewport{m_arc->document->viewport()};
+                const auto in_view{[&](Position at)
+                                   {
+                                       return Position{viewport.origin().x + at.x * viewport.zoom(),
+                                                       viewport.origin().y + at.y * viewport.zoom()};
+                                   }};
+                const auto from{in_view(m_arc->gesture.center())};
+                const auto to{in_view(m_arc->gesture.pointer())};
+                const auto steps{static_cast<int>(std::ceil(std::max(std::abs(to.x - from.x), std::abs(to.y - from.y))))};
+                for(int step{}; step <= steps; ++ step)
+                {
+                    const auto along{steps == 0 ? 0.0 : static_cast<double>(step) / steps};
+                    const auto x{static_cast<int>(std::lround(from.x + (to.x - from.x) * along))};
+                    const auto y{static_cast<int>(std::lround(from.y + (to.y - from.y) * along))};
+                    if(x >= 0 && y >= 0 && x < width && y < height)
+                    {
+                        pixels[static_cast<std::ptrdiff_t>(y) * width + x] = (step / 4) % 2 == 0 ? 0x000000u : 0xffffffu;
+                    }
+                }
+            }
             const auto moving{m_tool_panel->selected() == "move_pixels"};
             if(!moving && !m_line_edit)
             {
@@ -1239,6 +1263,10 @@ bool PaintApp::close(std::size_t index)
     {
         finish_line();
     }
+    if(m_arc && m_arc->document == document)
+    {
+        cancel_arc();
+    }
     if(document->modified())
     {
         m_tabs->select(index);
@@ -1361,6 +1389,16 @@ void PaintApp::use_tool(const ToolEvent& event)
                 open->viewport().zoom_in(event.in_view);
             }
         }
+        return;
+    }
+    // Only Arc hears of the pointer moving between clicks.
+    if(tool == "arc")
+    {
+        use_arc(event);
+        return;
+    }
+    if(event.phase == ToolEvent::Phase::hover)
+    {
         return;
     }
     if(tool == "move_pixels" || tool == "move_selection")
@@ -1537,6 +1575,9 @@ void PaintApp::use_tool(const ToolEvent& event)
             open->set_modified(true);
             refresh_titles();
         }
+        return;
+    case ToolEvent::Phase::hover:
+        // Left out above: painting tools hear only of the button.
         return;
     }
     if(m_stroke != nullptr)
@@ -1729,6 +1770,11 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
                                m_tool_options->line(),
                                std::nullopt};
         m_dragging.reset();
+        // Enter and Esc reach it from the canvas, which hands on what it does not take.
+        if(auto* const view{current_view()})
+        {
+            view->claim_keys(true);
+        }
         return;
     }
     if(event.phase == ToolEvent::Phase::release)
@@ -1738,6 +1784,76 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
         open->set_modified(true);
         refresh_titles();
     }
+}
+
+void PaintApp::use_arc(const ToolEvent& event)
+{
+    auto* const open{current()};
+    if(m_arc && m_arc->document != open)
+    {
+        cancel_arc();
+    }
+    if(event.phase == ToolEvent::Phase::release || (!m_arc && event.phase != ToolEvent::Phase::press))
+    {
+        return;
+    }
+    auto& document{open->document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    if(!m_arc)
+    {
+        settle();
+        open->history().begin_step(document);
+        m_arc = ArcDrawing{open, layer, {}, event.secondary};
+        // Esc reaches it from the canvas, which hands on what it does not take.
+        if(auto* const view{current_view()})
+        {
+            view->claim_keys(true);
+        }
+    }
+    const auto done{event.phase == ToolEvent::Phase::press ? m_arc->gesture.click(event.at, event.shift)
+                                                           : (m_arc->gesture.move(event.at, event.shift), false)};
+    if(m_arc->gesture.step() == ArcGesture::Step::sweep)
+    {
+        const auto before{LayersState::of(document)};
+        layer = m_arc->base;
+        auto brush{m_tool_options->settings()};
+        const auto& arc{m_arc->gesture.arc()};
+        static_cast<void>(draw_arc(layer, document.selection(), arc.center, arc.radius, arc.start, arc.sweep,
+                                   ink(m_arc->secondary), brush.width, brush.antialias && !document.indexed()));
+        open->refresh(changed_tiles(before, LayersState::of(document)));
+    }
+    if(done)
+    {
+        m_arc.reset();
+        release_keys();
+        open->history().finish_step(oui::translate("History", "Arc"), document);
+        open->set_modified(true);
+        refresh_titles();
+    }
+}
+
+void PaintApp::release_keys()
+{
+    if(auto* const view{current_view()}; view != nullptr && !m_typing && !m_line_edit && !m_arc)
+    {
+        view->claim_keys(false);
+    }
+}
+
+void PaintApp::cancel_arc()
+{
+    if(!m_arc)
+    {
+        return;
+    }
+    auto& open{*m_arc->document};
+    auto& document{open.document()};
+    const auto before{LayersState::of(document)};
+    document.layers()[document.active_layer()] = m_arc->base;
+    m_arc.reset();
+    release_keys();
+    open.refresh(changed_tiles(before, LayersState::of(document)));
+    open.history().cancel_step();
 }
 
 void PaintApp::redraw_line()
@@ -1760,6 +1876,7 @@ void PaintApp::finish_line()
     }
     auto& open{*m_line_edit->document};
     m_line_edit.reset();
+    release_keys();
     open.history().finish_step(oui::translate("History", "Line / Curve"), open.document());
     open.set_modified(true);
     refresh_titles();
@@ -2254,6 +2371,13 @@ void PaintApp::show_typing(bool with_cursor)
 
 bool PaintApp::type_key(const oui::Event& event)
 {
+    // Esc leaves an arc being drawn out.
+    if(const auto* const key{std::get_if<oui::KeyEvent>(&event)};
+       m_arc && key != nullptr && key->key == oui::Key::escape)
+    {
+        cancel_arc();
+        return true;
+    }
     // Enter leaves a line being bent as it is.
     if(const auto* const key{std::get_if<oui::KeyEvent>(&event)};
        m_line_edit && key != nullptr && (key->key == oui::Key::enter || key->key == oui::Key::escape))
@@ -2316,6 +2440,7 @@ void PaintApp::settle(bool keep_line)
     {
         finish_line();
     }
+    cancel_arc();
     m_floating.reset();
     if(m_typing)
     {

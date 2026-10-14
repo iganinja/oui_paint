@@ -66,6 +66,7 @@ Edit > Flip Selection and Rotate Selection flip and turn what is selected in pla
 | Text | T | Types text where clicked |
 | Line / Curve | O | Drag from one end to the other, Shift keeping to steps of 15 degrees; then drag its four handles to bend it, and Enter, or a click away from them, leaves it as it is |
 | Shapes | O again | Drag from one corner to the other; Shift keeps them square or round |
+| Arc | O a third time | As with a compass: a click puts the centre, a second the radius and where it starts, and the pointer turns it round, either way, up to the whole circle, until a third click leaves it; Shift keeps to steps of 15 degrees, Esc leaves it out |
 
 [ and ] make the brush narrower and wider; with Ctrl, by 5. X swaps the primary and secondary colors. C chooses which
 of them a click on a palette sets, the one framed in front; a right click sets the other.

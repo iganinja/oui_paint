@@ -4,6 +4,7 @@
 #include "app/open_document.h"
 #include "core/selection.h"
 #include "effects/plugins.h"
+#include "tools/arc.h"
 #include "tools/floating.h"
 #include "tools/shapes.h"
 #include "tools/stroke.h"
@@ -136,6 +137,12 @@ class PaintApp
     void select_shape(const ToolEvent& event, bool ellipse);
     // Draws the line being bent as its points are now.
     void redraw_line();
+    // The Arc tool: its clicks, and the pointer between them.
+    void use_arc(const ToolEvent& event);
+    // An arc not finished left out, as Esc does, the layer as it was.
+    void cancel_arc();
+    // The canvas stops taking keys first once nothing between clicks or typing needs them.
+    void release_keys();
     // Ends bending the line: it stays as it is, one step.
     void finish_line();
     // Where the line's points are in the view, for its handles.
@@ -307,6 +314,15 @@ class PaintApp
         std::optional<std::size_t> held;
     };
     std::optional<LineEdit> m_line_edit;
+    // An arc being drawn with the Arc tool, between its clicks: the layer before it, and the button it started with.
+    struct ArcDrawing
+    {
+        OpenDocument* document{};
+        Layer base;
+        ArcGesture gesture;
+        bool secondary{false};
+    };
+    std::optional<ArcDrawing> m_arc;
     // Text being typed with the Text tool: where, what, and the layer before it.
     struct Typing
     {

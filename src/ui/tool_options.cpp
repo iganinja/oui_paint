@@ -163,7 +163,7 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
 void ToolOptions::show_for(std::string_view tool)
 {
     const auto brushing{tool == "brush" || tool == "eraser"};
-    const auto drawing{tool == "line" || tool == "shapes"};
+    const auto drawing{tool == "line" || tool == "shapes" || tool == "arc"};
     m_width_group->set_visible(brushing || drawing || tool == "clone_stamp" || tool == "recolor");
     m_hardness_group->set_visible(brushing || tool == "clone_stamp" || tool == "recolor");
     m_antialias_group->set_visible(brushing || drawing || tool == "ellipse_select" || tool == "text");

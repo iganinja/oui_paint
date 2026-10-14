@@ -27,6 +27,7 @@ const std::vector<ToolInfo>& all_tools()
         {"text", "Text", olagarro::oui::translate("Tools", "Text"), U't'},
         {"line", "Line", olagarro::oui::translate("Tools", "Line / Curve"), U'o'},
         {"shapes", "Shapes", olagarro::oui::translate("Tools", "Shapes"), U'o'},
+        {"arc", "Arc", olagarro::oui::translate("Tools", "Arc"), U'o'},
     };
     return tools;
 }

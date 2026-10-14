@@ -75,6 +75,7 @@ add_library(oui_paint_core STATIC
     src/tools/fill.cpp
     src/tools/floating.cpp
     src/tools/gradient.cpp
+    src/tools/arc.cpp
     src/tools/shapes.cpp
     src/tools/stroke.cpp
     src/tools/text.cpp
@@ -117,7 +118,7 @@ set(OUI_PAINT_GODOT_ICONS
     Add Bucket ColorPick Duplicate Edit Eraser Gradient GuiVisibilityHidden GuiVisibilityVisible Image Line MoveDown
     MoveUp RegionEdit Remove RotateLeft RotateRight ToolMove ToolPan ToolSelect Tools Zoom)
 list(TRANSFORM OUI_PAINT_GODOT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
-set(OUI_PAINT_OWN_ICONS CloneStamp EllipseSelect Lasso MagicWand MergeDown Paintbrush Recolor Shapes Text)
+set(OUI_PAINT_OWN_ICONS Arc CloneStamp EllipseSelect Lasso MagicWand MergeDown Paintbrush Recolor Shapes Text)
 list(TRANSFORM OUI_PAINT_OWN_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/oui_paint/)
 set(OUI_PAINT_ICONS ${OUI_PAINT_GODOT_ICONS} ${OUI_PAINT_OWN_ICONS})
 list(TRANSFORM OUI_PAINT_ICONS APPEND .svg)
@@ -186,6 +187,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/indexed_test.cpp
         tests/indexing_test.cpp
         tests/mode_change_test.cpp
+        tests/arc_test.cpp
         tests/background_effect_test.cpp
         tests/layers_panel_test.cpp
         tests/levels_test.cpp
