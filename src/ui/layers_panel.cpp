@@ -186,9 +186,11 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             painter.push_clip({name_x, line.y, std::max(0, eye_x - name_x), 1});
             painter.draw_label({name_x, line.y}, layer.name(), style);
             painter.pop_clip();
+            // Over the active row's colour, the icons as that colour needs to show them.
+            const auto over{active ? std::optional<oui::Color>{theme.menu_selected_background} : std::nullopt};
             paint_icon(painter, layer.visible() ? "GuiVisibilityVisible" : "GuiVisibilityHidden",
-                       {eye_x, line.y, eye_width, 1}, theme);
-            paint_icon(painter, "Remove", {eye_x + eye_width, line.y, delete_width, 1}, theme);
+                       {eye_x, line.y, eye_width, 1}, theme, over);
+            paint_icon(painter, "Remove", {eye_x + eye_width, line.y, delete_width, 1}, theme, over);
         }
     }
     // The buttons on a bar of their own, as a toolbar; none without a document to work on.
@@ -214,11 +216,11 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
 }
 
 void LayersPanel::paint_icon(oui::Painter& painter, const char* name, const oui::Rect& cells,
-                             const oui::Theme& theme) const
+                             const oui::Theme& theme, std::optional<oui::Color> over) const
 {
     if(const auto area{painter.pixel_bounds(cells)})
     {
-        if(const auto* const picture{m_icons.picture(name, area->width, area->height)})
+        if(const auto* const picture{m_icons.picture(name, area->width, area->height, over)})
         {
             oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
             image.alpha = true;

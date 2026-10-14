@@ -117,9 +117,16 @@ void Icons::set_dark_interface(bool dark)
     }
 }
 
-const oui::Picture* Icons::picture(std::string_view name, int width, int height)
+const oui::Picture* Icons::picture(std::string_view name, int width, int height,
+                                   std::optional<oui::Color> background)
 {
-    const auto key{std::make_tuple(std::string{name}, width, height)};
+    // Light, as Godot draws them, over a dark interface or a dark background.
+    auto dark{m_dark};
+    if(background)
+    {
+        dark = 0.299 * background->red + 0.587 * background->green + 0.114 * background->blue < 128.0;
+    }
+    const auto key{std::make_tuple(std::string{name}, width, height, dark)};
     if(const auto found{m_drawn.find(key)}; found != m_drawn.end())
     {
         return &found->second;
@@ -133,7 +140,7 @@ const oui::Picture* Icons::picture(std::string_view name, int width, int height)
     constexpr int native{16};
     const auto room{std::min(width, height)};
     const auto side{room >= native ? room / native * native : room};
-    auto drawn{oui::draw_svg(m_dark ? std::string{*source} : for_light_interface(*source), side, side)};
+    auto drawn{oui::draw_svg(dark ? std::string{*source} : for_light_interface(*source), side, side)};
     if(!drawn)
     {
         return nullptr;

@@ -91,7 +91,9 @@ class ToggleIcons final : public oui::Widget
             {
                 continue;
             }
-            if(const auto* const picture{m_icons.picture(m_toggles[index].icon, area->width, area->height)})
+            const auto over{*m_toggles[index].pressed ? std::optional<oui::Color>{theme.menu_selected_background}
+                                                      : std::nullopt};
+            if(const auto* const picture{m_icons.picture(m_toggles[index].icon, area->width, area->height, over)})
             {
                 oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
                 image.alpha = true;

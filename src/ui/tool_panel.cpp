@@ -77,7 +77,10 @@ void ToolPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
         {
             continue;
         }
-        if(const auto* const picture{m_icons.picture(m_buttons[index].icon, area->width, area->height)})
+        const auto selected{m_buttons[index].id == m_selected};
+        if(const auto* const picture{m_icons.picture(
+               m_buttons[index].icon, area->width, area->height,
+               selected ? std::optional<oui::Color>{theme.menu_selected_background} : std::nullopt)})
         {
             oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
             image.alpha = true;

@@ -53,3 +53,26 @@ TEST(Icons, OnADarkInterfaceTheyAreDrawnLighterAsGodotDrawsThem)
     const auto dark{brightness(*icons.picture("Bucket", 16, 16))};
     EXPECT_GT(dark, light + 60.0) << light << " on a light interface, " << dark << " on a dark one";
 }
+
+TEST(Icons, OverADarkBackgroundOnALightInterfaceTheyAreDrawnLightToo)
+{
+    // As the selected row of a list: dark blue on a light interface, where the dark icons would not show.
+    const auto brightness{[](const olagarro::oui::Picture& picture)
+                          {
+                              double total{};
+                              double covered{};
+                              for(const auto pixel : picture.pixels)
+                              {
+                                  const auto alpha{(pixel >> 24u) / 255.0};
+                                  total += alpha * (((pixel >> 16u) & 0xffu) + ((pixel >> 8u) & 0xffu) + (pixel & 0xffu)) / 3.0;
+                                  covered += alpha;
+                              }
+                              return total / covered;
+                          }};
+    oui_paint::Icons icons;
+    const auto as_the_interface{brightness(*icons.picture("Remove", 16, 16))};
+    const auto over_dark{brightness(*icons.picture("Remove", 16, 16, olagarro::oui::Color{40, 70, 130}))};
+    const auto over_light{brightness(*icons.picture("Remove", 16, 16, olagarro::oui::Color{230, 230, 220}))};
+    EXPECT_GT(over_dark, as_the_interface + 60.0);
+    EXPECT_DOUBLE_EQ(over_light, as_the_interface);
+}

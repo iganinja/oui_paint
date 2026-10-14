@@ -84,8 +84,9 @@ class LayersPanel final : public olagarro::oui::Widget
     };
     [[nodiscard]] Part part_at(int column) const;
     [[nodiscard]] bool is_ticked(std::size_t index) const;
+    // `over` is the colour under it, when it is not the panel's.
     void paint_icon(olagarro::oui::Painter& painter, const char* name, const olagarro::oui::Rect& cells,
-                    const olagarro::oui::Theme& theme) const;
+                    const olagarro::oui::Theme& theme, std::optional<olagarro::oui::Color> over = std::nullopt) const;
     void paint_picture(olagarro::oui::Painter& painter, const Layer& layer, const olagarro::oui::Rect& cells) const;
 
     Icons& m_icons;
