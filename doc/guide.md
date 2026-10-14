@@ -107,7 +107,17 @@ loaded or saved alone as .pal, .gpl or .act, or taken from an image's palette.
 
 Opening a PNG that has a palette asks whether to keep it indexed or open it in colors. Saving an indexed image as PNG
 asks whether to save it indexed, with every palette one after the other, or in colors. Image > Mode changes an open
-image to colour or grayscale, of 8 or 16 bits a channel, or to indexed, the mode it is in marked.
+image to colour or grayscale, of 8 or 16 bits a channel, or to indexed, the mode it is in marked; the image shows the
+change as its dialog's choices change.
+
+- **To indexed** asks for a palette, made for the image or loaded from a file, how many colors a palette made has,
+  and the method: Median cut chooses as many colors as asked and can dither, by Floyd-Steinberg or an ordered pattern,
+  so gradients keep no bands; Exact colors keeps the image's own colors, when there are no more than asked. Every
+  layer goes into the same palette, index 0 kept see-through when the image has see-through pixels.
+- **To grayscale** asks how much red, green and blue each count; **from 16 bits to 8** asks whether to round each
+  pixel or dither so smooth gradients keep no bands.
+
+The methods are plugins, and more can be written: see Plugins.
 
 ## Files
 

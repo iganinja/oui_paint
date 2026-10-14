@@ -12,6 +12,19 @@ declare namespace paint {
      */
     function onSaved(hook: (path: string) => void): void;
     /**
+     * Declares a way of turning an image into indices of a palette, which Image > Mode > Indexed offers.
+     */
+    function indexer(definition: IndexerDefinition): void;
+    /**
+     * Declares a way of changing an image's format, which Image > Mode offers when it changes that way.
+     */
+    function converter(definition: ConverterDefinition): void;
+    /**
+     * A palette of up to `count` colours for the image by median cut: its colours split again and again at the
+     * middle of the widest spread, each part's average one of the palette.
+     */
+    function medianCut(image: Image, count: number): number[][];
+    /**
      * Fractal noise from black to white, `scale` the size of its features, `roughness` from 0 to 1.
      */
     function clouds(width: number, height: number, scale: number, roughness: number, seed: number): Image;
@@ -50,6 +63,78 @@ declare namespace paint {
          * changed in place or another array given back.
          */
         row(row: Float32Array, y: number, values: Values, context: EffectContext): Float32Array;
+    }
+
+    /**
+     * A way of turning an image into indices, as paint.indexer takes it. Palettes are lists of colours, each
+     * [red, green, blue] from 0 to 1; see-through pixels take the see-through index whatever the palette.
+     */
+    class IndexerDefinition {
+        /**
+         * Its name in the dialog.
+         */
+        name: string;
+        /**
+         * What the dialog asks for besides, as an effect's.
+         */
+        parameters: Parameter[];
+        /**
+         * The palette, no more than context.count colours; context.palette when one is given, as a palette loaded.
+         */
+        palette(image: Image, values: object, context: IndexContext): number[][];
+        /**
+         * The image of indices: each pixel's red its index over 255, as nearest and the dithers make it. Left out,
+         * each pixel takes its nearest colour.
+         */
+        assign(image: Image, palette: number[][], values: object, context: IndexContext): Image;
+    }
+
+    /**
+     * What an indexer is told.
+     */
+    class IndexContext {
+        /**
+         * How many colours the palette may have.
+         */
+        count: number;
+        /**
+         * The palette the image goes into, when one is given; null to make one.
+         */
+        palette: number[][];
+    }
+
+    /**
+     * A way of changing an image's format, as paint.converter takes it.
+     */
+    class ConverterDefinition {
+        /**
+         * Its name in the dialog.
+         */
+        name: string;
+        /**
+         * "grayscale", from colour to grey, or "8 bits", from 16 bits a channel to 8.
+         */
+        to: string;
+        /**
+         * What the dialog asks for besides, as an effect's.
+         */
+        parameters: Parameter[];
+        /**
+         * The image as it should be in the new format: grey in all three channels for "grayscale", what 8 bits keep
+         * for "8 bits", the rest rounded as the format keeps it.
+         */
+        render(image: Image, values: object): Image;
+    }
+
+    /**
+     * A colour and how many pixels have it.
+     */
+    class ColorCount {
+        /**
+         * [red, green, blue] from 0 to 1.
+         */
+        color: number[];
+        count: number;
     }
 
     /**
@@ -170,6 +255,31 @@ declare namespace paint {
          * Color Dodge, Reflect, Glow, Overlay, Difference, Negation, Lighten, Darken, Screen or Xor.
          */
         over(below: Image, mode?: string, opacity?: number): Image;
+        /**
+         * Grey: each pixel the weighted sum of its red, green and blue, Rec. 601's weights unless given.
+         */
+        grayscale(red?: number, green?: number, blue?: number): Image;
+        /**
+         * Each channel brought to `levels` even steps, nudged first by a Bayer matrix of `size` 2, 4 or 8, `strength`
+         * from 0, plain rounding, to 1, so bands become a fine pattern.
+         */
+        ditherLevels(levels: number, size?: number, strength?: number): Image;
+        /**
+         * Its different colours and how many pixels have each, the commonest first, no more than `most`.
+         */
+        colors(most?: number): ColorCount[];
+        /**
+         * An image of indices: each pixel the index of the palette's colour nearest it.
+         */
+        nearest(palette: number[][]): Image;
+        /**
+         * An image of indices dithered by Floyd and Steinberg's error diffusion, `strength` from 0 to 1.
+         */
+        ditherFloydSteinberg(palette: number[][], strength?: number): Image;
+        /**
+         * An image of indices dithered by a Bayer matrix of `size` 2, 4 or 8, `strength` from 0 to 1.
+         */
+        ditherBayer(palette: number[][], size?: number, strength?: number): Image;
         /**
          * Each row given to `change(row, y)` as a Float32Array, changed in place or replaced by the one it gives back.
          */

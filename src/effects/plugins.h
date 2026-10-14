@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/color.h"
 #include "effects/pieces.h"
 #include "tools/stroke.h"
 
@@ -9,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,6 +61,41 @@ struct EffectContext
     int selection_height{0};
 };
 
+// A way of turning an image into indices of a palette, as a plugin declares it with paint.indexer: its parameters,
+// and whether it says itself which index each pixel takes, or leaves it to the nearest colour.
+struct Indexer
+{
+    std::string name;
+    std::vector<EffectParameter> parameters;
+    std::size_t index{0};
+    bool assigns{false};
+};
+
+// What an indexer is told: how many colours its palette may have, and the palette to use when one is given, as when an
+// image goes into a palette loaded.
+struct IndexContext
+{
+    int count{256};
+    std::optional<std::vector<Color>> palette;
+};
+
+// What an indexer made: its palette, and an image of indices, as indexing.h describes them.
+struct Indexed
+{
+    std::vector<Color> palette;
+    WorkImage indices;
+};
+
+// A way of changing an image's format, as a plugin declares it with paint.converter: "grayscale", from colour to
+// grey, or "8 bits", from 16 bits a channel to 8, and its parameters.
+struct Converter
+{
+    std::string name;
+    std::string to;
+    std::vector<EffectParameter> parameters;
+    std::size_t index{0};
+};
+
 // Runs plugins: JavaScript that declares effects with `paint.effect`, and hooks with `paint.onSaved`, building on the
 // pieces in C++.
 class PluginHost
@@ -71,6 +108,16 @@ class PluginHost
     // Runs a plugin's source; its effects are added. Throws ScriptError when it fails.
     void load(std::string_view source, std::string_view name);
     [[nodiscard]] const std::vector<Effect>& effects() const { return m_effects; }
+    [[nodiscard]] const std::vector<Indexer>& indexers() const { return m_indexers; }
+    [[nodiscard]] const std::vector<Converter>& converters() const { return m_converters; }
+    // What an indexer makes of `image`, with these values of its parameters. Throws ScriptError when it fails, or
+    // gives a palette of more colours than it may, or indices past it.
+    [[nodiscard]] Indexed index(const Indexer& indexer, const WorkImage& image,
+                                const std::map<std::string, double>& values, const IndexContext& context);
+    // What a converter makes of `image`, its colours as the format it converts to will keep them. Throws ScriptError
+    // when it fails.
+    [[nodiscard]] WorkImage convert(const Converter& converter, const WorkImage& image,
+                                    const std::map<std::string, double>& values);
     // An effect's result on `image` with these values of its parameters, by id. Throws ScriptError when it fails.
     [[nodiscard]] WorkImage apply(const Effect& effect, const WorkImage& image,
                                   const std::map<std::string, double>& values, const EffectContext& context);
@@ -91,6 +138,10 @@ class PluginHost
 
     olagarro::oui::script::ScriptEngine m_engine;
     std::vector<Effect> m_effects;
+    std::vector<Indexer> m_indexers;
+    std::vector<Converter> m_converters;
+    olagarro::oui::script::Value m_index_runner;
+    olagarro::oui::script::Value m_convert_runner;
     // The images an effect works on while it runs, by the ids scripts hold.
     std::map<int, WorkImage> m_images;
     // The image an effect is given, lent rather than copied, as big as images are: read, never written.

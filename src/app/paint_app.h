@@ -8,6 +8,7 @@
 #include "tools/shapes.h"
 #include "tools/stroke.h"
 #include "ui/canvas_view.h"
+#include "ui/mode_dialogs.h"
 #include "ui/plugins_dialog.h"
 #include "ui/icons.h"
 
@@ -171,11 +172,20 @@ class PaintApp
     void change_palettes(std::string name, const std::function<void(PaletteSetup&)>& change);
     // The Palettes menu's commands, and turning an image indexed or into colours.
     void register_palette_commands();
-    // Converts every layer to `format`, an indexed image to colours first, as Image > Mode does.
+    // Converts every layer to `format`, an indexed image to colours first, as Image > Mode does: through the
+    // converters the plugins offer when the change loses something, asking which.
     void convert_to(PixelFormat format);
     // Image > Mode marked as the image on show is.
     void update_mode_checks();
+    // Makes every layer indices of one palette, by the indexer the plugins offer that is chosen.
     void convert_to_indexed();
+    // Changes the current document as one undoable step, the image showing it as `ask` asks how: `ask` is given what
+    // shows the change as it is chosen by then, which gives what went wrong, if anything. False when given up or the
+    // change failed, having said why.
+    bool change_with_preview(std::string name, const std::function<void(Document&)>& change,
+                             const std::function<bool(const std::function<std::string()>& show)>& ask);
+    // A palette file the user picks, by its name, and its colours; none when given up or unreadable, having said why.
+    [[nodiscard]] std::optional<std::pair<std::string, std::vector<Color>>> pick_palette_file();
     // Asks for the primary or the secondary colour as hexadecimal.
     void edit_color(bool primary);
     void build_window();
@@ -212,6 +222,10 @@ class PaintApp
     // Each effect's values as last used, and the effect run last, for Ctrl+F.
     std::map<std::size_t, std::map<std::string, double>> m_effect_values;
     std::optional<std::size_t> m_last_effect;
+    // How Image > Mode last made an image indexed, grey, or 8 bits, to ask the same way next time.
+    IndexingChoice m_indexing;
+    MethodChoice m_to_gray;
+    MethodChoice m_to_8_bits;
     // The plugins as they loaded, for Manage Plugins.
     std::vector<PluginRecord> m_plugin_records;
     // The menus added, and where Adjustments is, which Effects follows: loading the plugins again changes both.

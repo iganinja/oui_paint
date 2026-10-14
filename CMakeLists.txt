@@ -61,6 +61,8 @@ add_library(oui_paint_core STATIC
     src/core/transform.cpp
     src/effects/curve_edit.cpp
     src/effects/curves.cpp
+    src/effects/indexing.cpp
+    src/effects/mode_change.cpp
     src/effects/pieces.cpp
     src/effects/plugin_trial.cpp
     src/effects/plugins.cpp
@@ -89,6 +91,7 @@ add_library(oui_paint_core STATIC
     src/ui/layers_panel.cpp
     src/ui/levels_bar.cpp
     src/ui/levels_dialog.cpp
+    src/ui/mode_dialogs.cpp
     src/ui/main_frame.cpp
     src/ui/new_image_dialog.cpp
     src/ui/palettes_panel.cpp
@@ -117,7 +120,7 @@ list(TRANSFORM OUI_PAINT_ICONS APPEND .svg)
 olagarro_embed_files(oui_paint_core FUNCTION embedded_icons FILES ${OUI_PAINT_ICONS})
 # The plugins built in, the prelude every plugin runs after first.
 olagarro_embed_files(oui_paint_core FUNCTION embedded_plugins
-    FILES src/plugins/prelude.js src/plugins/adjustments.js src/plugins/effects.js)
+    FILES src/plugins/prelude.js src/plugins/adjustments.js src/plugins/effects.js src/plugins/indexers.js)
 # What plugins can use, which the workbench suggests from and the help lists.
 olagarro_embed_files(oui_paint_core NAMESPACE oui_paint FUNCTION embedded_plugin_api FILES src/plugins/paint.d.ts)
 # The help, and OUI Paint's license, which About shows.
@@ -175,6 +178,8 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/history_test.cpp
         tests/icons_test.cpp
         tests/indexed_test.cpp
+        tests/indexing_test.cpp
+        tests/mode_change_test.cpp
         tests/layers_panel_test.cpp
         tests/levels_test.cpp
         tests/main_frame_test.cpp

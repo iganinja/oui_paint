@@ -9,6 +9,7 @@
 #include "codecs/openraster.h"
 #include "codecs/palettes.h"
 #include "effects/curves.h"
+#include "effects/mode_change.h"
 #include "effects/plugin_trial.h"
 #include "tools/fill.h"
 #include "tools/gradient.h"
@@ -2407,25 +2408,14 @@ void PaintApp::register_palette_commands()
                              return oui::file_dialog(m_application, options);
                          }};
     const auto& filters{palette_filters()};
-    const auto read_colors{[this, pick_file, filters]() -> std::optional<std::vector<Color>>
+    const auto read_colors{[this]() -> std::optional<std::vector<Color>>
                            {
-                               const auto path{pick_file(oui::FileDialogMode::open_file, filters, "")};
-                               if(!path)
+                               auto picked{pick_palette_file()};
+                               if(!picked)
                                {
                                    return std::nullopt;
                                }
-                               std::string error;
-                               auto bytes{read_file(*path, error)};
-                               std::optional<std::vector<Color>> colors;
-                               if(bytes)
-                               {
-                                   colors = read_palette_file(oui::utf8_of(path->filename()), *bytes, error);
-                               }
-                               if(!colors)
-                               {
-                                   show_error("Palette", oui::utf8_of(path->filename()) + ": " + error);
-                               }
-                               return colors;
+                               return std::move(picked->second);
                            }};
     commands.register_command("palettes.load_setup", "&Load Palette Setup...",
                               [this, indexed, pick_file]
@@ -2596,25 +2586,75 @@ void PaintApp::convert_to(PixelFormat format)
                            : format == PixelFormat::rgba16       ? "Color, 16 Bits"
                            : format == PixelFormat::gray_alpha8  ? "Grayscale, 8 Bits"
                                                                  : "Grayscale, 16 Bits"};
-    change_layers(name,
-                  [format](Document& document)
-                  {
-                      for(auto& layer : document.layers())
+    const auto conversions{conversions_between(open->document().format(), open->document().indexed(), format)};
+    if(conversions.empty())
+    {
+        // Nothing lost: every layer as it shows, kept in the new format.
+        change_layers(name,
+                      [format](Document& document)
                       {
-                          // An indexed layer as its palette's colours first.
-                          const auto whole{layer.read(0, 0, document.width(), document.height())};
-                          const auto pixels{document.indexed() ? document.colors_of(whole, layer.palette_slot())
-                                                               : whole};
-                          Layer made{format, layer.name()};
-                          made.set_visible(layer.visible());
-                          made.set_opacity(layer.opacity());
-                          made.set_blend_mode(layer.blend_mode());
-                          made.write(converted(pixels, format), 0, 0);
-                          layer = std::move(made);
-                      }
-                      document.set_format(format);
-                      document.set_palettes(std::nullopt);
-                  });
+                          for(auto& layer : document.layers())
+                          {
+                              // An indexed layer as its palette's colours first.
+                              const auto whole{layer.read(0, 0, document.width(), document.height())};
+                              const auto pixels{document.indexed() ? document.colors_of(whole, layer.palette_slot())
+                                                                   : whole};
+                              Layer made{format, layer.name()};
+                              made.set_visible(layer.visible());
+                              made.set_opacity(layer.opacity());
+                              made.set_blend_mode(layer.blend_mode());
+                              made.write(converted(pixels, format), 0, 0);
+                              layer = std::move(made);
+                          }
+                          document.set_format(format);
+                          document.set_palettes(std::nullopt);
+                      });
+        update_mode_checks();
+        return;
+    }
+    // Each step by a converter of the plugins', chosen in the dialog.
+    std::vector<std::pair<std::string, MethodChoice*>> asked;
+    std::vector<std::vector<const Converter*>> offered;
+    for(const auto& to : conversions)
+    {
+        std::vector<std::string> names;
+        std::vector<std::vector<EffectParameter>> parameters;
+        offered.emplace_back();
+        for(const auto& converter : m_plugins->converters())
+        {
+            if(converter.to == to)
+            {
+                names.push_back(converter.name);
+                parameters.push_back(converter.parameters);
+                offered.back().push_back(&converter);
+            }
+        }
+        if(names.empty())
+        {
+            show_error(name, "No plugin converts to " + to + ".");
+            return;
+        }
+        auto& choice{to == "grayscale" ? m_to_gray : m_to_8_bits};
+        choice.offer(std::move(names), std::move(parameters));
+        asked.emplace_back(to == "grayscale" ? "To Grayscale" : "To 8 Bits", &choice);
+    }
+    if(change_with_preview(
+           name,
+           [&](Document& document)
+           {
+               std::vector<ConversionStep> steps;
+               for(std::size_t step{}; step < asked.size(); ++ step)
+               {
+                   auto& choice{*asked[step].second};
+                   steps.push_back({offered[step][choice.chosen], choice.chosen_values()});
+               }
+               convert_document(*m_plugins, steps, format, document);
+           },
+           [&](const std::function<std::string()>& show)
+           { return ask_conversion(m_application, std::string{"Convert to "} + name, asked, show); }))
+    {
+        update_mode_checks();
+    }
 }
 
 void PaintApp::update_mode_checks()
@@ -2637,60 +2677,134 @@ void PaintApp::convert_to_indexed()
     {
         return;
     }
-    const auto& document{open->document()};
-    // One palette of the image's own colours, index 0 see-through, as many as there are up to 255.
-    std::vector<Color> colors;
-    std::set<std::uint32_t> seen;
-    for(const auto& layer : document.layers())
+    std::vector<std::string> names;
+    std::vector<std::vector<EffectParameter>> parameters;
+    std::vector<const Indexer*> offered;
+    for(const auto& indexer : m_plugins->indexers())
     {
-        const auto pixels{converted(layer.read(0, 0, document.width(), document.height()), PixelFormat::rgba8)};
-        for(int y{}; y < pixels.height; ++ y)
-        {
-            for(int x{}; x < pixels.width; ++ x)
-            {
-                const auto pixel{pixels.pixel<Rgba8>(x, y)};
-                if(pixel.alpha() == 0)
-                {
-                    continue;
-                }
-                const auto key{static_cast<std::uint32_t>(pixel.value[0]) << 16u |
-                               static_cast<std::uint32_t>(pixel.value[1]) << 8u | pixel.value[2]};
-                if(seen.insert(key).second)
-                {
-                    if(colors.size() == 255)
-                    {
-                        show_error("Convert to Indexed",
-                                   "The image has more than 255 colors. Reduce it first, as with Posterize.");
-                        return;
-                    }
-                    colors.push_back({pixel.value[0] / 255.0, pixel.value[1] / 255.0, pixel.value[2] / 255.0, 1.0});
-                }
-            }
-        }
+        names.push_back(indexer.name);
+        parameters.push_back(indexer.parameters);
+        offered.push_back(&indexer);
     }
-    PaletteSetup setup;
-    setup.size = std::max(2, static_cast<int>((colors.size() + 1 + 15) / 16 * 16));
-    Palette palette{"Palette 1", {Color{0, 0, 0, 1}}, 0};
-    palette.colors.insert(palette.colors.end(), colors.begin(), colors.end());
-    palette.colors.resize(static_cast<std::size_t>(setup.size), Color{0, 0, 0, 1});
-    setup.palettes.push_back(std::move(palette));
-    change_layers("Convert to Indexed",
-                  [&setup](Document& changed)
-                  {
-                      const auto old_format{changed.format()};
-                      changed.set_format(PixelFormat::gray_alpha8);
-                      changed.set_palettes(setup);
-                      for(auto& layer : changed.layers())
-                      {
-                          auto indexed{Layer{PixelFormat::gray_alpha8, layer.name()}};
-                          indexed.set_visible(layer.visible());
-                          indexed.set_opacity(layer.opacity());
-                          indexed.set_blend_mode(layer.blend_mode());
-                          static_cast<void>(old_format);
-                          indexed.write(changed.indices_of(layer.read(0, 0, changed.width(), changed.height()), 0), 0, 0);
-                          layer = std::move(indexed);
-                      }
-                  });
+    if(offered.empty())
+    {
+        show_error("Convert to Indexed", "No plugin makes an image indexed.");
+        return;
+    }
+    m_indexing.method.offer(std::move(names), std::move(parameters));
+    if(change_with_preview(
+           "Convert to Indexed",
+           [&](Document& document)
+           {
+               const auto palette{m_indexing.into_loaded && m_indexing.loaded
+                                      ? std::optional<std::vector<Color>>{m_indexing.loaded->second}
+                                      : std::nullopt};
+               index_document(*m_plugins, *offered[m_indexing.method.chosen], m_indexing.method.chosen_values(),
+                              m_indexing.count, palette, document);
+           },
+           [&](const std::function<std::string()>& show)
+           { return ask_indexing(m_application, m_indexing, [this] { return pick_palette_file(); }, show); }))
+    {
+        update_mode_checks();
+    }
+}
+
+bool PaintApp::change_with_preview(std::string name, const std::function<void(Document&)>& change,
+                                   const std::function<bool(const std::function<std::string()>& show)>& ask)
+{
+    auto* const open{current()};
+    if(open == nullptr || m_stroke != nullptr)
+    {
+        return false;
+    }
+    settle();
+    auto& document{open->document()};
+    const auto base{LayersState::of(document)};
+    // Draws again what shows differently: every tile when the palettes or the format changed.
+    const auto refresh{[open](const LayersState& before, const LayersState& after)
+                       {
+                           auto tiles{changed_tiles(before, after)};
+                           if(before.palettes != after.palettes || before.format != after.format)
+                           {
+                               std::set<TilePoint> all{tiles.begin(), tiles.end()};
+                               for(const auto* const state : {&before, &after})
+                               {
+                                   for(const auto& layer : state->layers)
+                                   {
+                                       for(const auto& [point, tile] : layer.tiles())
+                                       {
+                                           all.insert(point);
+                                       }
+                                   }
+                               }
+                               tiles.assign(all.begin(), all.end());
+                           }
+                           open->refresh(tiles);
+                       }};
+    const auto show{[&]() -> std::string
+                    {
+                        const auto before{LayersState::of(document)};
+                        base.restore_into(document);
+                        std::string problem;
+                        try
+                        {
+                            change(document);
+                        }
+                        catch(const std::exception& failure)
+                        {
+                            base.restore_into(document);
+                            problem = failure.what();
+                        }
+                        refresh(before, LayersState::of(document));
+                        return problem;
+                    }};
+    open->history().begin_step(document);
+    const auto accepted{ask(show)};
+    const auto problem{accepted ? show() : std::string{}};
+    if(!accepted || !problem.empty())
+    {
+        const auto before{LayersState::of(document)};
+        base.restore_into(document);
+        refresh(before, base);
+        open->history().cancel_step();
+        if(!problem.empty())
+        {
+            show_error(name, problem);
+        }
+        return false;
+    }
+    open->history().finish_step(std::move(name), document);
+    open->set_modified(true);
+    refresh_titles();
+    update_ants();
+    return true;
+}
+
+std::optional<std::pair<std::string, std::vector<Color>>> PaintApp::pick_palette_file()
+{
+    oui::FileDialogOptions options;
+    options.mode = oui::FileDialogMode::open_file;
+    options.directory = m_last_folder;
+    options.filters = palette_filters();
+    const auto path{oui::file_dialog(m_application, options)};
+    if(!path)
+    {
+        return std::nullopt;
+    }
+    const auto name{oui::utf8_of(path->filename())};
+    std::string error;
+    const auto bytes{read_file(*path, error)};
+    std::optional<std::vector<Color>> colors;
+    if(bytes)
+    {
+        colors = read_palette_file(name, *bytes, error);
+    }
+    if(!colors)
+    {
+        show_error("Palette", name + ": " + error);
+        return std::nullopt;
+    }
+    return std::pair{name, std::move(*colors)};
 }
 
 void PaintApp::undo()

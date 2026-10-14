@@ -77,6 +77,60 @@ paint.effect({
 });
 ```
 
+## Indexed images
+
+Image > Mode > Indexed turns an image into indices of one palette by an indexer, which plugins declare with
+`paint.indexer`. Its `palette` gives the palette, as a list of `[red, green, blue]` from 0 to 1, of no more than
+`context.count` colours; when the user loads a palette to put the image in, `context.palette` holds it. Its `assign`,
+when it has one, gives the image of indices, each pixel's red its index over 255, as `nearest`, `ditherFloydSteinberg`
+and `ditherBayer` make it; without one, each pixel takes the nearest colour.
+
+```js
+paint.indexer({
+    name: "Web safe",
+    parameters: [{id: "dither", name: "Dithering", options: ["None", "Ordered 4x4"], value: 0}],
+    palette(image, values, context) {
+        if (context.palette) return context.palette;
+        const steps = [0, 0.2, 0.4, 0.6, 0.8, 1];
+        const palette = [];
+        for (const r of steps) for (const g of steps) for (const b of steps) palette.push([r, g, b]);
+        return palette;
+    },
+    assign(image, palette, values) {
+        return values.dither === 1 ? image.ditherBayer(palette, 4, 1) : image.nearest(palette);
+    },
+});
+```
+
+All the layers are indexed together, as one image, so the palette fits them all. A pixel see-through, half or more,
+takes index 0, kept see-through, whatever the palette; then there is room for 255 colours, else 256. OUI Paint comes
+with Median cut, dithered or not, and Exact colors, the image's own colours when there are no more than asked.
+`paint.medianCut(image, count)` and `image.colors(most)` are there for indexers of one's own.
+
+## Changing the format
+
+When Image > Mode loses something, colour to grey or 16 bits a channel to 8, it asks which converter to do it with,
+which plugins declare with `paint.converter`. `to` says which change it does, `"grayscale"` or `"8 bits"`, and
+`render` gives the image as the new format should keep it: grey in its three channels, or what 8 bits keep.
+
+```js
+paint.converter({
+    name: "Desaturate",
+    to: "grayscale",
+    parameters: [],
+    render(image) {
+        return image.rows((row) => {
+            for (let i = 0; i < row.length; i += 4) {
+                const grey = (Math.max(row[i], row[i + 1], row[i + 2]) + Math.min(row[i], row[i + 1], row[i + 2])) / 2;
+                row[i] = row[i + 1] = row[i + 2] = grey;
+            }
+        });
+    },
+});
+```
+
+From 16 bits colour to 8 bits grey goes through both, grey first.
+
 ## After saving
 
 ```js

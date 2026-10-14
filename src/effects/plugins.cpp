@@ -1,5 +1,8 @@
 #include "effects/plugins.h"
 
+#include "core/json.h"
+#include "effects/indexing.h"
+
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
@@ -63,6 +66,58 @@ BlendMode mode_named(std::string_view name)
         }
     }
     throw ScriptError{"no blend mode is called " + std::string{name}};
+}
+
+// The parameters a plugin declares, as a dialog shows them.
+std::vector<EffectParameter> parameters_of(const Value& parameters)
+{
+    std::vector<EffectParameter> found;
+    for(std::size_t index{}; index < parameters.length(); ++ index)
+    {
+        const auto parameter{parameters.at(index)};
+        EffectParameter made;
+        made.id = parameter.get("id").to_string();
+        made.name = parameter.get("name").is_undefined() ? made.id : parameter.get("name").to_string();
+        const auto options{parameter.get("options")};
+        for(std::size_t option{}; option < options.length(); ++ option)
+        {
+            made.options.push_back(options.at(option).to_string());
+        }
+        const auto read{[&parameter](std::string_view key, double fallback)
+                        {
+                            const auto value{parameter.get(key)};
+                            return value.is_undefined() ? fallback : value.to_number();
+                        }};
+        made.minimum = read("min", 0.0);
+        made.maximum = read("max", made.options.empty() ? 100.0 : made.options.size() - 1.0);
+        made.value = read("value", made.minimum);
+        made.step = read("step", 1.0);
+        found.push_back(std::move(made));
+    }
+    return found;
+}
+
+// A palette as a plugin gives it, colours of three or four numbers from 0 to 1, or as the pieces take it, a flat
+// list of three numbers a colour.
+std::vector<Color> palette_of_numbers(const std::vector<double>& numbers)
+{
+    std::vector<Color> palette;
+    for(std::size_t at{}; at + 2 < numbers.size(); at += 3)
+    {
+        palette.push_back({numbers[at], numbers[at + 1], numbers[at + 2], 1.0});
+    }
+    return palette;
+}
+
+std::string json_of_palette(const std::vector<Color>& palette)
+{
+    std::string json{"["};
+    for(const auto& color : palette)
+    {
+        json += (json.size() > 1 ? "," : "") + std::string{"["} + json_number(color.red) + "," +
+                json_number(color.green) + "," + json_number(color.blue) + "]";
+    }
+    return json + "]";
 }
 
 std::vector<double> table_of(const Value& value)
@@ -181,33 +236,92 @@ PluginHost::PluginHost()
                         {
                             throw ScriptError{effect.name + " has neither render nor row"};
                         }
-                        const auto parameters{spec.get("parameters")};
-                        for(std::size_t index{}; index < parameters.length(); ++ index)
-                        {
-                            const auto parameter{parameters.at(index)};
-                            EffectParameter made;
-                            made.id = parameter.get("id").to_string();
-                            made.name = parameter.get("name").is_undefined() ? made.id
-                                                                             : parameter.get("name").to_string();
-                            const auto options{parameter.get("options")};
-                            for(std::size_t option{}; option < options.length(); ++ option)
-                            {
-                                made.options.push_back(options.at(option).to_string());
-                            }
-                            const auto read{[&parameter](std::string_view key, double fallback)
-                                            {
-                                                const auto value{parameter.get(key)};
-                                                return value.is_undefined() ? fallback : value.to_number();
-                                            }};
-                            made.minimum = read("min", 0.0);
-                            made.maximum = read("max", made.options.empty() ? 100.0 : made.options.size() - 1.0);
-                            made.value = read("value", made.minimum);
-                            made.step = read("step", 1.0);
-                            effect.parameters.push_back(std::move(made));
-                        }
+                        effect.parameters = parameters_of(spec.get("parameters"));
                         m_effects.push_back(std::move(effect));
                         return m_engine.undefined();
                     });
+    // Indexers and converters, as plugins declare them.
+    m_engine.define("__paint.registerIndexer",
+                    [this](const std::vector<Value>& arguments)
+                    {
+                        const auto& spec{arguments.at(0)};
+                        Indexer indexer;
+                        indexer.name = spec.get("name").to_string();
+                        if(!spec.get("palette").is_function())
+                        {
+                            throw ScriptError{indexer.name + " has no palette"};
+                        }
+                        indexer.assigns = spec.get("assign").is_function();
+                        indexer.parameters = parameters_of(spec.get("parameters"));
+                        indexer.index = m_indexers.size();
+                        m_indexers.push_back(std::move(indexer));
+                        return m_engine.undefined();
+                    });
+    m_engine.define("__paint.registerConverter",
+                    [this](const std::vector<Value>& arguments)
+                    {
+                        const auto& spec{arguments.at(0)};
+                        Converter converter;
+                        converter.name = spec.get("name").to_string();
+                        converter.to = spec.get("to").to_string();
+                        if(converter.to != "grayscale" && converter.to != "8 bits")
+                        {
+                            throw ScriptError{converter.name + " converts to \"grayscale\" or \"8 bits\", not \"" +
+                                              converter.to + "\""};
+                        }
+                        if(!spec.get("render").is_function())
+                        {
+                            throw ScriptError{converter.name + " has no render"};
+                        }
+                        converter.parameters = parameters_of(spec.get("parameters"));
+                        converter.index = m_converters.size();
+                        m_converters.push_back(std::move(converter));
+                        return m_engine.undefined();
+                    });
+    m_engine.define("__paint.setIndexRunner", [this](const std::vector<Value>& arguments) {
+        m_index_runner = arguments.at(0);
+        return m_engine.undefined();
+    });
+    m_engine.define("__paint.setConvertRunner", [this](const std::vector<Value>& arguments) {
+        m_convert_runner = arguments.at(0);
+        return m_engine.undefined();
+    });
+    // The pieces that index, as indexing.h has them; palettes cross as flat lists of three numbers a colour.
+    m_engine.define("__paint.colors",
+                    [this, number](const std::vector<Value>& arguments)
+                    {
+                        std::string json{"["};
+                        for(const auto& [color, count] :
+                            distinct_colors(image(arguments.at(0)), static_cast<std::size_t>(number(arguments, 1))))
+                        {
+                            json += (json.size() > 1 ? "," : "") + std::string{"{\"color\":["} +
+                                    json_number(color.red) + "," + json_number(color.green) + "," +
+                                    json_number(color.blue) + "],\"count\":" + std::to_string(count) + "}";
+                        }
+                        return m_engine.string(json + "]");
+                    });
+    m_engine.define("__paint.medianCut", [this, number](const std::vector<Value>& arguments) {
+        return m_engine.string(
+            json_of_palette(median_cut(image(arguments.at(0)), static_cast<int>(number(arguments, 1)))));
+    });
+    define_image("nearest", [this](const std::vector<Value>& arguments) {
+        return nearest_indices(image(arguments.at(0)), palette_of_numbers(table_of(arguments.at(1))));
+    });
+    define_image("ditherFloydSteinberg", [this, number](const std::vector<Value>& arguments) {
+        return floyd_steinberg_indices(image(arguments.at(0)), palette_of_numbers(table_of(arguments.at(1))),
+                                       number(arguments, 2));
+    });
+    define_image("ditherBayer", [this, number](const std::vector<Value>& arguments) {
+        return bayer_indices(image(arguments.at(0)), palette_of_numbers(table_of(arguments.at(1))),
+                             static_cast<int>(number(arguments, 2)), number(arguments, 3));
+    });
+    define_image("grayscale", [this, number](const std::vector<Value>& arguments) {
+        return grayscale(image(arguments.at(0)), number(arguments, 1), number(arguments, 2), number(arguments, 3));
+    });
+    define_image("ditherLevels", [this, number](const std::vector<Value>& arguments) {
+        return dither_levels(image(arguments.at(0)), static_cast<int>(number(arguments, 1)),
+                             static_cast<int>(number(arguments, 2)), number(arguments, 3));
+    });
     m_engine.define("__paint.setRunner", [this](const std::vector<Value>& arguments) {
         m_runner = arguments.at(0);
         return m_engine.undefined();
@@ -385,6 +499,121 @@ WorkImage PluginHost::apply(const Effect& effect, const WorkImage& source, const
     if(made.width != source.width || made.height != source.height)
     {
         throw ScriptError{effect.name + " gave back an image of another size"};
+    }
+    return made;
+}
+
+namespace
+{
+
+std::string json_of_values(const std::map<std::string, double>& values)
+{
+    std::string json{"{"};
+    for(const auto& [id, value] : values)
+    {
+        json += (json.size() > 1 ? "," : "") + json_string(id) + ":" + json_number(value);
+    }
+    return json + "}";
+}
+
+} // namespace
+
+Indexed PluginHost::index(const Indexer& indexer, const WorkImage& source, const std::map<std::string, double>& values,
+                          const IndexContext& context)
+{
+    const auto context_json{"{\"count\":" + std::to_string(context.count) + ",\"palette\":" +
+                            (context.palette ? json_of_palette(*context.palette) : std::string{"null"}) + "}"};
+    m_images.clear();
+    m_lent = &source;
+    m_lent_id = m_next_id++;
+    struct Return
+    {
+        PluginHost& host;
+        ~Return()
+        {
+            host.m_lent = nullptr;
+            host.m_images.clear();
+        }
+    } given_back{*this};
+    const auto result{m_index_runner.call({m_engine.number(static_cast<double>(indexer.index)),
+                                           m_engine.number(m_lent_id), m_engine.string(json_of_values(values)),
+                                           m_engine.string(context_json)})};
+    const auto parsed{parse_json(result.to_string())};
+    if(!parsed || parsed->kind != Json::Kind::object)
+    {
+        throw ScriptError{indexer.name + " gave back no palette and indices"};
+    }
+    Indexed made;
+    const auto& palette{(*parsed)["palette"]};
+    for(std::size_t entry{}; entry < palette.items.size(); ++ entry)
+    {
+        const auto& color{palette.items[entry]};
+        if(color.items.size() < 3)
+        {
+            throw ScriptError{indexer.name + "'s palette has a colour that is not three numbers from 0 to 1"};
+        }
+        made.palette.push_back({std::clamp(color.items[0].number, 0.0, 1.0),
+                                std::clamp(color.items[1].number, 0.0, 1.0),
+                                std::clamp(color.items[2].number, 0.0, 1.0), 1.0});
+    }
+    if(static_cast<int>(made.palette.size()) > context.count)
+    {
+        throw ScriptError{indexer.name + " made " + std::to_string(made.palette.size()) + " colours, " +
+                          std::to_string(context.count) + " being all there is room for"};
+    }
+    const auto id{static_cast<int>((*parsed)["indices"].number)};
+    const auto found{m_images.find(id)};
+    if(found == m_images.end())
+    {
+        throw ScriptError{indexer.name + " gave back no image of indices"};
+    }
+    made.indices = std::move(found->second);
+    if(made.indices.width != source.width || made.indices.height != source.height)
+    {
+        throw ScriptError{indexer.name + " gave back indices of another size"};
+    }
+    for(std::size_t at{}; at < made.indices.pixels.size(); at += 4)
+    {
+        if(made.indices.pixels[at + 3] >= 0.5f &&
+           std::lround(made.indices.pixels[at] * 255.0f) >= static_cast<long>(made.palette.size()))
+        {
+            throw ScriptError{indexer.name + " gave a pixel an index past its palette"};
+        }
+    }
+    return made;
+}
+
+WorkImage PluginHost::convert(const Converter& converter, const WorkImage& source,
+                              const std::map<std::string, double>& values)
+{
+    m_images.clear();
+    m_lent = &source;
+    m_lent_id = m_next_id++;
+    struct Return
+    {
+        PluginHost& host;
+        ~Return()
+        {
+            host.m_lent = nullptr;
+            host.m_images.clear();
+        }
+    } given_back{*this};
+    const auto result{m_convert_runner.call({m_engine.number(static_cast<double>(converter.index)),
+                                             m_engine.number(m_lent_id), m_engine.string(json_of_values(values))})};
+    const auto id{static_cast<int>(result.to_number())};
+    if(id == m_lent_id)
+    {
+        return source;
+    }
+    const auto found{m_images.find(id)};
+    if(found == m_images.end())
+    {
+        throw ScriptError{converter.name + " gave back no image"};
+    }
+    auto made{std::move(found->second)};
+    if(made.width != source.width || made.height != source.height)
+    {
+        throw ScriptError{converter.name + " gave back an image of another size"};
     }
     return made;
 }

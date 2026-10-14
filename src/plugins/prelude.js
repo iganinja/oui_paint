@@ -4,6 +4,10 @@
 
 const native = __paint;
 const effects = [];
+const indexers = [];
+const converters = [];
+// A palette as the pieces take it: three numbers a colour, one after the other.
+const flat = (palette) => new Float32Array(palette.flatMap((color) => [color[0], color[1], color[2]]));
 const saved = [];
 
 class PaintImage {
@@ -51,6 +55,31 @@ class PaintImage {
     over(below, mode = "Normal", opacity = 1) {
         return new PaintImage(native.mix(below.id, this.id, mode, opacity));
     }
+    // Grey: each pixel the weighted sum of its red, green and blue.
+    grayscale(red = 0.299, green = 0.587, blue = 0.114) {
+        return new PaintImage(native.grayscale(this.id, red, green, blue));
+    }
+    // Each channel brought to `levels` even steps, nudged by a Bayer matrix of `size` 2, 4 or 8 first, `strength`
+    // from 0, plain rounding, to 1.
+    ditherLevels(levels, size = 4, strength = 1) {
+        return new PaintImage(native.ditherLevels(this.id, levels, size, strength));
+    }
+    // Its different colours, as {color: [red, green, blue], count}, the commonest first, no more than `most`.
+    colors(most = 65536) {
+        return JSON.parse(native.colors(this.id, most));
+    }
+    // An image of indices: each pixel the index of the palette's colour nearest it.
+    nearest(palette) {
+        return new PaintImage(native.nearest(this.id, flat(palette)));
+    }
+    // An image of indices dithered by Floyd and Steinberg's error diffusion, `strength` from 0 to 1.
+    ditherFloydSteinberg(palette, strength = 1) {
+        return new PaintImage(native.ditherFloydSteinberg(this.id, flat(palette), strength));
+    }
+    // An image of indices dithered by a Bayer matrix of `size` 2, 4 or 8, `strength` from 0 to 1.
+    ditherBayer(palette, size = 4, strength = 1) {
+        return new PaintImage(native.ditherBayer(this.id, flat(palette), size, strength));
+    }
     // Each row as a Float32Array of red, green, blue and alpha from 0 to 1, colour multiplied by alpha, given to
     // `change(row, y)`, which changes it in place or returns another.
     rows(change) {
@@ -76,6 +105,22 @@ globalThis.paint = {
     onSaved(hook) {
         saved.push(hook);
     },
+    // Declares a way of turning an image into indices of a palette: {name, parameters, palette(image, values, context),
+    // assign(image, palette, values, context)}, assign giving an image of indices, the nearest colours when left out.
+    indexer(spec) {
+        indexers.push(spec);
+        native.registerIndexer(spec);
+    },
+    // Declares a way of changing an image's format: {name, to: "grayscale" or "8 bits", parameters,
+    // render(image, values)}.
+    converter(spec) {
+        converters.push(spec);
+        native.registerConverter(spec);
+    },
+    // A palette of up to `count` colours for the image by median cut.
+    medianCut(image, count) {
+        return JSON.parse(native.medianCut(image.id, count));
+    },
     clouds(width, height, scale, roughness, seed) {
         return new PaintImage(native.clouds(width, height, scale, roughness, seed));
     },
@@ -96,6 +141,18 @@ native.setRowRunner((index, id, values, context) => {
         native.setRow(id, y, changed instanceof Float32Array ? changed : row);
     }
     return id;
+});
+native.setIndexRunner((index, id, values, context) => {
+    const indexer = indexers[index];
+    const image = new PaintImage(id);
+    const parsed = JSON.parse(values);
+    const told = JSON.parse(context);
+    const palette = indexer.palette(image, parsed, told);
+    const indices = indexer.assign ? indexer.assign(image, palette, parsed, told) : image.nearest(palette);
+    return JSON.stringify({palette: palette.map((color) => [color[0], color[1], color[2]]), indices: indices.id});
+});
+native.setConvertRunner((index, id, values) => {
+    return converters[index].render(new PaintImage(id), JSON.parse(values)).id;
 });
 native.setSaved((path) => {
     for (const hook of saved) {
