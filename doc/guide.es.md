@@ -52,7 +52,7 @@ rellena con el color primario.
 
 **Mover píxeles seleccionados** (M) levanta lo seleccionado para poder arrastrarlo, escalarlo con sus asas y girarlo
 arrastrando con el botón derecho; Mayús mantiene sus proporciones al escalar y lo gira de 15 en 15 grados. **Mover
-selección** (M otra vez) mueve solo el contorno. Edición > Voltear selección y Girar selección voltean y giran lo
+selección** (M otra vez) mueve solo el contorno. Edición > Espejar selección y Girar selección espejan y giran lo
 seleccionado en su sitio.
 
 ## Pintar
