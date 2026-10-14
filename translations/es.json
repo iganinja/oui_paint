@@ -361,7 +361,8 @@
     "Layers": {
       "Background": "Fondo",
       "Layer": "Capa",
-      "Layer {0}": "Capa {0}"
+      "Layer {0}": "Capa {0}",
+      "Palette {0}": "Paleta {0}"
     },
     "Menus": {
       "&Adjustments": "A&justes",

@@ -279,6 +279,15 @@ std::optional<PaletteSetup> read_palette_setup(std::string_view text, std::strin
     return setup;
 }
 
+namespace
+{
+
+// The text chunk that keeps an indexed PNG's palettes as OUI Paint has them, the setup as its JSON: the PNG's own
+// palette is them all one after the other, which other programs read.
+constexpr auto setup_keyword{"OUI Paint palette setup"};
+
+} // namespace
+
 std::string write_indexed_png(const Document& document)
 {
     const auto& setup{*document.palettes()};
@@ -309,6 +318,7 @@ std::string write_indexed_png(const Document& document)
             }
         }
     }
+    lodepng_add_itext(&state.info_png, setup_keyword, "", "", write_palette_setup(setup).c_str());
     // Where no layer shows, the see-through index of the first palette.
     const auto nothing{setup.palettes.front().transparent.value_or(0)};
     std::vector<unsigned char> indices(static_cast<std::size_t>(document.width()) * document.height(),
@@ -370,6 +380,55 @@ std::optional<Document> read_indexed_png(std::string_view bytes, std::string& er
         {
             palette.transparent = static_cast<int>(index);
         }
+    }
+    // Written by OUI Paint: its palettes as they were, each pixel on a layer of the palette its index falls in.
+    for(std::size_t chunk{}; chunk < state.info_png.itext_num; ++ chunk)
+    {
+        if(std::string_view{state.info_png.itext_keys[chunk]} != setup_keyword)
+        {
+            continue;
+        }
+        std::string ignored;
+        const auto setup{read_palette_setup(state.info_png.itext_strings[chunk], ignored)};
+        if(!setup || setup->count() * setup->size != static_cast<int>(palette.colors.size()))
+        {
+            break;
+        }
+        Document document{static_cast<int>(width), static_cast<int>(height), PixelFormat::gray_alpha8};
+        document.set_palettes(*setup);
+        for(int slot{}; slot < setup->count(); ++ slot)
+        {
+            Image image{PixelFormat::gray_alpha8, static_cast<int>(width), static_cast<int>(height)};
+            auto used{false};
+            const auto& transparent{setup->palettes[static_cast<std::size_t>(slot)].transparent};
+            for(unsigned y{}; y < height; ++ y)
+            {
+                for(unsigned x{}; x < width; ++ x)
+                {
+                    const int index{indices[static_cast<std::size_t>(y) * width + x]};
+                    const auto in_slot{index / setup->size == slot};
+                    const auto shown{in_slot && transparent != index % setup->size};
+                    used = used || shown;
+                    image.set_pixel(static_cast<int>(x), static_cast<int>(y),
+                                    GrayAlpha8{{static_cast<std::uint8_t>(in_slot ? index % setup->size : 0),
+                                                static_cast<std::uint8_t>(shown ? 255 : 0)}});
+                }
+            }
+            if(!used)
+            {
+                continue;
+            }
+            auto& layer{document.add_layer(olagarro::oui::format_text(olagarro::oui::translate("Layers", "Palette {0}"),
+                                                                      {std::to_string(slot + 1)}))};
+            layer.set_palette_slot(slot);
+            layer.write(image, 0, 0);
+        }
+        // Nothing shows: a layer still, as every document has one.
+        if(document.layers().empty())
+        {
+            document.add_layer(olagarro::oui::translate("Layers", "Background"));
+        }
+        return document;
     }
     PaletteSetup setup;
     setup.size = static_cast<int>(palette.colors.size());

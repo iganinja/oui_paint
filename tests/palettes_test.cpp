@@ -48,7 +48,7 @@ TEST(Palettes, PaletteFilesComeBack)
     }
 }
 
-TEST(Palettes, AnIndexedPngHoldsEveryPaletteInOrderAndComesBackWithItsIndices)
+TEST(Palettes, AnIndexedPngHoldsEveryPaletteInOrderAndComesBackWithItsPalettesAndLayers)
 {
     Document document{3, 1, PixelFormat::gray_alpha8};
     auto setup{PaletteSetup::greys(4, 16)};
@@ -71,14 +71,61 @@ TEST(Palettes, AnIndexedPngHoldsEveryPaletteInOrderAndComesBackWithItsIndices)
     std::string error;
     const auto back{read_indexed_png(file, error)};
     ASSERT_TRUE(back.has_value()) << error;
-    ASSERT_EQ(back->palettes()->size, 64) << "four palettes of sixteen";
-    const auto pixels{back->layers()[0].read(0, 0, 3, 1)};
-    EXPECT_EQ(pixels.pixel<GrayAlpha8>(0, 0).value[0], 9);
-    EXPECT_EQ(pixels.pixel<GrayAlpha8>(1, 0).alpha(), 0);
-    EXPECT_EQ(pixels.pixel<GrayAlpha8>(2, 0).value[0], 2 * 16 + 7) << "the top layer's, of palette 2";
-    EXPECT_EQ(to_hex(back->palettes()->palettes[0].colors[2 * 16 + 7]), "#0080ff");
+    ASSERT_EQ(back->palettes()->count(), 4) << "the palettes as they were, kept beside the PNG's own";
+    ASSERT_EQ(back->palettes()->size, 16);
+    EXPECT_EQ(to_hex(back->palettes()->palettes[2].colors[7]), "#0080ff");
+    // A layer for each palette the pixels use, which shows as the image did.
+    ASSERT_EQ(back->layers().size(), 2u);
+    EXPECT_EQ(back->layers()[0].palette_slot(), 0);
+    EXPECT_EQ(back->layers()[1].palette_slot(), 2);
+    const auto bottom_back{back->layers()[0].read(0, 0, 3, 1)};
+    EXPECT_EQ(bottom_back.pixel<GrayAlpha8>(0, 0).value[0], 9);
+    EXPECT_EQ(bottom_back.pixel<GrayAlpha8>(1, 0).alpha(), 0);
+    EXPECT_EQ(bottom_back.pixel<GrayAlpha8>(2, 0).alpha(), 0) << "palette 2's pixel is on its own layer";
+    EXPECT_EQ(back->layers()[1].read(2, 0, 1, 1).pixel<GrayAlpha8>(0, 0).value[0], 7);
+    const auto before{document.flatten()};
+    const auto after{back->flatten()};
+    for(int x{}; x < 3; ++ x)
+    {
+        EXPECT_EQ(after.pixel<Rgba8>(x, 0).value, before.pixel<Rgba8>(x, 0).value) << x;
+    }
     std::string colors_error;
     const auto palette{read_palette_file("x.png", file, colors_error)};
     ASSERT_TRUE(palette.has_value());
     EXPECT_EQ(palette->size(), 64u);
+}
+
+TEST(Palettes, AnIndexedPngOfAnotherProgramComesBackAsOnePaletteOfAllItsColours)
+{
+    Document document{2, 1, PixelFormat::gray_alpha8};
+    document.set_palettes(PaletteSetup::greys(4, 16));
+    Image indices{PixelFormat::gray_alpha8, 2, 1};
+    indices.set_pixel(0, 0, GrayAlpha8{{9, 255}});
+    indices.set_pixel(1, 0, GrayAlpha8{{3, 255}});
+    auto& layer{document.add_layer("Only")};
+    layer.write(indices, 0, 0);
+    layer.set_palette_slot(1);
+    const auto file{write_indexed_png(document)};
+    // The file without OUI Paint's text chunks, as another program writes it: chunks are a length, a type, the data
+    // and a checksum, after an eight-byte signature.
+    std::string plain{file.substr(0, 8)};
+    for(std::size_t at{8}; at + 8 <= file.size();)
+    {
+        const auto length{static_cast<std::size_t>(static_cast<unsigned char>(file[at])) << 24u |
+                          static_cast<std::size_t>(static_cast<unsigned char>(file[at + 1])) << 16u |
+                          static_cast<std::size_t>(static_cast<unsigned char>(file[at + 2])) << 8u |
+                          static_cast<std::size_t>(static_cast<unsigned char>(file[at + 3]))};
+        if(file.compare(at + 4, 4, "iTXt") != 0)
+        {
+            plain += file.substr(at, length + 12);
+        }
+        at += length + 12;
+    }
+    ASSERT_LT(plain.size(), file.size()) << "it had a text chunk";
+    std::string error;
+    const auto back{read_indexed_png(plain, error)};
+    ASSERT_TRUE(back.has_value()) << error;
+    EXPECT_EQ(back->palettes()->count(), 1);
+    EXPECT_EQ(back->palettes()->size, 64);
+    EXPECT_EQ(back->layers()[0].read(0, 0, 1, 1).pixel<GrayAlpha8>(0, 0).value[0], 16 + 9);
 }

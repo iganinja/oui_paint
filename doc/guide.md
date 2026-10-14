@@ -107,7 +107,8 @@ The palettes are saved apart, as a palette setup in JSON (Image > Palettes > Sav
 loaded or saved alone as .pal, .gpl or .act, or taken from an image's palette.
 
 Opening a PNG that has a palette asks whether to keep it indexed or open it in colors. Saving an indexed image as PNG
-asks whether to save it indexed, with every palette one after the other, or in colors. Image > Mode changes an open
+asks whether to save it indexed, with every palette one after the other, or in colors; saved indexed, it opens again
+with its palettes as they were, the pixels of each palette on a layer of their own. Image > Mode changes an open
 image to colour or grayscale, of 8 or 16 bits a channel, or to indexed, the mode it is in marked; the image shows the
 change as its dialog's choices change.
 

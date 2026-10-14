@@ -113,7 +113,8 @@ Las paletas se guardan aparte, como una configuración de paletas en JSON (Image
 paletas); una paleta sola se puede cargar o guardar como .pal, .gpl o .act, o tomar de la paleta de una imagen.
 
 Al abrir un PNG que tiene paleta se pregunta si mantenerlo indexado o abrirlo en colores. Al guardar una imagen
-indexada como PNG se pregunta si guardarla indexada, con todas las paletas una tras otra, o en colores. Imagen > Modo
+indexada como PNG se pregunta si guardarla indexada, con todas las paletas una tras otra, o en colores; guardada
+indexada, se vuelve a abrir con sus paletas como estaban, los píxeles de cada paleta en una capa propia. Imagen > Modo
 cambia una imagen abierta a color o escala de grises, de 8 o 16 bits por canal, o a indexada, con el modo en que está
 marcado; la imagen muestra el cambio mientras cambian las opciones del diálogo.
 
