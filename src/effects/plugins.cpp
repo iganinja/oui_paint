@@ -394,6 +394,30 @@ void PluginHost::load(std::string_view source, std::string_view name)
     m_sources.emplace_back(source, name);
 }
 
+std::unique_ptr<PluginHost> PluginHost::copy() const
+{
+    auto made{std::make_unique<PluginHost>()};
+    made->set_time_limit(m_time_limit);
+    if(m_print)
+    {
+        made->set_print(m_print);
+    }
+    for(const auto& [code, name] : m_sources)
+    {
+        made->load(code, name);
+    }
+    return made;
+}
+
+const Effect& PluginHost::same_effect(const Effect& effect) const
+{
+    if(effect.index >= m_effects.size() || m_effects[effect.index].name != effect.name)
+    {
+        throw ScriptError{"the plugins loaded again did not declare " + effect.name + " where they did"};
+    }
+    return m_effects[effect.index];
+}
+
 WorkImage PluginHost::apply_rows(const Effect& effect, const WorkImage& band, int first_row, const std::string& values,
                                  const EffectContext& context)
 {
@@ -444,20 +468,10 @@ WorkImage PluginHost::apply(const Effect& effect, const WorkImage& source, const
                 {
                     try
                     {
-                        PluginHost worker;
-                        worker.set_time_limit(m_time_limit);
-                        if(m_print)
-                        {
-                            worker.set_print(m_print);
-                        }
-                        for(const auto& [code, name] : m_sources)
-                        {
-                            worker.load(code, name);
-                        }
+                        const auto worker{copy()};
                         WorkImage rows{source.width, last - first};
                         std::copy(source.at(0, first), source.at(0, first) + rows.pixels.size(), rows.pixels.begin());
-                        const auto made{worker.apply_rows(worker.effects().at(effect.index), rows, first, json,
-                                                          context)};
+                        const auto made{worker->apply_rows(worker->same_effect(effect), rows, first, json, context)};
                         std::copy(made.pixels.begin(), made.pixels.end(), result.at(0, first));
                     }
                     catch(...)

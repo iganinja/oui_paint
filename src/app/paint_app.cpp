@@ -1,5 +1,6 @@
 #include "app/paint_app.h"
 
+#include "app/background_effect.h"
 #include "app/file_filters.h"
 #include "app/help.h"
 #include "app/fonts.h"
@@ -3269,19 +3270,19 @@ void PaintApp::run_effect(std::size_t index, bool again)
     {
         values.emplace(parameter.id, parameter.value);
     }
-    const auto show{[&](const std::map<std::string, double>& shown)
+    // The layer as it was with the effect's result over it.
+    const auto put{[&](const WorkImage& result)
                     {
                         const auto before{LayersState::of(document)};
                         layer = base;
                         try
                         {
-                            auto result{m_plugins->apply(effect, source, shown, context)};
                             // With nothing selected the effect takes the whole layer as it made it; else as much as
                             // each pixel is selected, the rows shared among the cores.
                             WorkImage inside;
                             if(!selection.active())
                             {
-                                inside = std::move(result);
+                                inside = result;
                             }
                             else
                             {
@@ -3333,6 +3334,8 @@ void PaintApp::run_effect(std::size_t index, bool again)
                         }
                         open->refresh(changed_tiles(before, LayersState::of(document)));
                     }};
+    const auto show{[&](const std::map<std::string, double>& shown)
+                    { put(m_plugins->apply(effect, source, shown, context)); }};
     open->history().begin_step(document);
     try
     {
@@ -3343,51 +3346,27 @@ void PaintApp::run_effect(std::size_t index, bool again)
         else
         {
             show(values);
-            // The image follows the dialog once a frame, with the values as they are by then: a drag sends many
-            // changes, each of which would make the whole effect again.
-            struct Following
-            {
-                std::optional<std::map<std::string, double>> pending;
-                bool closed{false};
-                bool failed{false};
-            };
-            const auto following{std::make_shared<Following>()};
+            // The image follows the dialog as fast as the effect is made, on a thread of its own, so the dialog never
+            // waits for it: each result with the values of its time, the latest asked for made next.
+            auto failed{false};
+            BackgroundEffect background{m_application, *m_plugins, effect, source, context,
+                                        [&put](const BackgroundEffect::Values&, const WorkImage& result) { put(result); },
+                                        [&](const std::string& problem)
+                                        {
+                                            failed = true;
+                                            show_error(effect.name, problem);
+                                        }};
             const auto accepted{ask_effect(
                 m_application, effect, values,
-                [&, following](const std::map<std::string, double>& changed)
+                [&](const std::map<std::string, double>& changed)
                 {
-                    if(following->failed)
+                    if(!failed)
                     {
-                        return;
+                        background.request(changed);
                     }
-                    const auto first{!following->pending};
-                    following->pending = changed;
-                    if(!first)
-                    {
-                        return;
-                    }
-                    m_application.post(
-                        [&show, &effect, this, following]
-                        {
-                            if(following->closed || following->failed || !following->pending)
-                            {
-                                return;
-                            }
-                            const auto shown{std::move(*following->pending)};
-                            following->pending.reset();
-                            try
-                            {
-                                show(shown);
-                            }
-                            catch(const std::exception& failure)
-                            {
-                                following->failed = true;
-                                show_error(effect.name, failure.what());
-                            }
-                        });
                 },
                 histogram_of(source, selection))};
-            following->closed = true;
+            const auto last{background.stop()};
             if(!accepted)
             {
                 const auto before{LayersState::of(document)};
@@ -3396,7 +3375,15 @@ void PaintApp::run_effect(std::size_t index, bool again)
                 open->history().cancel_step();
                 return;
             }
-            show(values);
+            // What was made last is what was accepted, unless the values changed after.
+            if(last && last->first == values)
+            {
+                put(*last->second);
+            }
+            else
+            {
+                show(values);
+            }
         }
     }
     catch(const std::exception& failure)

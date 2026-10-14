@@ -39,6 +39,8 @@ paint.effect({
 Each parameter becomes a slider and a number in the effect's dialog, or a list when it has `options` (its value is
 then the index chosen). `step` sets what values are whole numbers of (1 unless given, 0 for any). The image changes
 as the parameters do, and the effect is applied inside the selection only, as much as each pixel is selected.
+While its dialog is open the effect is made on a thread of its own, with a copy of the plugins loaded again, so the
+dialog never waits for it: what it makes there has none of the `oui` system functions, as rows made on every core.
 
 `context` holds `primary` and `secondary`, the colours as `[red, green, blue, alpha]` from 0 to 1, and `selection`,
 its bounds as `{x, y, width, height}`.

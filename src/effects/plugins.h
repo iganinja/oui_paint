@@ -128,6 +128,12 @@ class PluginHost
     void set_time_limit(std::chrono::milliseconds limit);
     void set_print(std::function<void(std::string_view text)> print);
     [[nodiscard]] olagarro::oui::script::ScriptEngine& engine() { return m_engine; }
+    // A host of the same plugins, loaded again in the same order, with the same limit and print, for another thread:
+    // an engine runs on the thread that made it, so it is called on the thread that uses the copy. The copy has none
+    // of what was given the engine apart from the plugins, as the `oui` system functions.
+    [[nodiscard]] std::unique_ptr<PluginHost> copy() const;
+    // The copy's own effect that is `effect` of this host's; throws when the copy did not load the same.
+    [[nodiscard]] const Effect& same_effect(const Effect& effect) const;
 
   private:
     // Runs a row effect's `row` on every row of `band`, whose first row is `first_row` of the image.
