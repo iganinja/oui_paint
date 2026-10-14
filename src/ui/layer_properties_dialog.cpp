@@ -19,7 +19,8 @@ using namespace olagarro;
 namespace oui_paint
 {
 
-std::optional<LayerProperties> ask_layer_properties(oui::Application& application, const LayerProperties& start)
+std::optional<LayerProperties> ask_layer_properties(oui::Application& application, const LayerProperties& start,
+                                                    const std::function<void(const LayerProperties&)>& changed)
 {
     auto window{oui::window("Layer Properties")};
     auto& content{oui::column(*window)};
@@ -63,8 +64,22 @@ std::optional<LayerProperties> ask_layer_properties(oui::Application& applicatio
     opacity.set_value(std::round(start.opacity * 255.0));
     opacity_slider.set_value(opacity.value());
     opacity_label.set_buddy(opacity.text_field());
+    // The properties as the dialog has them now, heard at every change.
+    const auto now{[&]
+                   {
+                       return LayerProperties{std::string{name.text()}, visible.is_checked(),
+                                              all_blend_modes()[mode.selected()], opacity.value() / 255.0};
+                   }};
     static_cast<void>(opacity_slider.on_changed([&opacity](double value) { opacity.set_value(value); }));
-    static_cast<void>(opacity.on_changed([&opacity_slider](double value) { opacity_slider.set_value(value); }));
+    static_cast<void>(opacity.on_changed(
+        [&](double value)
+        {
+            opacity_slider.set_value(value);
+            changed(now());
+        }));
+    static_cast<void>(name.on_changed([&](std::string_view) { changed(now()); }));
+    static_cast<void>(visible.on_toggled([&](bool) { changed(now()); }));
+    static_cast<void>(mode.on_selected([&](std::size_t) { changed(now()); }));
 
     auto& buttons{oui::row(content)};
     buttons.set_gap(oui::Spacing::normal);

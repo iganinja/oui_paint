@@ -8,15 +8,17 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
 namespace oui_paint
 {
 
-// The document's layers, top one first, as Paint.NET's Layers window shows them: an eye that shows or hides each, a
-// small picture of it and its name, the active one marked; under them, buttons that add, remove, duplicate, merge
-// and move layers and open their properties. It says what was asked; the program does it.
+// The document's layers, top one first, as Paint.NET's Layers window shows them: a box that ticks each, a small
+// picture of it and its name, the active one marked, and at the right an eye that shows or hides it and a bin that
+// deletes it; under them, buttons that add, remove, duplicate, merge and move layers and open their properties. The
+// layers ticked are those the remove button deletes, when any are. It says what was asked; the program does it.
 class LayersPanel final : public olagarro::oui::Widget
 {
   public:
@@ -42,6 +44,12 @@ class LayersPanel final : public olagarro::oui::Widget
     // Called with the layer whose eye was clicked.
     void on_toggle_visible(std::function<void(std::size_t)> toggle);
     void on_action(std::function<void(Action)> action);
+    // Called with the layer whose bin was clicked.
+    void on_delete(std::function<void(std::size_t)> remove) { m_delete = std::move(remove); }
+    // The layers ticked, bottom first.
+    [[nodiscard]] std::vector<std::size_t> ticked() const;
+    // Unticks them all, as when the layers move.
+    void clear_ticks();
 
     // The layer at a row counted from the panel's top, none past them.
     [[nodiscard]] std::optional<std::size_t> layer_at_row(int row) const;
@@ -53,7 +61,9 @@ class LayersPanel final : public olagarro::oui::Widget
 
   private:
     // The cells the eye and the picture take at the start of each row.
+    static constexpr int tick_width{2};
     static constexpr int eye_width{2};
+    static constexpr int delete_width{2};
     static constexpr int picture_width{3};
 
     struct Button
@@ -64,6 +74,18 @@ class LayersPanel final : public olagarro::oui::Widget
     };
 
     [[nodiscard]] std::optional<Action> button_at(olagarro::oui::Point cell) const;
+    // What of a layer's row is at a column of the panel.
+    enum class Part
+    {
+        tick,
+        name,
+        eye,
+        remove
+    };
+    [[nodiscard]] Part part_at(int column) const;
+    [[nodiscard]] bool is_ticked(std::size_t index) const;
+    void paint_icon(olagarro::oui::Painter& painter, const char* name, const olagarro::oui::Rect& cells,
+                    const olagarro::oui::Theme& theme) const;
     void paint_picture(olagarro::oui::Painter& painter, const Layer& layer, const olagarro::oui::Rect& cells) const;
 
     Icons& m_icons;
@@ -72,6 +94,10 @@ class LayersPanel final : public olagarro::oui::Widget
     std::function<void(std::size_t)> m_select;
     std::function<void(std::size_t)> m_toggle_visible;
     std::function<void(Action)> m_action;
+    std::function<void(std::size_t)> m_delete;
+    // The layers ticked, by place, and how many layers there were: a layer added or taken away clears them.
+    mutable std::set<std::size_t> m_ticked;
+    mutable std::size_t m_ticked_count{0};
     mutable std::vector<std::uint32_t> m_picture;
 };
 

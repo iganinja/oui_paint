@@ -4,6 +4,7 @@
 
 #include <oui/application.h>
 
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -19,8 +20,9 @@ struct LayerProperties
 };
 
 // Asks for a layer's name, whether it shows, its blend mode and opacity, as Paint.NET's Layer Properties; none when
-// cancelled.
-[[nodiscard]] std::optional<LayerProperties> ask_layer_properties(olagarro::oui::Application& application,
-                                                                  const LayerProperties& start);
+// cancelled. `changed` hears each change as it is made, so the image shows it.
+[[nodiscard]] std::optional<LayerProperties> ask_layer_properties(
+    olagarro::oui::Application& application, const LayerProperties& start,
+    const std::function<void(const LayerProperties&)>& changed);
 
 } // namespace oui_paint

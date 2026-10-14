@@ -55,6 +55,9 @@ class Document
     Layer& insert_layer_above(std::string name);
     // Takes the layer away; the one under it, or the new bottom one, becomes active. The last layer stays.
     void remove_layer(std::size_t index);
+    // Removes the layers at `indices`, any order, but never the last one left: with all of them asked, the bottom one
+    // stays. The active layer becomes the one under the highest removed, or the bottom one.
+    void remove_layers(std::vector<std::size_t> indices);
     // A copy just above it, sharing its tiles until either is written, which becomes active.
     void duplicate_layer(std::size_t index);
     // Moves a layer to another place among them; it stays active if it was.

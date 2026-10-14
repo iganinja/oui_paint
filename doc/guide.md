@@ -73,7 +73,8 @@ of them a click on a palette sets, the one framed in front; a right click sets t
 ## Layers
 
 Each layer has a name, can be shown or hidden, and has an opacity and a blend mode, as Paint.NET's (F4 opens its
-properties). The buttons under the list add, delete, duplicate, merge down and move the layer up and down. Saving
+properties, which the image shows as they change). In the list, the eye at the right of a layer shows or hides it and
+the bin deletes it; the boxes at the left tick layers for the delete button under the list to delete together. The buttons under the list add, delete, duplicate, merge down and move the layer up and down. Saving
 to a format of one layer, such as PNG, saves the image flattened; the layers stay in the open image, and OpenRaster
 (.ora) keeps them.
 

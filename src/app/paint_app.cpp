@@ -592,6 +592,9 @@ void PaintApp::build_window()
                               layer.set_visible(!layer.visible());
                           });
         });
+    m_layers_panel->on_delete(
+        [this](std::size_t index)
+        { change_layers("Delete Layer", [index](Document& document) { document.remove_layer(index); }); });
     m_layers_panel->on_action(
         [this](LayersPanel::Action action)
         {
@@ -602,8 +605,19 @@ void PaintApp::build_window()
                 run("layers.add");
                 break;
             case LayersPanel::Action::remove:
-                run("layers.delete");
+            {
+                // The layers ticked, when any are; else the active one.
+                const auto ticked{m_layers_panel->ticked()};
+                if(ticked.empty())
+                {
+                    run("layers.delete");
+                    break;
+                }
+                change_layers(ticked.size() == 1 ? "Delete Layer" : "Delete Layers",
+                              [&ticked](Document& document) { document.remove_layers(ticked); });
+                m_layers_panel->clear_ticks();
                 break;
+            }
             case LayersPanel::Action::duplicate:
                 run("layers.duplicate");
                 break;
@@ -611,9 +625,11 @@ void PaintApp::build_window()
                 run("layers.merge_down");
                 break;
             case LayersPanel::Action::move_up:
+                m_layers_panel->clear_ticks();
                 run("layers.move_up");
                 break;
             case LayersPanel::Action::move_down:
+                m_layers_panel->clear_ticks();
                 run("layers.move_down");
                 break;
             case LayersPanel::Action::properties:
@@ -1541,9 +1557,20 @@ void PaintApp::layer_properties()
     {
         return;
     }
-    const auto& layer{open->document().layers()[open->document().active_layer()]};
-    const auto changed{ask_layer_properties(
-        m_application, {layer.name(), layer.visible(), layer.blend_mode(), layer.opacity()})};
+    auto& layer{open->document().layers()[open->document().active_layer()]};
+    const LayerProperties start{layer.name(), layer.visible(), layer.blend_mode(), layer.opacity()};
+    // The layer shows each change as the dialog makes it, and goes back as it was when it closes: what was accepted
+    // is then made one step.
+    const auto show{[&layer, open](const LayerProperties& shown)
+                    {
+                        layer.set_name(shown.name);
+                        layer.set_visible(shown.visible);
+                        layer.set_blend_mode(shown.blend_mode);
+                        layer.set_opacity(shown.opacity);
+                        open->display().invalidate_all();
+                    }};
+    const auto changed{ask_layer_properties(m_application, start, show)};
+    show(start);
     if(!changed)
     {
         return;

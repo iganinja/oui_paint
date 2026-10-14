@@ -63,6 +63,10 @@ LayersPanel::LayersPanel(Icons& icons) : m_icons{icons}
 
 void LayersPanel::set_document(const Document* document)
 {
+    if(document != m_document)
+    {
+        m_ticked.clear();
+    }
     m_document = document;
 }
 
@@ -167,21 +171,23 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             {
                 painter.fill_rect(line, theme.menu_selected_background);
             }
-            const oui::Rect eye{line.x, line.y, eye_width, 1};
-            if(const auto area{painter.pixel_bounds(eye)})
-            {
-                if(const auto* const picture{m_icons.picture(
-                       layer.visible() ? "GuiVisibilityVisible" : "GuiVisibilityHidden", area->width, area->height)})
-                {
-                    oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
-                    image.alpha = true;
-                    painter.draw_image(eye, image, theme);
-                }
-            }
-            paint_picture(painter, layer, {line.x + eye_width, line.y, picture_width, 1});
-            const oui::TextStyle style{active ? theme.menu_selected_foreground : theme.status_foreground,
-                                       active ? theme.menu_selected_background : side_panel_color(theme)};
-            painter.draw_label({line.x + eye_width + picture_width + 1, line.y}, layer.name(), style);
+            const auto background{active ? theme.menu_selected_background : side_panel_color(theme)};
+            // The box that ticks it, to delete several at once.
+            oui::CheckBoxLook tick;
+            tick.checked = is_ticked(index);
+            tick.background = background;
+            painter.draw_check_box({line.x, line.y, tick_width, 1}, tick, theme);
+            paint_picture(painter, layer, {line.x + tick_width, line.y, picture_width, 1});
+            const oui::TextStyle style{active ? theme.menu_selected_foreground : theme.status_foreground, background};
+            // The name, then at the right the eye and the bin.
+            const auto name_x{line.x + tick_width + picture_width + 1};
+            const auto eye_x{line.x + line.width - eye_width - delete_width};
+            painter.push_clip({name_x, line.y, std::max(0, eye_x - name_x), 1});
+            painter.draw_label({name_x, line.y}, layer.name(), style);
+            painter.pop_clip();
+            paint_icon(painter, layer.visible() ? "GuiVisibilityVisible" : "GuiVisibilityHidden",
+                       {eye_x, line.y, eye_width, 1}, theme);
+            paint_icon(painter, "Remove", {eye_x + eye_width, line.y, delete_width, 1}, theme);
         }
     }
     // The buttons on a bar of their own, as a toolbar; none without a document to work on.
@@ -206,6 +212,67 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     }
 }
 
+void LayersPanel::paint_icon(oui::Painter& painter, const char* name, const oui::Rect& cells,
+                             const oui::Theme& theme) const
+{
+    if(const auto area{painter.pixel_bounds(cells)})
+    {
+        if(const auto* const picture{m_icons.picture(name, area->width, area->height)})
+        {
+            oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
+            image.alpha = true;
+            painter.draw_image(cells, image, theme);
+        }
+    }
+}
+
+bool LayersPanel::is_ticked(std::size_t index) const
+{
+    const auto count{m_document != nullptr ? m_document->layers().size() : 0};
+    if(count != m_ticked_count)
+    {
+        m_ticked.clear();
+        m_ticked_count = count;
+    }
+    return m_ticked.count(index) != 0;
+}
+
+std::vector<std::size_t> LayersPanel::ticked() const
+{
+    std::vector<std::size_t> found;
+    for(std::size_t index{}; m_document != nullptr && index < m_document->layers().size(); ++ index)
+    {
+        if(is_ticked(index))
+        {
+            found.push_back(index);
+        }
+    }
+    return found;
+}
+
+void LayersPanel::clear_ticks()
+{
+    m_ticked.clear();
+}
+
+LayersPanel::Part LayersPanel::part_at(int column) const
+{
+    if(column < tick_width)
+    {
+        return Part::tick;
+    }
+    const auto eye_x{m_bounds.width - eye_width - delete_width};
+    if(column >= eye_x + eye_width)
+    {
+        return Part::remove;
+    }
+    if(column >= eye_x)
+    {
+        return Part::eye;
+    }
+    return Part::name;
+}
+
 bool LayersPanel::handle_event(const oui::Event& event)
 {
     const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
@@ -227,13 +294,34 @@ bool LayersPanel::handle_event(const oui::Event& event)
     {
         return false;
     }
-    if(cell.x < eye_width)
+    switch(part_at(cell.x))
     {
+    case Part::tick:
+    {
+        if(!is_ticked(*index))
+        {
+            m_ticked.insert(*index);
+        }
+        else
+        {
+            m_ticked.erase(*index);
+        }
+        return true;
+    }
+    case Part::eye:
         if(m_toggle_visible)
         {
             m_toggle_visible(*index);
         }
         return true;
+    case Part::remove:
+        if(m_delete)
+        {
+            m_delete(*index);
+        }
+        return true;
+    case Part::name:
+        break;
     }
     if(m_select)
     {
@@ -248,6 +336,20 @@ bool LayersPanel::handle_event(const oui::Event& event)
 
 std::optional<std::string> LayersPanel::tooltip_at(oui::Point point) const
 {
+    if(layer_at_row(point.y - m_bounds.y))
+    {
+        switch(part_at(point.x - m_bounds.x))
+        {
+        case Part::tick:
+            return std::string{"Tick layers to delete them together"};
+        case Part::eye:
+            return std::string{"Show or hide the layer"};
+        case Part::remove:
+            return std::string{"Delete the layer"};
+        case Part::name:
+            break;
+        }
+    }
     if(const auto action{button_at({point.x - m_bounds.x, point.y - m_bounds.y})})
     {
         for(const auto& button : m_buttons)

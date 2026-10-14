@@ -1,5 +1,8 @@
 #include "core/document.h"
 
+#include <algorithm>
+#include <functional>
+
 #include "core/blend.h"
 
 #include <cmath>
@@ -57,6 +60,33 @@ void Document::remove_layer(std::size_t index)
     }
     m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(index));
     m_active_layer = index > 0 ? index - 1 : 0;
+}
+
+void Document::remove_layers(std::vector<std::size_t> indices)
+{
+    std::sort(indices.begin(), indices.end(), std::greater<>{});
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+    indices.erase(std::remove_if(indices.begin(), indices.end(),
+                                 [this](std::size_t index) { return index >= m_layers.size(); }),
+                  indices.end());
+    if(indices.empty())
+    {
+        return;
+    }
+    const auto highest{indices.front()};
+    auto removed{std::size_t{}};
+    for(const auto index : indices)
+    {
+        if(m_layers.size() <= 1)
+        {
+            break;
+        }
+        m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(index));
+        ++ removed;
+    }
+    // Under the highest removed: as many places down as were removed at or under it, then one more.
+    const auto under{highest + 1 > removed ? highest + 1 - removed : std::size_t{1}};
+    m_active_layer = std::min(under > 0 ? under - 1 : 0, m_layers.size() - 1);
 }
 
 void Document::duplicate_layer(std::size_t index)

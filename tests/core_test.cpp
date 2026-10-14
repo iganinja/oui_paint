@@ -222,3 +222,22 @@ TEST(Document, RotateZoomTurnsALayerRoundTheMiddle)
     // A quarter turn clockwise round (10, 10): five to the right goes five down.
     EXPECT_EQ(document.flatten().pixel<Rgba8>(9, 15).value[0], 255);
 }
+
+TEST(Document, SeveralLayersGoAtOnceButNeverTheLastOne)
+{
+    Document document{4, 4, PixelFormat::rgba8};
+    for(const auto* const name : {"A", "B", "C", "D", "E"})
+    {
+        document.add_layer(name);
+    }
+    document.remove_layers({3, 1});
+    ASSERT_EQ(document.layers().size(), 3u);
+    EXPECT_EQ(document.layers()[0].name(), "A");
+    EXPECT_EQ(document.layers()[1].name(), "C");
+    EXPECT_EQ(document.layers()[2].name(), "E");
+    EXPECT_EQ(document.layers()[document.active_layer()].name(), "C") << "the one under the highest removed";
+    document.remove_layers({0, 1, 2});
+    ASSERT_EQ(document.layers().size(), 1u) << "one always stays";
+    EXPECT_EQ(document.layers()[0].name(), "A") << "the bottom one";
+    EXPECT_EQ(document.active_layer(), 0u);
+}

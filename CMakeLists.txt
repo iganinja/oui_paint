@@ -97,7 +97,8 @@ add_library(oui_paint_core STATIC
     src/ui/transform_dialogs.cpp
     src/ui/tool_panel.cpp)
 target_include_directories(oui_paint_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics olagarro::OUIScript PRIVATE oui_paint_lodepng oui_paint_miniz)
+target_link_libraries(oui_paint_core PUBLIC olagarro::OUI olagarro::OUIGraphics olagarro::OUIScript
+    PRIVATE olagarro::Concurrency oui_paint_lodepng oui_paint_miniz)
 target_include_directories(oui_paint_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb)
 # stb and miniz are used as they come, so OUI Paint's warnings stay off the files that hold them.
 set_source_files_properties(src/codecs/stb_api.cpp src/codecs/zip_api.cpp
@@ -172,6 +173,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/history_test.cpp
         tests/icons_test.cpp
         tests/indexed_test.cpp
+        tests/layers_panel_test.cpp
         tests/levels_test.cpp
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
