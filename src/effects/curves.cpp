@@ -32,7 +32,8 @@ std::array<double, 256> curve_table(const std::vector<CurvePoint>& points)
         slopes.back() = secants.back();
         for(std::size_t index{1}; index + 1 < count; ++ index)
         {
-            slopes[index] = secants[index - 1] * secants[index] <= 0.0 ? 0.0 : (secants[index - 1] + secants[index]) / 2.0;
+            slopes[index] =
+                secants[index - 1] * secants[index] <= 0.0 ? 0.0 : (secants[index - 1] + secants[index]) / 2.0;
         }
         for(std::size_t index{}; index + 1 < count; ++ index)
         {
@@ -115,7 +116,8 @@ std::vector<CurvePoint> curve_points(const std::map<std::string, double>& values
     std::vector<CurvePoint> points;
     for(std::size_t index{}; index < static_cast<std::size_t>(count->second); ++ index)
     {
-        points.push_back({values.at(name + "px" + std::to_string(index)), values.at(name + "py" + std::to_string(index))});
+        points.push_back(
+            {values.at(name + "px" + std::to_string(index)), values.at(name + "py" + std::to_string(index))});
     }
     return points;
 }
@@ -124,7 +126,8 @@ Histogram histogram_of(const WorkImage& image, const Selection& selection)
 {
     Histogram histogram;
     const auto area{selection.bounds()};
-    const auto level{[](float value) { return static_cast<std::size_t>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); }};
+    const auto level{[](float value)
+                     { return static_cast<std::size_t>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); }};
     for(int y{area.y}; y < area.y + area.height; ++ y)
     {
         for(int x{area.x}; x < area.x + area.width; ++ x)

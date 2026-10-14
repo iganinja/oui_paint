@@ -93,6 +93,9 @@ class PluginHost
     std::vector<Effect> m_effects;
     // The images an effect works on while it runs, by the ids scripts hold.
     std::map<int, WorkImage> m_images;
+    // The image an effect is given, lent rather than copied, as big as images are: read, never written.
+    const WorkImage* m_lent{};
+    int m_lent_id{0};
     int m_next_id{1};
     olagarro::oui::script::Value m_runner;
     olagarro::oui::script::Value m_row_runner;

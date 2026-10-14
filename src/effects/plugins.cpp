@@ -143,7 +143,7 @@ PluginHost::PluginHost()
     m_engine.define("__paint.row",
                     [this](const std::vector<Value>& arguments)
                     {
-                        auto& work{m_images.at(static_cast<int>(arguments.at(0).to_number()))};
+                        const auto& work{image(arguments.at(0))};
                         const auto y{static_cast<int>(arguments.at(1).to_number())};
                         if(y < 0 || y >= work.height)
                         {
@@ -240,6 +240,10 @@ int PluginHost::keep(WorkImage made)
 
 const WorkImage& PluginHost::image(const Value& id) const
 {
+    if(m_lent != nullptr && static_cast<int>(id.to_number()) == m_lent_id)
+    {
+        return *m_lent;
+    }
     const auto found{m_images.find(static_cast<int>(id.to_number()))};
     if(found == m_images.end())
     {
@@ -352,16 +356,32 @@ WorkImage PluginHost::apply(const Effect& effect, const WorkImage& source, const
         return result;
     }
     m_images.clear();
-    const auto id{keep(source)};
-    const auto result{m_runner.call({m_engine.number(static_cast<double>(effect.index)), m_engine.number(id),
+    // Lent, not copied: every piece makes a new image of what it reads.
+    m_lent = &source;
+    m_lent_id = m_next_id++;
+    struct Return
+    {
+        PluginHost& host;
+        ~Return()
+        {
+            host.m_lent = nullptr;
+            host.m_images.clear();
+        }
+    } given_back{*this};
+    const auto result{m_runner.call({m_engine.number(static_cast<double>(effect.index)), m_engine.number(m_lent_id),
                                      m_engine.string(json), m_engine.string(context_json)})};
-    const auto found{m_images.find(static_cast<int>(result.to_number()))};
+    const auto id{static_cast<int>(result.to_number())};
+    if(id == m_lent_id)
+    {
+        // Given back as it came.
+        return source;
+    }
+    const auto found{m_images.find(id)};
     if(found == m_images.end())
     {
         throw ScriptError{effect.name + " gave back no image"};
     }
     auto made{std::move(found->second)};
-    m_images.clear();
     if(made.width != source.width || made.height != source.height)
     {
         throw ScriptError{effect.name + " gave back an image of another size"};

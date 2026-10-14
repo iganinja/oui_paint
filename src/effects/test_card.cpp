@@ -81,7 +81,8 @@ Image test_card(int width, int height)
                 else if(patch == 1)
                 {
                     const auto radius{std::min(patch_width, patch_height) * 0.4};
-                    const auto distance{std::hypot(local_x + 0.5 - patch_width / 2.0, local_y + 0.5 - patch_height / 2.0)};
+                    const auto distance{
+                        std::hypot(local_x + 0.5 - patch_width / 2.0, local_y + 0.5 - patch_height / 2.0)};
                     const auto inside{std::clamp(radius - distance + 0.5, 0.0, 1.0)};
                     put(x, y, 1.0 - inside * 0.1, 1.0 - inside * 0.6, 1.0 - inside);
                 }

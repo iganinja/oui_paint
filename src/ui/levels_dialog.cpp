@@ -102,8 +102,8 @@ bool ask_levels(oui::Application& application, std::map<std::string, double>& va
                                  input.set_markers({{low / 255.0, 0x000000},
                                                     {gamma_marker(low, high, values["gamma"]), 0x808080},
                                                     {high / 255.0, 0xFFFFFF}});
-                                 output.set_markers(
-                                     {{values["outputLow"] / 255.0, 0x000000}, {values["outputHigh"] / 255.0, 0xFFFFFF}});
+                                 output.set_markers({{values["outputLow"] / 255.0, 0x000000},
+                                                     {values["outputHigh"] / 255.0, 0xFFFFFF}});
                              }};
     for(const auto& [id, field] : fields)
     {

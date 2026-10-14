@@ -63,7 +63,8 @@ bool CurveEdit::press(double x, double y, bool right)
         return false;
     }
     // A new point where pressed, between those either side, unless as close to one as two points may be.
-    const auto after{std::find_if(m_points.begin(), m_points.end(), [x](const CurvePoint& point) { return point.x > x; })};
+    const auto after{
+        std::find_if(m_points.begin(), m_points.end(), [x](const CurvePoint& point) { return point.x > x; })};
     if((after != m_points.end() && after->x - x < gap) ||
        (after != m_points.begin() && x - std::prev(after)->x < gap))
     {

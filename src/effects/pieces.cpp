@@ -3,6 +3,8 @@
 #include "core/blend.h"
 #include "tools/color_math.h"
 
+#include <concurrency/concurrency.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -117,6 +119,22 @@ const float* WorkImage::clamped(int x, int y) const
     return at(std::clamp(x, 0, width - 1), std::clamp(y, 0, height - 1));
 }
 
+void for_each_row(int height, const std::function<void(int)>& row)
+{
+    // Small images are not worth the threads.
+    if(height < 64)
+    {
+        for(int y{}; y < height; ++ y)
+        {
+            row(y);
+        }
+        return;
+    }
+    std::vector<int> rows(static_cast<std::size_t>(height));
+    std::iota(rows.begin(), rows.end(), 0);
+    olagarro::concurrency::concurrent_for(rows.begin(), rows.end(), [&row](std::size_t, int y) { row(y); }).get();
+}
+
 WorkImage to_work(const Image& image)
 {
     WorkImage work{image.width, image.height};
@@ -125,8 +143,7 @@ WorkImage to_work(const Image& image)
                  {
                      using PixelType = typename decltype(tag)::Type;
                      constexpr auto full{static_cast<double>(PixelType::full)};
-                     for(int y{}; y < image.height; ++ y)
-                     {
+                     for_each_row(image.height, [&](int y) {
                          for(int x{}; x < image.width; ++ x)
                          {
                              const auto pixel{image.pixel<PixelType>(x, y)};
@@ -142,7 +159,7 @@ WorkImage to_work(const Image& image)
                                              pixel.value[2] / full, alpha);
                              }
                          }
-                     }
+                     });
                  });
     return work;
 }
@@ -158,8 +175,7 @@ Image from_work(const WorkImage& work, PixelFormat format)
                      constexpr auto full{static_cast<double>(PixelType::full)};
                      const auto channel{[](double value)
                                         { return static_cast<Channel>(std::lround(std::clamp(value, 0.0, 1.0) * full)); }};
-                     for(int y{}; y < work.height; ++ y)
-                     {
+                     for_each_row(work.height, [&](int y) {
                          for(int x{}; x < work.width; ++ x)
                          {
                              double red{};
@@ -178,7 +194,7 @@ Image from_work(const WorkImage& work, PixelFormat format)
                              }
                              image.set_pixel(x, y, pixel);
                          }
-                     }
+                     });
                  });
     return image;
 }
@@ -367,8 +383,7 @@ WorkImage lookup(const WorkImage& image, const std::array<std::vector<double>, 3
                            return table[low] + (table[high] - table[low]) * (place - low);
                        }};
     WorkImage result{image.width, image.height};
-    for(int y{}; y < image.height; ++ y)
-    {
+    for_each_row(image.height, [&](int y) {
         for(int x{}; x < image.width; ++ x)
         {
             double red{};
@@ -379,15 +394,14 @@ WorkImage lookup(const WorkImage& image, const std::array<std::vector<double>, 3
             premultiply(result.at(x, y), through(tables[0], red), through(tables[1], green), through(tables[2], blue),
                         alpha);
         }
-    }
+    });
     return result;
 }
 
 WorkImage lookup_luminosity(const WorkImage& image, const std::vector<double>& table)
 {
     WorkImage result{image.width, image.height};
-    for(int y{}; y < image.height; ++ y)
-    {
+    for_each_row(image.height, [&](int y) {
         for(int x{}; x < image.width; ++ x)
         {
             double red{};
@@ -421,7 +435,7 @@ WorkImage lookup_luminosity(const WorkImage& image, const std::vector<double>& t
             premultiply(result.at(x, y), std::clamp(scaled_red, 0.0, 1.0), std::clamp(scaled_green, 0.0, 1.0),
                         std::clamp(scaled_blue, 0.0, 1.0), alpha);
         }
-    }
+    });
     return result;
 }
 

@@ -554,7 +554,8 @@ void PaintApp::build_window()
                          "layers.properties"});
     add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.zoom_to_selection",
                        "view.actual_size",
-                       oui::menu_separator(), "view.history_panel", "view.layers_panel", oui::menu_separator(), "view.interface_bigger",
+                       oui::menu_separator(), "view.history_panel", "view.layers_panel", oui::menu_separator(),
+                       "view.interface_bigger",
                        "view.interface_smaller", "view.interface_reset"});
     auto left{oui::column()};
     m_tool_panel = &left->add(std::make_unique<ToolPanel>(tool_buttons(), m_icons));
@@ -1724,7 +1725,8 @@ std::vector<Position> PaintApp::line_handles()
     const auto& viewport{m_line_edit->document->viewport()};
     for(const auto& point : m_line_edit->points)
     {
-        handles.push_back({viewport.origin().x + point.x * viewport.zoom(), viewport.origin().y + point.y * viewport.zoom()});
+        handles.push_back(
+            {viewport.origin().x + point.x * viewport.zoom(), viewport.origin().y + point.y * viewport.zoom()});
     }
     return handles;
 }
@@ -3071,21 +3073,33 @@ void PaintApp::run_effect(std::size_t index, bool again)
                         layer = base;
                         try
                         {
-                            const auto result{m_plugins->apply(effect, source, shown, context)};
-                            WorkImage inside{area.width, area.height};
-                            for(int y{}; y < area.height; ++ y)
+                            auto result{m_plugins->apply(effect, source, shown, context)};
+                            // With nothing selected the effect takes the whole layer as it made it; else as much as
+                            // each pixel is selected, the rows shared among the cores.
+                            WorkImage inside;
+                            if(!selection.active())
                             {
-                                for(int x{}; x < area.width; ++ x)
-                                {
-                                    const auto amount{selection.at(area.x + x, area.y + y) / 255.0f};
-                                    const auto* const was{source.at(area.x + x, area.y + y)};
-                                    const auto* const made{result.at(area.x + x, area.y + y)};
-                                    auto* const out{inside.at(x, y)};
-                                    for(int channel{}; channel < 4; ++ channel)
-                                    {
-                                        out[channel] = was[channel] + (made[channel] - was[channel]) * amount;
-                                    }
-                                }
+                                inside = std::move(result);
+                            }
+                            else
+                            {
+                                inside = WorkImage{area.width, area.height};
+                                for_each_row(area.height,
+                                             [&](int y)
+                                             {
+                                                 for(int x{}; x < area.width; ++ x)
+                                                 {
+                                                     const auto amount{selection.at(area.x + x, area.y + y) / 255.0f};
+                                                     const auto* const was{source.at(area.x + x, area.y + y)};
+                                                     const auto* const made{result.at(area.x + x, area.y + y)};
+                                                     auto* const out{inside.at(x, y)};
+                                                     for(int channel{}; channel < 4; ++ channel)
+                                                     {
+                                                         out[channel] =
+                                                             was[channel] + (made[channel] - was[channel]) * amount;
+                                                     }
+                                                 }
+                                             });
                             }
                             if(document.indexed())
                             {
@@ -3127,25 +3141,51 @@ void PaintApp::run_effect(std::size_t index, bool again)
         else
         {
             show(values);
-            auto failed{false};
-            const auto accepted{ask_effect(m_application, effect, values,
-                                           [&](const std::map<std::string, double>& changed)
-                                           {
-                                               if(failed)
-                                               {
-                                                   return;
-                                               }
-                                               try
-                                               {
-                                                   show(changed);
-                                               }
-                                               catch(const std::exception& failure)
-                                               {
-                                                   failed = true;
-                                                   show_error(effect.name, failure.what());
-                                               }
-                                           },
-                                           histogram_of(source, selection))};
+            // The image follows the dialog once a frame, with the values as they are by then: a drag sends many
+            // changes, each of which would make the whole effect again.
+            struct Following
+            {
+                std::optional<std::map<std::string, double>> pending;
+                bool closed{false};
+                bool failed{false};
+            };
+            const auto following{std::make_shared<Following>()};
+            const auto accepted{ask_effect(
+                m_application, effect, values,
+                [&, following](const std::map<std::string, double>& changed)
+                {
+                    if(following->failed)
+                    {
+                        return;
+                    }
+                    const auto first{!following->pending};
+                    following->pending = changed;
+                    if(!first)
+                    {
+                        return;
+                    }
+                    m_application.post(
+                        [&show, &effect, this, following]
+                        {
+                            if(following->closed || following->failed || !following->pending)
+                            {
+                                return;
+                            }
+                            const auto shown{std::move(*following->pending)};
+                            following->pending.reset();
+                            try
+                            {
+                                show(shown);
+                            }
+                            catch(const std::exception& failure)
+                            {
+                                following->failed = true;
+                                show_error(effect.name, failure.what());
+                            }
+                        });
+                },
+                histogram_of(source, selection))};
+            following->closed = true;
             if(!accepted)
             {
                 const auto before{LayersState::of(document)};

@@ -4,6 +4,7 @@
 #include "core/layer.h"
 
 #include <array>
+#include <functional>
 #include <cstdint>
 #include <vector>
 
@@ -26,6 +27,10 @@ struct WorkImage
     // The pixel at a place, the nearest edge pixel past the edges.
     [[nodiscard]] const float* clamped(int x, int y) const;
 };
+
+// Calls `row` with each of the rows from 0 to `height`, the rows shared out among the cores, as work done a pixel at
+// a time is: `row` must touch only its own row of what it writes.
+void for_each_row(int height, const std::function<void(int y)>& row);
 
 [[nodiscard]] WorkImage to_work(const Image& image);
 // Back to `format`, colour divided by alpha again; grey from the colours' luma.

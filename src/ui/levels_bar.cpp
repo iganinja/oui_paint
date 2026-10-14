@@ -55,9 +55,8 @@ void LevelsBar::paint(oui::Painter& painter, const oui::Theme&) const
         if(m_histogram)
         {
             const auto tallest{*std::max_element(m_histogram->begin(), m_histogram->end())};
-            const auto height{tallest > 0.0 ? static_cast<int>(std::lround((*m_histogram)[static_cast<std::size_t>(level)] /
-                                                                           tallest * bar_height))
-                                            : 0};
+            const auto count{(*m_histogram)[static_cast<std::size_t>(level)]};
+            const auto height{tallest > 0.0 ? static_cast<int>(std::lround(count / tallest * bar_height)) : 0};
             m_drawing.fill(margin + column, bar_height - height, 1, height, 0xB8B4A8);
         }
         else

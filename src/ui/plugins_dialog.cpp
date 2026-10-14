@@ -25,7 +25,8 @@ PluginsChoice ask_manage_plugins(oui::Application& application, const std::vecto
     content.set_columns({oui::Length::fill()});
     content.set_rows({oui::Length::content(), oui::Length::fill(), oui::Length::content()});
     content.set_gap(oui::Spacing::tight);
-    oui::label("Plugins are JavaScript files in " + oui::utf8_of(folder) + ". Edit opens one beside an image to try it on.",
+    oui::label("Plugins are JavaScript files in " + oui::utf8_of(folder) +
+                   ". Edit opens one beside an image to try it on.",
                content);
     auto& table{content.add(std::make_unique<oui::Table>())};
     table.set_headers({"Plugin", "From", "Effects"});

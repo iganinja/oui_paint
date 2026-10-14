@@ -28,7 +28,8 @@ struct CurvePoint
 // again, and its table, which the Curves plugin applies, as "l0" to "l255".
 void put_curve(std::map<std::string, double>& values, const std::string& name, const std::vector<CurvePoint>& points);
 // The points of curve `name` in `values`; the straight line from black to white when there are none.
-[[nodiscard]] std::vector<CurvePoint> curve_points(const std::map<std::string, double>& values, const std::string& name);
+[[nodiscard]] std::vector<CurvePoint> curve_points(const std::map<std::string, double>& values,
+                                                   const std::string& name);
 
 // How many pixels there are of each level, 0 to 255, in luminosity and in each colour, counted where selected.
 struct Histogram
