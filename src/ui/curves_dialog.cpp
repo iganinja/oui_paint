@@ -144,7 +144,7 @@ bool ask_curves(oui::Application& application, std::map<std::string, double>& va
                 {
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
-                });
+                }).set_default(true);
     oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
     show();
     static_cast<void>(application.show_modal_and_keep(window));

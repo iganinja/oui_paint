@@ -81,7 +81,7 @@ std::optional<NewImage> ask_new_image(oui::Application& application, const NewIm
                     palette_size.commit();
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
-                });
+                }).set_default(true);
     oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
 
     application.focus(width.text_field());

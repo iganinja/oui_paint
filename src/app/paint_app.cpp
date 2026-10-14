@@ -537,8 +537,15 @@ void PaintApp::build_window()
                        "edit.flip_selection_horizontal", "edit.flip_selection_vertical",
                        "edit.rotate_selection_clockwise", "edit.rotate_selection_counter_clockwise",
                        "edit.rotate_selection_180"});
+    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.zoom_to_selection",
+                       "view.actual_size",
+                       oui::menu_separator(), "view.history_panel", "view.layers_panel", oui::menu_separator(),
+                       "view.interface_bigger",
+                       "view.interface_smaller", "view.interface_reset"});
     add_menu("&Image", {"image.crop_to_selection", "image.resize", "image.canvas_size", oui::menu_separator(),
-                        "image.convert_indexed", "image.convert_color",
+                        oui::menu_submenu("&Mode", std::vector<oui::MenuItem>{"image.mode_color8", "image.mode_color16",
+                                                                             "image.mode_gray8", "image.mode_gray16",
+                                                                             "image.convert_indexed"}),
                         oui::menu_submenu("&Palettes",
                                           std::vector<oui::MenuItem>{
                                               "palettes.load_setup", "palettes.save_setup", oui::menu_separator(),
@@ -553,11 +560,6 @@ void PaintApp::build_window()
                          "layers.move_up", "layers.move_down", "layers.toggle_visible", oui::menu_separator(),
                          "layers.flip_horizontal", "layers.flip_vertical", "layers.rotate_zoom", oui::menu_separator(),
                          "layers.properties"});
-    add_menu("&View", {"view.zoom_in", "view.zoom_out", "view.zoom_to_window", "view.zoom_to_selection",
-                       "view.actual_size",
-                       oui::menu_separator(), "view.history_panel", "view.layers_panel", oui::menu_separator(),
-                       "view.interface_bigger",
-                       "view.interface_smaller", "view.interface_reset"});
     auto left{oui::column()};
     auto tools{std::make_unique<ToolPanel>(tool_buttons(), m_icons)};
     m_tool_panel = tools.get();
@@ -782,6 +784,7 @@ void PaintApp::refresh_titles()
         }
     }
     refresh_workbench_images();
+    update_mode_checks();
 }
 
 void PaintApp::refresh_workbench_images()
@@ -880,6 +883,12 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
 void PaintApp::new_image()
 {
     auto start{m_last_new_image};
+    // As big as an image on the clipboard, as Paint.NET starts it, ready to paste it in.
+    if(const auto copied{clipboard_image()})
+    {
+        start.width = copied->width;
+        start.height = copied->height;
+    }
     const auto request{ask_new_image(m_application, start)};
     if(!request)
     {
@@ -2564,33 +2573,61 @@ void PaintApp::register_palette_commands()
                                       change_palettes("Allow Any Color", [](PaletteSetup& setup) { setup.allowed.clear(); });
                                   }
                               });
-    commands.register_command("image.convert_indexed", "Convert to &Indexed", [this] { convert_to_indexed(); });
-    commands.register_command("image.convert_color", "Convert to &Color",
-                              [this]
-                              {
-                                  if(current() == nullptr || !current()->document().indexed())
-                                  {
-                                      return;
-                                  }
-                                  change_layers("Convert to Color",
-                                                [](Document& document)
-                                                {
-                                                    for(auto& layer : document.layers())
-                                                    {
-                                                        auto colored{Layer{PixelFormat::rgba8, layer.name()}};
-                                                        colored.set_visible(layer.visible());
-                                                        colored.set_opacity(layer.opacity());
-                                                        colored.set_blend_mode(layer.blend_mode());
-                                                        colored.write(document.colors_of(layer.read(0, 0, document.width(),
-                                                                                                    document.height()),
-                                                                                         layer.palette_slot()),
-                                                                      0, 0);
-                                                        layer = std::move(colored);
-                                                    }
-                                                    document.set_format(PixelFormat::rgba8);
-                                                    document.set_palettes(std::nullopt);
-                                                });
-                              });
+    commands.register_command("image.convert_indexed", "&Indexed", [this] { convert_to_indexed(); });
+    // Image > Mode: the image's pixels as colour or grey, 8 or 16 bits a channel, every layer converted.
+    for(const auto& [id, title, format] :
+        {std::tuple{"image.mode_color8", "&Color, 8 Bits per Channel", PixelFormat::rgba8},
+         std::tuple{"image.mode_color16", "Color, 1&6 Bits per Channel", PixelFormat::rgba16},
+         std::tuple{"image.mode_gray8", "&Grayscale, 8 Bits", PixelFormat::gray_alpha8},
+         std::tuple{"image.mode_gray16", "Grayscale, &16 Bits", PixelFormat::gray_alpha16}})
+    {
+        commands.register_command(id, title, [this, format{format}] { convert_to(format); });
+    }
+}
+
+void PaintApp::convert_to(PixelFormat format)
+{
+    auto* const open{current()};
+    if(open == nullptr || (!open->document().indexed() && open->document().format() == format))
+    {
+        return;
+    }
+    const auto* const name{format == PixelFormat::rgba8          ? "Color, 8 Bits"
+                           : format == PixelFormat::rgba16       ? "Color, 16 Bits"
+                           : format == PixelFormat::gray_alpha8  ? "Grayscale, 8 Bits"
+                                                                 : "Grayscale, 16 Bits"};
+    change_layers(name,
+                  [format](Document& document)
+                  {
+                      for(auto& layer : document.layers())
+                      {
+                          // An indexed layer as its palette's colours first.
+                          const auto whole{layer.read(0, 0, document.width(), document.height())};
+                          const auto pixels{document.indexed() ? document.colors_of(whole, layer.palette_slot())
+                                                               : whole};
+                          Layer made{format, layer.name()};
+                          made.set_visible(layer.visible());
+                          made.set_opacity(layer.opacity());
+                          made.set_blend_mode(layer.blend_mode());
+                          made.write(converted(pixels, format), 0, 0);
+                          layer = std::move(made);
+                      }
+                      document.set_format(format);
+                      document.set_palettes(std::nullopt);
+                  });
+}
+
+void PaintApp::update_mode_checks()
+{
+    auto& commands{m_application.commands()};
+    const auto* const open{current()};
+    const auto format{open != nullptr ? std::optional<PixelFormat>{open->document().format()} : std::nullopt};
+    const auto indexed{open != nullptr && open->document().indexed()};
+    commands.set_checked("image.mode_color8", !indexed && format == PixelFormat::rgba8);
+    commands.set_checked("image.mode_color16", !indexed && format == PixelFormat::rgba16);
+    commands.set_checked("image.mode_gray8", !indexed && format == PixelFormat::gray_alpha8);
+    commands.set_checked("image.mode_gray16", !indexed && format == PixelFormat::gray_alpha16);
+    commands.set_checked("image.convert_indexed", indexed);
 }
 
 void PaintApp::convert_to_indexed()

@@ -82,7 +82,7 @@ class Form
                         }
                         accepted = true;
                         window.close(oui::DialogResult::accepted);
-                    });
+                    }).set_default(true);
         oui::button("Cancel", buttons, [&] { window.close(oui::DialogResult::cancelled); });
         static_cast<void>(application.show_modal_and_keep(m_window));
         return accepted;

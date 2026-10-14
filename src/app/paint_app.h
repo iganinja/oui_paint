@@ -171,6 +171,10 @@ class PaintApp
     void change_palettes(std::string name, const std::function<void(PaletteSetup&)>& change);
     // The Palettes menu's commands, and turning an image indexed or into colours.
     void register_palette_commands();
+    // Converts every layer to `format`, an indexed image to colours first, as Image > Mode does.
+    void convert_to(PixelFormat format);
+    // Image > Mode marked as the image on show is.
+    void update_mode_checks();
     void convert_to_indexed();
     // Asks for the primary or the secondary colour as hexadecimal.
     void edit_color(bool primary);

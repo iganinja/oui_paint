@@ -91,7 +91,7 @@ std::optional<LayerProperties> ask_layer_properties(oui::Application& applicatio
                     opacity.commit();
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
-                });
+                }).set_default(true);
     oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
 
     application.focus(name);

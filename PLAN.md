@@ -213,5 +213,4 @@ and load. Missing ones are drawn in the same style.
 
 ## Wanted
 
-- The numeric fields' arrows one over the other, not side by side (OUI's NumberField).
 - Text with an outline, a drop shadow, a glow and the like, which Paint.NET's text tool lacks.

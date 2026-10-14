@@ -322,7 +322,7 @@ std::optional<Color> ask_color(oui::Application& application, const std::string&
                 {
                     accepted = true;
                     window_reference.close(oui::DialogResult::accepted);
-                });
+                }).set_default(true);
     oui::button("Cancel", buttons, [&] { window_reference.close(oui::DialogResult::cancelled); });
     static_cast<void>(application.show_modal_and_keep(window));
     if(!accepted)
