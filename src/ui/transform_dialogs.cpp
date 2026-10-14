@@ -1,5 +1,7 @@
 #include "ui/transform_dialogs.h"
 
+#include "ui/anchor_grid.h"
+
 #include <oui/button.h>
 #include <oui/check_button.h>
 #include <oui/combo_box.h>
@@ -46,6 +48,15 @@ class Form
         label.set_buddy(field.text_field());
         oui::label(after, *m_grid);
         return field;
+    }
+
+    // A widget of its own under the rows before, in the second column.
+    template <typename Child> Child& below(std::unique_ptr<Child> child)
+    {
+        oui::label("", *m_grid);
+        auto& added{m_grid->add(std::move(child))};
+        oui::label("", *m_grid);
+        return added;
     }
 
     oui::ComboBox& choice(std::string_view name, std::vector<std::string> options, std::size_t selected = 0)
@@ -167,7 +178,7 @@ std::optional<ResizeRequest> ask_resize(oui::Application& application, int width
                          all_resamplings()[resampling.selected()]};
 }
 
-std::optional<CanvasRequest> ask_canvas_size(oui::Application& application, int width, int height)
+std::optional<CanvasRequest> ask_canvas_size(oui::Application& application, Icons& icons, int width, int height)
 {
     Form form{"Canvas Size"};
     auto& keep{form.check("&Maintain aspect ratio", false)};
@@ -179,6 +190,11 @@ std::optional<CanvasRequest> ask_canvas_size(oui::Application& application, int 
                              {"Top Left", "Top", "Top Right", "Left", "Middle", "Right", "Bottom Left", "Bottom",
                               "Bottom Right"},
                              4)};
+    // The anchor as Paint.NET shows it too: the image in its square, arrows where the canvas grows; each follows the
+    // other.
+    auto& grid{form.below(std::make_unique<AnchorGrid>(icons, 4))};
+    grid.on_changed([&anchor](int chosen) { anchor.set_selected(static_cast<std::size_t>(chosen)); });
+    static_cast<void>(anchor.on_selected([&grid](std::size_t chosen) { grid.set_anchor(static_cast<int>(chosen)); }));
     if(!form.ask(application,
                  [&]
                  {

@@ -75,6 +75,7 @@ add_library(oui_paint_core STATIC
     src/tools/stroke.cpp
     src/tools/text.cpp
     src/ui/canvas_view.cpp
+    src/ui/anchor_grid.cpp
     src/ui/color_dialog.cpp
     src/ui/color_panel.cpp
     src/ui/curve_editor.cpp
@@ -106,8 +107,8 @@ set_source_files_properties(src/codecs/stb_api.cpp src/codecs/zip_api.cpp
 
 # The icons the program shows, built into it. Only those it uses: add one here when a button or a menu needs it.
 set(OUI_PAINT_GODOT_ICONS
-    Add Bucket ColorPick Duplicate Edit Eraser Gradient GuiVisibilityHidden GuiVisibilityVisible Line MoveDown MoveUp
-    RegionEdit Remove RotateLeft RotateRight ToolMove ToolPan ToolSelect Tools Zoom)
+    Add Bucket ColorPick Duplicate Edit Eraser Gradient GuiVisibilityHidden GuiVisibilityVisible Image Line MoveDown
+    MoveUp RegionEdit Remove RotateLeft RotateRight ToolMove ToolPan ToolSelect Tools Zoom)
 list(TRANSFORM OUI_PAINT_GODOT_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/godot/)
 set(OUI_PAINT_OWN_ICONS CloneStamp EllipseSelect Lasso MagicWand MergeDown Paintbrush Recolor Shapes Text)
 list(TRANSFORM OUI_PAINT_OWN_ICONS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/icons/oui_paint/)

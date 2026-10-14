@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/document.h"
+#include "ui/icons.h"
 
 #include <oui/application.h>
 
@@ -33,9 +34,9 @@ struct RotateZoomRequest
 
 // Paint.NET's Resize: by a percentage or to a size, keeping the proportions unless told not to.
 [[nodiscard]] std::optional<ResizeRequest> ask_resize(olagarro::oui::Application& application, int width, int height);
-// Paint.NET's Canvas Size: a new size and where the image goes in it.
-[[nodiscard]] std::optional<CanvasRequest> ask_canvas_size(olagarro::oui::Application& application, int width,
-                                                           int height);
+// Paint.NET's Canvas Size: a new size and where the image goes in it, chosen in a list or on a grid of nine squares.
+[[nodiscard]] std::optional<CanvasRequest> ask_canvas_size(olagarro::oui::Application& application, Icons& icons,
+                                                           int width, int height);
 // Paint.NET's Rotate / Zoom for a layer.
 [[nodiscard]] std::optional<RotateZoomRequest> ask_rotate_zoom(olagarro::oui::Application& application);
 

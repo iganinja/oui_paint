@@ -414,7 +414,7 @@ void PaintApp::register_commands()
                 return;
             }
             const auto& document{open->document()};
-            if(const auto request{ask_canvas_size(m_application, document.width(), document.height())})
+            if(const auto request{ask_canvas_size(m_application, m_icons, document.width(), document.height())})
             {
                 change_layers("Canvas Size", [&request](Document& changed)
                               { changed.resize_canvas(request->width, request->height, request->anchor); });
