@@ -49,7 +49,8 @@ fills it with the primary color.
 
 **Move Selected Pixels** (M) shows the selection's handles at once and lifts what is selected so it can be
 dragged, scaled by its handles and turned; the two signs beyond its bottom right corner move and turn it, and dragging
-with the right button anywhere turns it too; Shift keeps its proportions while scaling and turns it in steps of 15 degrees. **Move Selection** (M again) moves only the outline.
+with the right button anywhere turns it too, round the point marked with a ring and a cross, its middle unless dragged
+elsewhere; Shift keeps its proportions while scaling and turns it in steps of 15 degrees. **Move Selection** (M again) moves only the outline.
 Edit > Flip Selection and Rotate Selection flip and turn what is selected in place.
 
 ## Painting

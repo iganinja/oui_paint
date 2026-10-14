@@ -83,3 +83,29 @@ TEST(Floating, ScaledTwiceAsBigThePieceCoversFourTimesTheRoom)
     EXPECT_EQ(scene.alpha(15, 12), 255);
     EXPECT_EQ(scene.alpha(16, 12), 0);
 }
+
+TEST(Floating, APieceTurnsRoundItsPivotWhereverItIs)
+{
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    Selection selection{40, 40};
+    selection.add_rectangle({10, 10, 10, 6}, SelectionMode::replace);
+    const auto piece{lift_piece(layer, selection)};
+    PieceTransform start;
+    start.dx = 3.0;
+    start.radians = 0.25;
+    const Position pivot{2.0, 30.0};
+    constexpr auto quarter{3.14159265358979323846 / 2.0};
+    const auto before{piece_corners(piece, start)};
+    const auto after{piece_corners(piece, turned_round(piece, start, pivot, quarter))};
+    for(std::size_t index{}; index < 4; ++ index)
+    {
+        // A quarter turn clockwise as the image shows it, y down: (x, y) round the pivot goes to (-y, x).
+        const auto x{before[index].x - pivot.x};
+        const auto y{before[index].y - pivot.y};
+        EXPECT_NEAR(after[index].x, pivot.x - y, 1e-9) << index;
+        EXPECT_NEAR(after[index].y, pivot.y + x, 1e-9) << index;
+    }
+    const auto round_itself{turned_round(piece, start, {15.0 + 3.0, 13.0}, quarter)};
+    EXPECT_NEAR(round_itself.dx, start.dx, 1e-9) << "round its own middle it stays where it is";
+    EXPECT_NEAR(round_itself.dy, start.dy, 1e-9);
+}

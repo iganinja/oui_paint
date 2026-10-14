@@ -24,7 +24,7 @@ void CanvasView::on_tool(std::function<void(const ToolEvent&)> tool)
     m_tool = std::move(tool);
 }
 
-void CanvasView::on_pointer(std::function<oui::Pointer(bool held)> pointer)
+void CanvasView::on_pointer(std::function<oui::Pointer(bool held, std::optional<Position> in_view)> pointer)
 {
     m_pointer_for_tool = std::move(pointer);
 }
@@ -179,6 +179,7 @@ bool CanvasView::handle_event(const oui::Event& event)
         return false;
     }
     const auto at{in_view(*mouse)};
+    m_in_view = at;
     if(mouse->wheel_delta != 0)
     {
         if(mouse->control && at)
@@ -300,7 +301,7 @@ oui::Pointer CanvasView::pointer_at(oui::Point) const
     {
         return oui::Pointer::hand;
     }
-    return m_pointer_for_tool ? m_pointer_for_tool(m_tool_button.has_value()) : oui::Pointer::crosshair;
+    return m_pointer_for_tool ? m_pointer_for_tool(m_tool_button.has_value(), m_in_view) : oui::Pointer::crosshair;
 }
 
 bool CanvasView::is_focusable() const

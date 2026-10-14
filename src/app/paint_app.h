@@ -179,6 +179,15 @@ class PaintApp
     // from them, as the right button turning is not.
     [[nodiscard]] std::optional<std::pair<Position, Position>> floating_gizmos();
     static constexpr double gizmo_size{20.0};
+    // The point Move Selected Pixels turns round, in the image's pixels: the middle of the piece as it shows unless
+    // dragged elsewhere, kept for the document it was set in until what floats is put down.
+    struct Pivot
+    {
+        OpenDocument* document{};
+        Position at;
+    };
+    std::optional<Pivot> m_pivot;
+    [[nodiscard]] std::optional<Position> pivot();
     // Puts floating pixels down where they are, and text being typed.
     // `keep_line`: but the line being bent, which Line / Curve itself goes on with.
     void settle(bool keep_line = false);
@@ -290,12 +299,17 @@ class PaintApp
             // top round.
             scale,
             outline,
+            // Dragging the point it turns round.
+            pivot,
         };
         Kind kind{Kind::move};
         Position from;
         PieceTransform start;
         int handle{0};
         std::optional<Layer> selection;
+        // The point it turns round as the drag began, and the pivot set by hand then, if one was.
+        Position pivot;
+        std::optional<Position> set_pivot;
     };
     std::optional<Moving> m_moving;
     // A gradient, line or shape being dragged: where it began, the layer before it, and which button.

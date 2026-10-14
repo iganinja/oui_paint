@@ -55,7 +55,8 @@ class CanvasView final : public olagarro::oui::Widget
     void claim_keys(bool claiming) { m_claiming_keys = claiming; }
     void on_keys(std::function<bool(const olagarro::oui::Event&)> keys);
     // What the pointer looks like over the image, as the tool in use asks, told whether a button is held.
-    void on_pointer(std::function<olagarro::oui::Pointer(bool held)> pointer);
+    // The pointer to show over the image, told whether a button is held and where the pointer is in the view's pixels.
+    void on_pointer(std::function<olagarro::oui::Pointer(bool held, std::optional<Position> in_view)> pointer);
     // Whether the key that pans while held, Space, is down: then a drag with the left button pans, whatever the tool.
     void on_pan_key(std::function<bool()> held) { m_pan_key = std::move(held); }
 
@@ -87,7 +88,9 @@ class CanvasView final : public olagarro::oui::Widget
     OpenDocument& m_document;
     std::function<void()> m_changed;
     std::function<void(const ToolEvent&)> m_tool;
-    std::function<olagarro::oui::Pointer(bool)> m_pointer_for_tool;
+    std::function<olagarro::oui::Pointer(bool, std::optional<Position>)> m_pointer_for_tool;
+    // Where the pointer last was, in the view's pixels.
+    std::optional<Position> m_in_view;
     std::function<bool(const olagarro::oui::Event&)> m_keys;
     std::function<void(std::uint32_t*, int, int)> m_overlay;
     bool m_claiming_keys{false};

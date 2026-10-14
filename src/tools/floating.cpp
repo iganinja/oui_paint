@@ -50,6 +50,17 @@ Affine piece_forward(const FloatingPiece& piece, const PieceTransform& transform
         .after(Affine::translation(-center_x, -center_y));
 }
 
+PieceTransform turned_round(const FloatingPiece& piece, PieceTransform start, Position pivot, double radians)
+{
+    const auto middle_x{piece.x + piece.pixels.width / 2.0 + start.dx - pivot.x};
+    const auto middle_y{piece.y + piece.pixels.height / 2.0 + start.dy - pivot.y};
+    auto turned{start};
+    turned.radians += radians;
+    turned.dx += middle_x * std::cos(radians) - middle_y * std::sin(radians) - middle_x;
+    turned.dy += middle_x * std::sin(radians) + middle_y * std::cos(radians) - middle_y;
+    return turned;
+}
+
 std::array<Position, 4> piece_corners(const FloatingPiece& piece, const PieceTransform& transform)
 {
     const auto forward{piece_forward(piece, transform)};

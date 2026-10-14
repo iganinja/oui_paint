@@ -918,6 +918,38 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
                     }
                 }
             }
+            // The point it turns round: a ring with a cross, black over white so it shows on any colour.
+            if(const auto centre{pivot()}; moving && centre)
+            {
+                const auto shown{current()->viewport().view_at(*centre)};
+                const auto put{[&](int x, int y, std::uint32_t color)
+                               {
+                                   if(x >= 0 && y >= 0 && x < width && y < height)
+                                   {
+                                       pixels[static_cast<std::ptrdiff_t>(y) * width + x] = color;
+                                   }
+                               }};
+                const auto cx{static_cast<int>(std::lround(shown.x))};
+                const auto cy{static_cast<int>(std::lround(shown.y))};
+                for(int y{-8}; y <= 8; ++ y)
+                {
+                    for(int x{-8}; x <= 8; ++ x)
+                    {
+                        const auto distance{std::hypot(x, y)};
+                        const auto ring{std::abs(distance - 6.0) <= 0.6};
+                        const auto edge{std::abs(distance - 6.0) <= 1.6 && !ring};
+                        const auto cross{(x == 0 || y == 0) && distance <= 8.0};
+                        if(ring || (cross && distance > 1.0))
+                        {
+                            put(cx + x, cy + y, 0x000000u);
+                        }
+                        else if(edge || ((std::abs(x) == 1 || std::abs(y) == 1) && std::min(std::abs(x), std::abs(y)) == 0))
+                        {
+                            put(cx + x, cy + y, 0xffffffu);
+                        }
+                    }
+                }
+            }
             // Squares of nine pixels, white with a black edge, where the handles are.
             for(const auto& handle : moving ? floating_handles() : line_handles())
             {
@@ -940,16 +972,29 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
             }
         });
     view->on_pointer(
-        [this](bool held)
+        [this](bool held, std::optional<Position> in_view)
         {
             const auto& tool{m_tool_panel->selected()};
             if(tool == "pan")
             {
                 return held ? oui::Pointer::grabbing : oui::Pointer::hand;
             }
-            if(tool == "move_pixels" || tool == "move_selection")
+            if(tool == "move_pixels")
             {
-                return oui::Pointer::move;
+                // The arrow, and over the point it turns round, which can be dragged, the moving one.
+                const auto centre{pivot()};
+                auto over{false};
+                if(centre && in_view)
+                {
+                    const auto shown{current()->viewport().view_at(*centre)};
+                    over = std::hypot(shown.x - in_view->x, shown.y - in_view->y) <= 8.0;
+                }
+                return over || (held && m_moving && m_moving->kind == Moving::Kind::pivot) ? oui::Pointer::move
+                                                                                             : oui::Pointer::arrow;
+            }
+            if(tool == "move_selection")
+            {
+                return oui::Pointer::arrow;
             }
             if(tool == "text")
             {
@@ -2095,6 +2140,32 @@ void PaintApp::transform_selection(std::string name, const std::function<void(Pi
     refresh_titles();
 }
 
+std::optional<Position> PaintApp::pivot()
+{
+    auto* const open{current()};
+    if(open == nullptr || m_tool_panel->selected() != "move_pixels")
+    {
+        return std::nullopt;
+    }
+    if(m_pivot && m_pivot->document == open)
+    {
+        return m_pivot->at;
+    }
+    // The piece's middle as it shows: where its own middle is taken by the move.
+    if(m_floating && m_floating->document == open)
+    {
+        const auto& piece{m_floating->piece};
+        return Position{piece.x + piece.pixels.width / 2.0 + m_floating->transform.dx,
+                        piece.y + piece.pixels.height / 2.0 + m_floating->transform.dy};
+    }
+    if(open->document().selection().active())
+    {
+        const auto area{open->document().selection().bounds()};
+        return Position{area.x + area.width / 2.0, area.y + area.height / 2.0};
+    }
+    return std::nullopt;
+}
+
 std::optional<std::pair<Position, Position>> PaintApp::floating_gizmos()
 {
     const auto handles{floating_handles()};
@@ -2158,8 +2229,20 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
         if(outline_only)
         {
             settle();
-            m_moving = Moving{Moving::Kind::outline, event.at, {}, 0, selection.mask()};
+            m_moving = Moving{Moving::Kind::outline, event.at, {}, 0, selection.mask(), event.at, std::nullopt};
             return;
+        }
+        const auto turning_round{pivot()};
+        const auto set_pivot{m_pivot && m_pivot->document == open ? std::optional<Position>{m_pivot->at} : std::nullopt};
+        // The point it turns round, dragged elsewhere: nothing lifted, nothing changed.
+        if(turning_round && !event.secondary)
+        {
+            const auto shown{open->viewport().view_at(*turning_round)};
+            if(std::hypot(shown.x - event.in_view.x, shown.y - event.in_view.y) <= 8.0)
+            {
+                m_moving = Moving{Moving::Kind::pivot, event.at, {}, 0, {}, *turning_round, set_pivot};
+                return;
+            }
         }
         // A handle pressed scales; the turning sign, or the right button, turns; anything else, and the moving
         // sign, moves.
@@ -2185,7 +2268,7 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
             }
         }
         ensure_floating();
-        m_moving = Moving{kind, event.at, m_floating->transform, handle, {}};
+        m_moving = Moving{kind, event.at, m_floating->transform, handle, {}, turning_round.value_or(event.at), set_pivot};
         return;
     }
     if(!m_moving)
@@ -2193,6 +2276,16 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
         return;
     }
     const auto& start{m_moving->start};
+    if(m_moving->kind == Moving::Kind::pivot)
+    {
+        m_pivot = Pivot{open, event.at};
+        if(event.phase == ToolEvent::Phase::release)
+        {
+            m_moving.reset();
+            open->history().cancel_step();
+        }
+        return;
+    }
     if(m_moving->kind == Moving::Kind::outline)
     {
         const auto before{LayersState::of(document)};
@@ -2211,20 +2304,28 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
         switch(m_moving->kind)
         {
         case Moving::Kind::move:
-            // By whole pixels, so a piece moved and nothing else keeps its pixels exactly.
+            // By whole pixels, so a piece moved and nothing else keeps its pixels exactly; a pivot set by hand goes
+            // with it.
             transform.dx = start.dx + std::round(event.at.x - m_moving->from.x);
             transform.dy = start.dy + std::round(event.at.y - m_moving->from.y);
+            if(m_moving->set_pivot)
+            {
+                m_pivot = Pivot{open, {m_moving->set_pivot->x + transform.dx - start.dx,
+                                       m_moving->set_pivot->y + transform.dy - start.dy}};
+            }
             break;
         case Moving::Kind::rotate:
         {
-            const auto turned{std::atan2(event.at.y - center_y, event.at.x - center_x) -
-                              std::atan2(m_moving->from.y - center_y, m_moving->from.x - center_x)};
-            transform.radians = start.radians + turned;
+            // Round the pivot: the piece's middle, as it was, turned round it as the rest is.
+            const auto& round{m_moving->pivot};
+            auto turned{std::atan2(event.at.y - round.y, event.at.x - round.x) -
+                        std::atan2(m_moving->from.y - round.y, m_moving->from.x - round.x)};
             if(event.shift)
             {
                 constexpr auto step{3.14159265358979323846 / 12.0};
-                transform.radians = std::round(transform.radians / step) * step;
+                turned = std::round((start.radians + turned) / step) * step - start.radians;
             }
+            transform = turned_round(piece, start, round, turned);
             break;
         }
         case Moving::Kind::scale:
@@ -2282,6 +2383,7 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
             break;
         }
         case Moving::Kind::outline:
+        case Moving::Kind::pivot:
             break;
         }
         place_floating();
@@ -2567,6 +2669,7 @@ void PaintApp::settle(bool keep_line)
     }
     cancel_arc();
     m_floating.reset();
+    m_pivot.reset();
     if(m_typing)
     {
         // What was typed stays, without its cursor, as one step.

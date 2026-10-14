@@ -38,6 +38,10 @@ struct PieceTransform
 [[nodiscard]] Affine piece_forward(const FloatingPiece& piece, const PieceTransform& transform);
 // The piece's corners where they go: top left, top right, bottom right, bottom left.
 [[nodiscard]] std::array<Position, 4> piece_corners(const FloatingPiece& piece, const PieceTransform& transform);
+// `start` turned `radians` further round `pivot`, in the image's pixels: the piece's middle goes round it as the rest
+// does.
+[[nodiscard]] PieceTransform turned_round(const FloatingPiece& piece, PieceTransform start, Position pivot,
+                                          double radians);
 // Lays the piece, transformed, over `base` into `layer`, and makes the selection its mask where it went. A transform
 // that only moves, mirrors or turns by quarter turns keeps every pixel exactly. Returns nothing; the caller redraws.
 // With `exact`, every transform takes the nearest pixel, as indices need.

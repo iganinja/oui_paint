@@ -52,7 +52,8 @@ rellena con el color primario.
 
 **Mover píxeles seleccionados** (M) muestra en seguida las asas de la selección y levanta lo seleccionado para poder
 arrastrarlo, escalarlo con sus asas y girarlo; los dos iconos tras su esquina inferior derecha lo mueven y lo giran, y
-arrastrar con el botón derecho en cualquier sitio también lo gira; Mayús mantiene sus proporciones al escalar y lo gira de 15 en 15 grados. **Mover
+arrastrar con el botón derecho en cualquier sitio también lo gira, alrededor del punto marcado con un círculo y una
+cruz, su centro si no se arrastra a otro sitio; Mayús mantiene sus proporciones al escalar y lo gira de 15 en 15 grados. **Mover
 selección** (M otra vez) mueve solo el contorno. Edición > Espejar selección y Girar selección espejan y giran lo
 seleccionado en su sitio.
 
