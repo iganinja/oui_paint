@@ -8,6 +8,7 @@
 #include "tools/floating.h"
 #include "tools/shapes.h"
 #include "tools/stroke.h"
+#include "tools/text.h"
 #include "ui/canvas_view.h"
 #include "ui/mode_dialogs.h"
 #include "ui/plugins_dialog.h"
@@ -166,7 +167,9 @@ class PaintApp
     bool type_key(const olagarro::oui::Event& event);
     // Draws the text being typed, with its cursor while it is being typed.
     void show_typing(bool with_cursor);
-    [[nodiscard]] olagarro::oui::Font* text_font();
+    // The Text tool's font, in the face its style asks for, and how `face` must make its letters where the family has
+    // no face of its own for the style.
+    [[nodiscard]] olagarro::oui::Font* text_font(TextFace& face);
     // Lifts what is selected into a floating piece unless one is floating already.
     void ensure_floating();
     // Lays the floating piece as its transform says, and draws again what changed.

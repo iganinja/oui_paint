@@ -579,6 +579,8 @@ void PaintApp::build_window()
     m_color_panel = colors.get();
     left->add(std::make_unique<Section>("", std::move(colors)));
     m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
+    // Text being typed is in the colours as they are now.
+    m_color_panel->on_changed([this] { show_typing(true); });
     // A colour picked from the colour panel's palette is used as the nearest index, not one picked before.
     m_color_panel->on_picked(
         [this](bool secondary) { (secondary ? m_secondary_index : m_primary_index).reset(); });
@@ -692,7 +694,10 @@ void PaintApp::build_window()
         std::make_unique<Section>(oui::translate("Panels", "Palettes"), std::move(palettes)))));
     show_layers_panel(m_settings.bool_value("layers_panel", true));
     show_history_panel(m_settings.bool_value("history_panel", true));
-    auto options{std::make_unique<ToolOptions>(BrushSettings{}, installed_fonts())};
+    auto options{std::make_unique<ToolOptions>(
+        BrushSettings{}, installed_fonts(), m_icons,
+        [this](const std::string& title, const Color& start, const std::function<void(const Color&)>& changed)
+        { return ask_color(m_application, title, start, changed); })};
     m_tool_options = options.get();
     // Text being typed shows a change of its look at once.
     m_tool_options->on_text_changed([this] { show_typing(true); });
@@ -2535,24 +2540,43 @@ void PaintApp::paste(PasteInto into)
     update_ants();
 }
 
-oui::Font* PaintApp::text_font()
+oui::Font* PaintApp::text_font(TextFace& face)
 {
     const auto* const family{m_tool_options->font()};
     if(family == nullptr)
     {
         return nullptr;
     }
+    // The family's own face for the style where it has one; otherwise the nearest it has, made thicker or slanted: bold
+    // and italic without a face of both is its bold one slanted, or its italic one made thicker.
+    const auto style{m_tool_options->text_style()};
+    const auto* path{&family->path};
+    if(style.bold && style.italic && !family->bold_italic.empty())
+    {
+        path = &family->bold_italic;
+    }
+    else if(style.bold && !family->bold.empty())
+    {
+        path = &family->bold;
+    }
+    else if(style.italic && !family->italic.empty())
+    {
+        path = &family->italic;
+    }
+    face.embolden = style.bold && path != &family->bold && path != &family->bold_italic;
+    face.slant = style.italic && path != &family->italic && path != &family->bold_italic;
+    face.strikethrough = style.strikethrough;
     const auto size{static_cast<int>(std::lround(m_tool_options->font_size()))};
-    const auto key{std::make_pair(family->path, size)};
+    const auto key{std::make_pair(*path, size)};
     if(const auto found{m_fonts.find(key)}; found != m_fonts.end())
     {
         return found->second.get();
     }
-    auto& bytes{m_font_files[family->path]};
+    auto& bytes{m_font_files[*path]};
     if(bytes.empty())
     {
         std::string error;
-        if(const auto read{read_file(family->path, error)})
+        if(const auto read{read_file(*path, error)})
         {
             bytes = *read;
         }
@@ -2578,21 +2602,24 @@ void PaintApp::show_typing(bool with_cursor)
     auto& layer{document.layers()[document.active_layer()]};
     const auto before{LayersState::of(document)};
     layer = m_typing->base;
-    if(auto* const font{text_font()})
+    TextFace face;
+    if(auto* const font{text_font(face)})
     {
         const auto color{ink(false)};
-        // The outline and the glow in the secondary colour, the shadow in black: in an indexed image, the colours of
-        // the palette nearest them.
+        // What goes around the text in the colours chosen for it: in an indexed image, those of the palette nearest
+        // them, as an index is written.
         auto effects{m_tool_options->text_effects()};
-        effects.color = ink(true);
         if(document.indexed())
         {
             const auto slot{layer.palette_slot()};
-            const auto grey{document.palettes()->nearest(slot, Color{0, 0, 0, 1}) / 255.0};
-            effects.shadow_color = {grey, grey, grey, 1.0};
+            for(auto* const effect_color : {&effects.outline_color, &effects.shadow_color, &effects.glow_color})
+            {
+                const auto grey{document.palettes()->nearest(slot, *effect_color) / 255.0};
+                *effect_color = {grey, grey, grey, 1.0};
+            }
         }
         static_cast<void>(draw_text(layer, document.selection(), *font, m_typing->text, m_typing->at, color,
-                                    m_tool_options->settings().antialias && !document.indexed(), effects));
+                                    m_tool_options->settings().antialias && !document.indexed(), effects, face));
         if(with_cursor)
         {
             // A thin line after the last character, as tall as a line of text.

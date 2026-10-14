@@ -14,10 +14,7 @@ using namespace olagarro;
 namespace oui_paint
 {
 
-namespace
-{
-
-[[nodiscard]] oui::Color on_screen(const Color& color)
+oui::Color on_screen(const Color& color)
 {
     // Seen through, as over the panel's grey.
     const auto channel{[&color](double value)
@@ -27,6 +24,9 @@ namespace
                        }};
     return {channel(color.red), channel(color.green), channel(color.blue)};
 }
+
+namespace
+{
 
 [[nodiscard]] Color gray(double value)
 {
@@ -52,9 +52,35 @@ ColorPanel::ColorPanel()
     }
 }
 
+void ColorPanel::set_primary(const Color& color)
+{
+    m_primary = color;
+    changed();
+}
+
+void ColorPanel::set_secondary(const Color& color)
+{
+    m_secondary = color;
+    changed();
+}
+
 void ColorPanel::swap()
 {
     std::swap(m_primary, m_secondary);
+    changed();
+}
+
+void ColorPanel::on_changed(std::function<void()> changed)
+{
+    m_changed = std::move(changed);
+}
+
+void ColorPanel::changed() const
+{
+    if(m_changed)
+    {
+        m_changed();
+    }
 }
 
 void ColorPanel::on_edit(std::function<void(bool primary)> edit)
@@ -131,6 +157,7 @@ bool ColorPanel::handle_event(const oui::Event& event)
         // The left button sets the colour being edited, the right one the other.
         const auto secondary{mouse->right != m_editing_secondary};
         (secondary ? m_secondary : m_primary) = *color;
+        changed();
         if(m_picked)
         {
             m_picked(secondary);

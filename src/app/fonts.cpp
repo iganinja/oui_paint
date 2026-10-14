@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <map>
 #include <system_error>
 
@@ -45,6 +46,33 @@ namespace
     return 2 + static_cast<int>(name.size());
 }
 
+// Which of a family's faces a style is: bold, italic or both, as their usual names say; none for any other.
+enum class Face
+{
+    other,
+    bold,
+    italic,
+    bold_italic
+};
+
+[[nodiscard]] Face face_of(std::string_view style)
+{
+    const auto name{lower(style)};
+    if(name == "bold")
+    {
+        return Face::bold;
+    }
+    if(name == "italic" || name == "oblique")
+    {
+        return Face::italic;
+    }
+    if(name == "bold italic" || name == "bold oblique" || name == "bolditalic" || name == "boldoblique")
+    {
+        return Face::bold_italic;
+    }
+    return Face::other;
+}
+
 [[nodiscard]] std::string first_of(std::string_view names)
 {
     return std::string{names.substr(0, names.find(','))};
@@ -57,7 +85,10 @@ std::vector<FontFamily> parse_font_list(std::string_view listed)
     struct Found
     {
         std::filesystem::path path;
-        int plainness;
+        int plainness{std::numeric_limits<int>::max()};
+        std::filesystem::path bold;
+        std::filesystem::path italic;
+        std::filesystem::path bold_italic;
     };
     std::map<std::string, Found> families;
     std::size_t start{};
@@ -89,17 +120,31 @@ std::vector<FontFamily> parse_font_list(std::string_view listed)
         {
             continue;
         }
-        const auto how_plain{plainness(style)};
-        const auto found{families.find(family)};
-        if(found == families.end() || how_plain < found->second.plainness)
+        auto& found{families[family]};
+        if(const auto how_plain{plainness(style)}; how_plain < found.plainness)
         {
-            families[family] = {path, how_plain};
+            found.path = path;
+            found.plainness = how_plain;
+        }
+        switch(face_of(style))
+        {
+        case Face::bold:
+            found.bold = path;
+            break;
+        case Face::italic:
+            found.italic = path;
+            break;
+        case Face::bold_italic:
+            found.bold_italic = path;
+            break;
+        case Face::other:
+            break;
         }
     }
     std::vector<FontFamily> result;
     for(const auto& [name, found] : families)
     {
-        result.push_back({name, found.path});
+        result.push_back({name, found.path, found.bold, found.italic, found.bold_italic});
     }
     return result;
 }

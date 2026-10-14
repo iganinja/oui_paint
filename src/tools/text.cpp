@@ -15,7 +15,7 @@ namespace oui_paint
 namespace
 {
 
-// Each glyph of `text` with the top left of its pixels, as draw_text lays them out.
+// Each glyph of `text` with the top left of its pixels and the baseline of its line, as draw_text lays them out.
 template <typename Visit>
 void each_glyph(olagarro::oui::Font& font, std::string_view text, int left, int top, Visit&& visit)
 {
@@ -31,10 +31,39 @@ void each_glyph(olagarro::oui::Font& font, std::string_view text, int left, int 
             continue;
         }
         const auto& glyph{font.glyph(character)};
-        visit(glyph, pen + glyph.left, top + font.ascent() + glyph.top);
+        const auto baseline{top + font.ascent()};
+        visit(glyph, pen + glyph.left, baseline + glyph.top, baseline);
         pen += glyph.advance;
     }
 }
+
+// A line of text: where it starts and ends, as far as its pen went, and its baseline.
+struct TextLine
+{
+    int left;
+    int right;
+    int baseline;
+};
+
+[[nodiscard]] std::vector<TextLine> lines_of(olagarro::oui::Font& font, std::string_view text, int left, int top)
+{
+    std::vector<TextLine> lines{{left, left, top + font.ascent()}};
+    std::size_t index{};
+    while(index < text.size())
+    {
+        const auto character{olagarro::oui::decode_utf8(text, index)};
+        if(character == U'\n')
+        {
+            lines.push_back({left, left, lines.back().baseline + font.line_height()});
+            continue;
+        }
+        lines.back().right += font.glyph(character).advance;
+    }
+    return lines;
+}
+
+// How far a letter leans for every pixel above its baseline when it is slanted, as an italic of about 11 degrees.
+constexpr double lean{0.2};
 
 // The squared distance along a line to the nearest point where `line` is 0, where `line` holds 0 at the points and a
 // huge number elsewhere, or the squared distances of a pass already made: the lower envelope of parabolas, as
@@ -115,32 +144,60 @@ std::vector<float> distances(const std::vector<bool>& inside, int width, int hei
 
 std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olagarro::oui::Font& font,
                                  std::string_view text, Position at, const Color& color, bool antialias,
-                                 const TextEffects& effects)
+                                 const TextEffects& effects, const TextFace& face)
 {
     const auto left{static_cast<int>(std::lround(at.x))};
     const auto top{static_cast<int>(std::lround(at.y))};
+
+    // How much thicker a letter is made, and how thick a line through the text is: in proportion to the font.
+    const auto thicker{face.embolden ? std::max(1, static_cast<int>(std::lround(font.line_height() / 18.0))) : 0};
+    const auto stroke{std::max(1, static_cast<int>(std::lround(font.line_height() / 16.0)))};
+    const auto lines{lines_of(font, text, left, top)};
+    // Where the line through the text goes in a line of it: about halfway up its small letters.
+    const auto strike_top{[&](const TextLine& line)
+                          { return line.baseline - static_cast<int>(std::lround(font.ascent() * 0.3)) - stroke / 2; }};
 
     // The pixels the glyphs cover, with room around them for what goes around the text.
     auto first_x{std::numeric_limits<int>::max()};
     auto first_y{std::numeric_limits<int>::max()};
     auto last_x{std::numeric_limits<int>::min()};
     auto last_y{std::numeric_limits<int>::min()};
+    const auto cover{[&](int x0, int y0, int x1, int y1)
+                     {
+                         first_x = std::min(first_x, x0);
+                         first_y = std::min(first_y, y0);
+                         last_x = std::max(last_x, x1);
+                         last_y = std::max(last_y, y1);
+                     }};
     each_glyph(font, text, left, top,
-               [&](const auto& glyph, int x, int y)
+               [&](const auto& glyph, int x, int y, int baseline)
                {
                    if(glyph.width == 0 || glyph.height == 0)
                    {
                        return;
                    }
-                   first_x = std::min(first_x, x);
-                   first_y = std::min(first_y, y);
-                   last_x = std::max(last_x, x + glyph.width - 1);
-                   last_y = std::max(last_y, y + glyph.height - 1);
+                   // Slanted, its bottom row moves the least, or left below the baseline, and its top row the most.
+                   const auto bottom{y + glyph.height - 1};
+                   const auto lowest{face.slant ? static_cast<int>(std::floor(lean * (baseline - bottom - 0.5))) : 0};
+                   const auto highest{face.slant ? static_cast<int>(std::floor(lean * (baseline - y - 0.5))) + 1 : 0};
+                   cover(x + lowest, y, x + glyph.width - 1 + highest, y + glyph.height - 1);
                });
+    if(face.strikethrough)
+    {
+        for(const auto& line : lines)
+        {
+            if(line.right > line.left)
+            {
+                cover(line.left, strike_top(line), line.right - 1, strike_top(line) + stroke - 1);
+            }
+        }
+    }
     if(first_x > last_x)
     {
         return {};
     }
+    // A thicker letter grows to the right.
+    last_x += thicker;
     const auto outline{std::max(effects.outline, 0)};
     const auto shadow{std::max(effects.shadow, 0)};
     const auto glow{std::max(effects.glow, 0)};
@@ -155,19 +212,74 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
     const auto cell{[width](int x, int y) { return static_cast<std::size_t>(y) * width + x; }};
 
     std::vector<float> coverage(static_cast<std::size_t>(width) * height);
+    const auto add{[&](int x, int y, float amount)
+                   {
+                       auto& value{coverage[cell(x - box_x, y - box_y)]};
+                       value = std::min(1.0f, std::max(value, amount));
+                   }};
     each_glyph(font, text, left, top,
-               [&](const auto& glyph, int x, int y)
+               [&](const auto& glyph, int x, int y, int baseline)
                {
                    for(int row{}; row < glyph.height; ++ row)
                    {
+                       // A slanted row moves right by how far it is above the baseline, shared between the two
+                       // columns it falls between.
+                       // Without antialiasing the row moves whole, to the nearest column.
+                       const auto shift{face.slant ? lean * (baseline - (y + row) - 0.5) : 0.0};
+                       const auto whole{static_cast<int>(antialias ? std::floor(shift) : std::round(shift))};
+                       const auto part{antialias ? static_cast<float>(shift - whole) : 0.0f};
                        for(int column{}; column < glyph.width; ++ column)
                        {
-                           auto& value{coverage[cell(x + column - box_x, y + row - box_y)]};
-                           value = std::max(value, glyph.coverage[static_cast<std::size_t>(row) * glyph.width + column] /
-                                                       255.0f);
+                           const auto value{glyph.coverage[static_cast<std::size_t>(row) * glyph.width + column] /
+                                            255.0f};
+                           if(value <= 0.0f)
+                           {
+                               continue;
+                           }
+                           const auto image_x{x + column + whole};
+                           if(face.slant)
+                           {
+                               auto& here{coverage[cell(image_x - box_x, y + row - box_y)]};
+                               here = std::min(1.0f, here + value * (1.0f - part));
+                               auto& next{coverage[cell(image_x + 1 - box_x, y + row - box_y)]};
+                               next = std::min(1.0f, next + value * part);
+                           }
+                           else
+                           {
+                               add(image_x, y + row, value);
+                           }
                        }
                    }
                });
+    // Thicker: each pixel as covered as the most covered of those up to `thicker` to its left.
+    if(thicker > 0)
+    {
+        const auto before{coverage};
+        for(int y{}; y < height; ++ y)
+        {
+            for(int x{}; x < width; ++ x)
+            {
+                auto& value{coverage[cell(x, y)]};
+                for(int step{1}; step <= thicker && x - step >= 0; ++ step)
+                {
+                    value = std::max(value, before[cell(x - step, y)]);
+                }
+            }
+        }
+    }
+    if(face.strikethrough)
+    {
+        for(const auto& line : lines)
+        {
+            for(auto y{strike_top(line)}; y < strike_top(line) + stroke; ++ y)
+            {
+                for(auto x{line.left}; x < line.right; ++ x)
+                {
+                    add(x, y, 1.0f);
+                }
+            }
+        }
+    }
 
     std::set<TilePoint> touched;
     visit_format(layer.format(),
@@ -260,13 +372,12 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                                  [&](int x, int y)
                                  {
                                      const auto distance{away_at(x - shadow, y - shadow)};
-                                     return std::clamp((outline + 0.5 + softness - distance) / softness, 0.0, 1.0) *
-                                            effects.shadow_opacity;
+                                     return std::clamp((outline + 0.5 + softness - distance) / softness, 0.0, 1.0);
                                  });
                          }
                          if(glow > 0)
                          {
-                             mix(effects.color,
+                             mix(effects.glow_color,
                                  [&](int x, int y)
                                  {
                                      const auto fading{std::clamp(1.0 - (away_at(x, y) - outline) / glow, 0.0, 1.0)};
@@ -275,9 +386,11 @@ std::vector<TilePoint> draw_text(Layer& layer, const Selection& selection, olaga
                          }
                          if(outline > 0)
                          {
-                             mix(effects.color,
-                                 [&](int x, int y)
-                                 { return std::max(std::clamp(outline + 0.5 - away_at(x, y), 0.0, 1.0), text_at(x, y)); });
+                             mix(effects.outline_color,
+                                 [&](int x, int y) {
+                                     return std::max(std::clamp(outline + 0.5 - away_at(x, y), 0.0, 1.0),
+                                                     text_at(x, y));
+                                 });
                          }
                      }
                      mix(color, text_at);

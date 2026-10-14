@@ -556,6 +556,7 @@
       "Arc": "Arco",
       "Arrow at &end": "Flecha al &final",
       "Arrow at &start": "Flecha al &inicio",
+      "Bold": "Negrita",
       "Brush &width:": "&Ancho del pincel:",
       "Clone Stamp": "Tampón de clonar",
       "Color": "Color",
@@ -570,6 +571,7 @@
       "Global": "Global",
       "Gradient": "Degradado",
       "Image": "Imagen",
+      "Italic": "Cursiva",
       "Lasso Select": "Selección con lazo",
       "Layer": "Capa",
       "Line / Curve": "Línea / curva",
@@ -593,6 +595,7 @@
       "Shapes": "Formas",
       "Si&ze:": "&Tamaño:",
       "St&yle:": "Es&tilo:",
+      "Strikethrough": "Tachado",
       "Text": "Texto",
       "Transparency": "Transparencia",
       "Zoom": "Zoom"

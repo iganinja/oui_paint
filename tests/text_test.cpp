@@ -87,11 +87,14 @@ std::array<int, 4> inked_box(const Layer& layer, int width, int height)
 
 constexpr int side{160};
 
-// "I" without antialiasing, with these effects around it, in black, its outline and glow in white.
+// "I" without antialiasing, with these effects around it, in black, its outline red, its glow green and its shadow
+// solid black.
 Layer letter(TextEffects effects)
 {
     auto font{olagarro::oui::built_in_interface_font(32.0f)};
-    effects.color = {1, 1, 1, 1};
+    effects.outline_color = {1, 0, 0, 1};
+    effects.shadow_color = {0, 0, 0, 1};
+    effects.glow_color = {0, 1, 0, 1};
     Layer layer{PixelFormat::rgba8, "Layer"};
     draw_text(layer, Selection{side, side}, *font, "I", {60, 60}, {0, 0, 0, 1}, false, effects);
     return layer;
@@ -99,7 +102,7 @@ Layer letter(TextEffects effects)
 
 } // namespace
 
-TEST(Text, AnOutlineGoesItsWidthAroundTheTextInTheEffectsColorAndLeavesTheTextAsItIs)
+TEST(Text, AnOutlineGoesItsWidthAroundTheTextInItsColorAndLeavesTheTextAsItIs)
 {
     const auto plain{letter({})};
     TextEffects effects;
@@ -122,7 +125,7 @@ TEST(Text, AnOutlineGoesItsWidthAroundTheTextInTheEffectsColorAndLeavesTheTextAs
             }
             else if(is.alpha() != 0)
             {
-                EXPECT_EQ(is.value, (Rgba8{{255, 255, 255, 255}}.value)) << "the outline at " << x << ", " << y;
+                EXPECT_EQ(is.value, (Rgba8{{255, 0, 0, 255}}.value)) << "the outline at " << x << ", " << y;
                 ++ ringed;
             }
         }
@@ -147,7 +150,6 @@ TEST(Text, AGlowFadesAsItGoesOutAndEndsAtItsReach)
     auto font{olagarro::oui::built_in_interface_font(32.0f)};
     TextEffects effects;
     effects.glow = 10;
-    effects.color = {1, 1, 1, 1};
     Layer plain{PixelFormat::rgba8, "Plain"};
     draw_text(plain, Selection{side, side}, *font, "I", {60, 60}, {0, 0, 0, 1}, true);
     Layer glowing{PixelFormat::rgba8, "Glowing"};
@@ -176,4 +178,92 @@ TEST(Text, WithoutAntialiasingWhatGoesAroundTheTextIsSolidToo)
             EXPECT_TRUE(alpha == 0 || alpha == 255) << x << ", " << y;
         }
     }
+}
+
+TEST(Text, AGlowIsInItsOwnColor)
+{
+    TextEffects effects;
+    effects.glow = 6;
+    const auto image{letter(effects).read(0, 0, side, side)};
+    const auto box{inked_box(letter({}), side, side)};
+    EXPECT_EQ(image.pixel<Rgba8>(box[2] + 1, (box[1] + box[3]) / 2).value, (Rgba8{{0, 255, 0, 255}}.value));
+}
+
+namespace
+{
+
+// `text` without antialiasing, as `face` makes it.
+Layer typed(std::string_view text, TextFace face)
+{
+    auto font{olagarro::oui::built_in_interface_font(32.0f)};
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    draw_text(layer, Selection{side, side}, *font, text, {40, 60}, {0, 0, 0, 1}, false, {}, face);
+    return layer;
+}
+
+// The first inked column in row `y`, or -1.
+int first_inked(const Layer& layer, int y)
+{
+    const auto image{layer.read(0, 0, side, side)};
+    for(int x{}; x < side; ++ x)
+    {
+        if(image.pixel<Rgba8>(x, y).alpha() != 0)
+        {
+            return x;
+        }
+    }
+    return -1;
+}
+
+} // namespace
+
+TEST(Text, MadeThickerALetterGrowsToTheRight)
+{
+    const auto plain{inked_box(typed("I", {}), side, side)};
+    TextFace face;
+    face.embolden = true;
+    const auto thick{inked_box(typed("I", face), side, side)};
+    EXPECT_EQ(thick[0], plain[0]);
+    EXPECT_GT(thick[2], plain[2]);
+    EXPECT_EQ(thick[1], plain[1]);
+    EXPECT_EQ(thick[3], plain[3]);
+}
+
+TEST(Text, SlantedALetterLeansRightAsItGoesUp)
+{
+    TextFace face;
+    face.slant = true;
+    const auto plain{typed("I", {})};
+    const auto slanted{typed("I", face)};
+    const auto box{inked_box(plain, side, side)};
+    EXPECT_EQ(first_inked(plain, box[1]), first_inked(plain, box[3]));
+    // A fifth of a pixel for each row: three columns over the sixteen rows of this "I".
+    EXPECT_GE(first_inked(slanted, box[1]), first_inked(slanted, box[3]) + 3);
+}
+
+TEST(Text, StruckThroughALineCrossesTheWholeText)
+{
+    // A row inked from the first letter's start to the last one's end, with nothing missing between them.
+    const auto crossed{[](const Layer& layer)
+                       {
+                           const auto image{layer.read(0, 0, side, side)};
+                           const auto box{inked_box(layer, side, side)};
+                           for(int y{box[1]}; y <= box[3]; ++ y)
+                           {
+                               auto whole{true};
+                               for(int x{box[0]}; x <= box[2] && whole; ++ x)
+                               {
+                                   whole = image.pixel<Rgba8>(x, y).alpha() != 0;
+                               }
+                               if(whole)
+                               {
+                                   return true;
+                               }
+                           }
+                           return false;
+                       }};
+    EXPECT_FALSE(crossed(typed("I I", {})));
+    TextFace face;
+    face.strikethrough = true;
+    EXPECT_TRUE(crossed(typed("I I", face)));
 }

@@ -1,10 +1,12 @@
 #include "ui/tool_options.h"
 
+#include "ui/color_panel.h"
 #include "ui/shown_names.h"
 
 #include <oui/translation.h>
 #include <oui/check_button.h>
 #include <oui/combo_box.h>
+#include <oui/command.h>
 #include <oui/label.h>
 #include <oui/layout.h>
 #include <oui/line_edit.h>
@@ -14,6 +16,7 @@
 #include <oui/theme.h>
 
 #include <algorithm>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -52,6 +55,120 @@ class Capped final : public oui::Container
     int m_columns;
 };
 
+// Buttons that stay pressed, side by side, each an icon, as a word processor's bold and italic: a click presses one or
+// lets it go, and `changed` hears it.
+class ToggleIcons final : public oui::Widget
+{
+  public:
+    struct Toggle
+    {
+        std::string icon;
+        std::string tooltip;
+        bool* pressed;
+    };
+
+    ToggleIcons(Icons& icons, std::vector<Toggle> toggles, std::function<void()> changed)
+        : m_icons{icons}, m_toggles{std::move(toggles)}, m_changed{std::move(changed)}
+    {
+    }
+
+    [[nodiscard]] oui::Size measure(const oui::Constraints& constraints) const override
+    {
+        return constraints.constrain({static_cast<int>(m_toggles.size()) * button_width, 1});
+    }
+
+    void paint(oui::Painter& painter, const oui::Theme& theme) const override
+    {
+        for(std::size_t index{}; index < m_toggles.size(); ++ index)
+        {
+            const oui::Rect bounds{m_bounds.x + static_cast<int>(index) * button_width, m_bounds.y, button_width, 1};
+            if(*m_toggles[index].pressed)
+            {
+                painter.fill_rect(bounds, theme.menu_selected_background);
+            }
+            const auto area{painter.pixel_bounds(bounds)};
+            if(!area)
+            {
+                continue;
+            }
+            if(const auto* const picture{m_icons.picture(m_toggles[index].icon, area->width, area->height)})
+            {
+                oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
+                image.alpha = true;
+                painter.draw_image(bounds, image, theme);
+            }
+        }
+    }
+
+    bool handle_event(const oui::Event& event) override
+    {
+        const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+        if(mouse == nullptr || !mouse->pressed || mouse->right)
+        {
+            return false;
+        }
+        const auto index{static_cast<std::size_t>((mouse->x - m_bounds.x) / button_width)};
+        if(mouse->x < m_bounds.x || index >= m_toggles.size())
+        {
+            return false;
+        }
+        *m_toggles[index].pressed = !*m_toggles[index].pressed;
+        m_changed();
+        return true;
+    }
+
+    [[nodiscard]] std::optional<std::string> tooltip_at(oui::Point point) const override
+    {
+        const auto index{static_cast<std::size_t>((point.x - m_bounds.x) / button_width)};
+        if(point.x < m_bounds.x || index >= m_toggles.size())
+        {
+            return std::nullopt;
+        }
+        return m_toggles[index].tooltip;
+    }
+
+  private:
+    static constexpr int button_width{2};
+
+    Icons& m_icons;
+    std::vector<Toggle> m_toggles;
+    std::function<void()> m_changed;
+};
+
+// A square of a colour; a click on it calls `clicked`, to choose another.
+class Swatch final : public oui::Widget
+{
+  public:
+    // `color` is shown as it is when painted, so it must outlive the square.
+    Swatch(const Color& color, std::function<void()> clicked) : m_color{&color}, m_clicked{std::move(clicked)} {}
+
+    [[nodiscard]] oui::Size measure(const oui::Constraints& constraints) const override
+    {
+        return constraints.constrain({2, 1});
+    }
+
+    void paint(oui::Painter& painter, const oui::Theme& theme) const override
+    {
+        painter.fill_rect(m_bounds, on_screen(*m_color));
+        painter.draw_field_frame(m_bounds, false, theme);
+    }
+
+    bool handle_event(const oui::Event& event) override
+    {
+        const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+        if(mouse == nullptr || !mouse->pressed || mouse->right)
+        {
+            return false;
+        }
+        m_clicked();
+        return true;
+    }
+
+  private:
+    const Color* m_color;
+    std::function<void()> m_clicked;
+};
+
 oui::Row& group(oui::Container& parent)
 {
     auto& row{oui::row(parent)};
@@ -69,8 +186,9 @@ oui::ComboBox& choice(oui::Row& row, std::string_view label, std::vector<std::st
 
 } // namespace
 
-ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
-    : m_settings{settings}, m_fonts{std::move(fonts)}
+ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts, Icons& icons,
+                         ColorChooser choose_color)
+    : m_settings{settings}, m_fonts{std::move(fonts)}, m_choose_color{std::move(choose_color)}
 {
     auto& bar{oui::row(*this)};
     bar.set_gap(oui::Spacing::normal);
@@ -141,7 +259,7 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
         names.push_back(oui::translate("Tools", "(no fonts)"));
     }
     auto& font_label{oui::label(oui::translate("Tools", "&Font:"), *m_text_group)};
-    auto& capped{m_text_group->add(std::make_unique<Capped>(16))};
+    auto& capped{m_text_group->add(std::make_unique<Capped>(14))};
     m_font = &capped.add(std::make_unique<oui::ComboBox>(std::move(names), 0));
     font_label.set_buddy(*m_font);
     m_font->set_selected(chosen);
@@ -151,20 +269,47 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts)
     m_font_size->set_range(4, 1000);
     m_font_size->set_value(32);
     size_label.set_buddy(m_font_size->text_field());
-    // What goes around text, in pixels, each off at 0.
-    const auto effect{[this](std::string_view name, double most)
+    m_text_group->add(std::make_unique<ToggleIcons>(
+        icons,
+        std::vector<ToggleIcons::Toggle>{{"Bold", oui::translate("Tools", "Bold"), &m_text_style[0]},
+                                         {"Italic", oui::translate("Tools", "Italic"), &m_text_style[1]},
+                                         {"Strikethrough", oui::translate("Tools", "Strikethrough"), &m_text_style[2]}},
+        [this] { text_changed(); }));
+    // What goes around text, in pixels, each off at 0, and its colour in a square beside it: a click on it asks for
+    // another, and the text shows each as it is chosen. Beside the bar where it fits, under it where it does not.
+    m_effects_group = &group(*this);
+    const auto effect{[this](std::string_view name, double most, std::size_t which)
                       {
-                          auto& label{oui::label(name, *m_text_group)};
-                          auto& field{oui::number_field(m_text_group->add(std::make_unique<Capped>(7)))};
+                          auto& label{oui::label(name, *m_effects_group)};
+                          auto& field{oui::number_field(m_effects_group->add(std::make_unique<Capped>(6)))};
                           field.set_range(0, most);
                           field.set_value(0);
                           label.set_buddy(field.text_field());
                           static_cast<void>(field.on_changed([this](double) { text_changed(); }));
+                          auto& color{m_effect_colors[which]};
+                          // The colour dialog's title is the option's name, without its colon.
+                          auto title{oui::strip_mnemonic(name)};
+                          if(!title.empty() && title.back() == ':')
+                          {
+                              title.pop_back();
+                          }
+                          m_effects_group->add(std::make_unique<Swatch>(
+                              color,
+                              [this, &color, title]
+                              {
+                                  const auto start{color};
+                                  const auto put{[this, &color](const Color& chosen)
+                                                 {
+                                                     color = chosen;
+                                                     text_changed();
+                                                 }};
+                                  put(m_choose_color(title, start, put).value_or(start));
+                              }));
                           return &field;
                       }};
-    m_outline = effect(oui::translate("Tools", "&Outline:"), 50);
-    m_shadow = effect(oui::translate("Tools", "S&hadow:"), 50);
-    m_glow = effect(oui::translate("Tools", "&Glow:"), 100);
+    m_outline = effect(oui::translate("Tools", "&Outline:"), 50, 0);
+    m_shadow = effect(oui::translate("Tools", "S&hadow:"), 50, 1);
+    m_glow = effect(oui::translate("Tools", "&Glow:"), 100, 2);
     static_cast<void>(m_font->on_selected([this](std::size_t) { text_changed(); }));
     static_cast<void>(m_font_size->on_changed([this](double) { text_changed(); }));
 
@@ -214,6 +359,7 @@ void ToolOptions::show_for(std::string_view tool)
     m_hardness_group->set_visible(brushing || tool == "clone_stamp" || tool == "recolor");
     m_antialias_group->set_visible(brushing || drawing || tool == "ellipse_select" || tool == "text");
     m_text_group->set_visible(tool == "text");
+    m_effects_group->set_visible(tool == "text");
     m_fill_group->set_visible(tool == "bucket" || tool == "magic_wand" || tool == "recolor");
     m_gradient_group->set_visible(tool == "gradient");
     m_line_group->set_visible(tool == "line");
@@ -261,7 +407,15 @@ TextEffects ToolOptions::text_effects() const
     effects.outline = static_cast<int>(m_outline->value());
     effects.shadow = static_cast<int>(m_shadow->value());
     effects.glow = static_cast<int>(m_glow->value());
+    effects.outline_color = m_effect_colors[0];
+    effects.shadow_color = m_effect_colors[1];
+    effects.glow_color = m_effect_colors[2];
     return effects;
+}
+
+ToolOptions::TextStyle ToolOptions::text_style() const
+{
+    return {m_text_style[0], m_text_style[1], m_text_style[2]};
 }
 
 void ToolOptions::change_width(double step)
@@ -297,13 +451,40 @@ void ToolOptions::changed()
 
 oui::Size ToolOptions::measure(const oui::Constraints& constraints) const
 {
-    return {constraints.max_width, 1};
+    return {constraints.max_width, one_line(constraints.max_width) ? 1 : 2};
+}
+
+bool ToolOptions::one_line(int width) const
+{
+    if(!m_effects_group->is_visible())
+    {
+        return true;
+    }
+    const oui::Constraints loose{std::numeric_limits<int>::max() / 2, 1};
+    return child_at(0).measure(loose).width + effects_gap + m_effects_group->measure(loose).width <= width;
 }
 
 void ToolOptions::arrange(const oui::Rect& bounds)
 {
     Widget::arrange(bounds);
-    child_at(0).arrange(bounds);
+    auto& bar{child_at(0)};
+    if(!m_effects_group->is_visible())
+    {
+        bar.arrange(bounds);
+        m_effects_group->arrange({bounds.x, bounds.y, 0, 0});
+        return;
+    }
+    const oui::Constraints loose{std::numeric_limits<int>::max() / 2, 1};
+    if(one_line(bounds.width))
+    {
+        const auto width{bar.measure(loose).width};
+        bar.arrange({bounds.x, bounds.y, width, 1});
+        m_effects_group->arrange({bounds.x + width + effects_gap, bounds.y,
+                                  bounds.width - width - effects_gap, 1});
+        return;
+    }
+    bar.arrange({bounds.x, bounds.y, bounds.width, 1});
+    m_effects_group->arrange({bounds.x, bounds.y + 1, bounds.width, 1});
 }
 
 void ToolOptions::paint(oui::Painter& painter, const oui::Theme& theme) const

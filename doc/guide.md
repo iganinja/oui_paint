@@ -65,7 +65,7 @@ Edit > Flip Selection and Rotate Selection flip and turn what is selected in pla
 | Clone Stamp | L | Ctrl+click picks where it copies from, then painting copies from there |
 | Recolor | R | Changes the secondary color into the primary one where it paints; the right button, the other way round |
 | Color Picker | K | Takes the color under the pointer: left for the primary, right for the secondary |
-| Text | T | Types text where clicked; Outline, Shadow and Glow put an outline and a glow in the secondary colour around it and a shadow under it, each as many pixels wide, off at 0, and the text shows each change as it is typed |
+| Text | T | Types text where clicked, bold, italic or struck through as the B, I and S buttons say; Outline, Shadow and Glow put an outline and a glow around it and a shadow under it, each as many pixels wide, off at 0, in the colour of the square beside it, which a click changes; the text shows each change, of its colour too, as it is typed |
 | Line / Curve | O | Drag from one end to the other, Shift keeping to steps of 15 degrees; then drag its four handles to bend it, and Enter, or a click away from them, leaves it as it is |
 | Shapes | O again | Drag from one corner to the other; Shift keeps them square or round |
 | Arc | O a third time | As with a compass: a click puts the centre, a second the radius and where it starts, and the pointer turns it round, either way, up to the whole circle, until a third click leaves it; Shift keeps to steps of 15 degrees, Esc leaves it out |

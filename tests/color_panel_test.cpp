@@ -36,3 +36,16 @@ TEST(ColorPanel, CChoosesWhichColorAClickOnThePaletteSets)
     panel.handle_event(click(2, 3, true));
     EXPECT_EQ(panel.primary().red, second.red) << "a right click sets the other";
 }
+
+TEST(ColorPanel, ItSaysEachTimeAColorChangesHoweverItChanges)
+{
+    ColorPanel panel;
+    panel.arrange({0, 0, ColorPanel::width, 40});
+    auto said{0};
+    panel.on_changed([&said] { ++ said; });
+    panel.set_primary({1, 0, 0, 1});
+    panel.set_secondary({0, 0, 1, 1});
+    panel.swap();
+    panel.handle_event(click(0, 3));
+    EXPECT_EQ(said, 4);
+}

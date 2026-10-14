@@ -17,3 +17,21 @@ TEST(Fonts, EachFamilyOnceWithItsRegularFaceInOrder)
     EXPECT_EQ(families[1].path, "/f/DejaVuSerif.ttf");
     EXPECT_EQ(families[2].name, "Ubuntu");
 }
+
+TEST(Fonts, AFamilyKeepsItsBoldItalicAndBoldItalicFacesWhereItHasThem)
+{
+    const auto families{parse_font_list("/f/Sans-Bold.ttf: Sans:style=Bold\n"
+                                        "/f/Sans.ttf: Sans:style=Regular\n"
+                                        "/f/Sans-Oblique.ttf: Sans:style=Oblique\n"
+                                        "/f/Sans-BoldItalic.ttf: Sans:style=Bold Italic\n"
+                                        "/f/Sans-ExtraBold.ttf: Sans:style=ExtraBold\n"
+                                        "/f/Serif.ttf: Serif:style=Regular\n")};
+    ASSERT_EQ(families.size(), 2u);
+    EXPECT_EQ(families[0].path, "/f/Sans.ttf");
+    EXPECT_EQ(families[0].bold, "/f/Sans-Bold.ttf");
+    EXPECT_EQ(families[0].italic, "/f/Sans-Oblique.ttf");
+    EXPECT_EQ(families[0].bold_italic, "/f/Sans-BoldItalic.ttf");
+    EXPECT_TRUE(families[1].bold.empty());
+    EXPECT_TRUE(families[1].italic.empty());
+    EXPECT_TRUE(families[1].bold_italic.empty());
+}
