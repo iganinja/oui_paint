@@ -152,7 +152,7 @@ Effects > Manage Plugins writes and tries them beside an image; see [Plugins](pl
 ## Settings
 
 Edit > Preferences (Ctrl+,) chooses the language, the system's or another, which changes when OUI Paint starts again;
-the theme, Classic, Ocean or Night, which shows as it is chosen; whether the images open when it last closed open again
+the theme, Classic, Ocean, Night, Dark or Paper, which shows as it is chosen; whether the images open when it last closed open again
 when it starts with none given, each at the zoom and the place it was left, the one in front in front; and whether each
 text the Text tool types goes on a new layer of its own, named after it.
 

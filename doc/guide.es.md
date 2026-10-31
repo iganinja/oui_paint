@@ -162,7 +162,7 @@ escribe y los prueba junto a una imagen; mira [Plugins](plugins.md), que está e
 ## Ajustes
 
 Edición > Preferencias (Ctrl+,) elige el idioma, el del sistema u otro, que cambia cuando OUI Paint vuelve a empezar; el
-tema, Clásico, Océano o Noche, que se ve en cuanto se elige; si al empezar sin ninguna imagen dada se vuelven a abrir
+tema, Clásico, Océano, Noche, Oscuro o Papel, que se ve en cuanto se elige; si al empezar sin ninguna imagen dada se vuelven a abrir
 las que estaban abiertas al cerrarlo, cada una con el zoom y en el sitio en que se dejó, y la de delante delante; y si
 cada texto que escribe la herramienta Texto va a una capa nueva para él, con su nombre.
 
