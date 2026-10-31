@@ -52,6 +52,33 @@ TEST(HistoryPanel, ARowIsThePositionItTakesTheImageToTheFirstAsItWas)
     EXPECT_TRUE(undone);
 }
 
+TEST(HistoryPanel, InAWindowItsButtonsHearThePointerAnywhereOnTheirRow)
+{
+    // A window places the panel between cells and gives the pointer between them too: the buttons are from 9.75 to
+    // 10.75.
+    Document document{16, 16, PixelFormat::gray_alpha8};
+    document.add_layer("Background");
+    auto history{made(document, 3)};
+    Icons icons;
+    HistoryPanel panel{icons};
+    panel.set_history(&history);
+    panel.arrange({0.5, 0.25, 24, 10.5});
+    auto undone{false};
+    auto redone{false};
+    panel.on_undo([&undone] { undone = true; });
+    panel.on_redo([&redone] { redone = true; });
+    panel.handle_event(click(1.3, 10.4));
+    EXPECT_TRUE(undone);
+    panel.handle_event(click(3.1, 9.8));
+    EXPECT_TRUE(redone);
+    EXPECT_EQ(panel.tooltip_at({1.3, 10.6}), std::optional<std::string>{"Undo"});
+    EXPECT_EQ(panel.tooltip_at({1.3, 9.6}), std::nullopt) << "the row above";
+    std::optional<std::size_t> chosen;
+    panel.on_choose([&chosen](std::size_t position) { chosen = position; });
+    panel.handle_event(click(5, 1.7));
+    EXPECT_EQ(chosen, std::optional<std::size_t>{1}) << "the steps' rows from the panel's top";
+}
+
 TEST(HistoryPanel, ItScrollsSoTheStepItIsAtShows)
 {
     Document document{64, 16, PixelFormat::gray_alpha8};

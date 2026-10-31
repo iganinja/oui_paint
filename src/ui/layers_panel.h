@@ -51,7 +51,7 @@ class LayersPanel final : public olagarro::oui::Widget
     // Unticks them all, as when the layers move.
     void clear_ticks();
 
-    // The layer at a row counted from the panel's top, none past them.
+    // The layer at a row counted from the panel's top, none past them or under the buttons.
     [[nodiscard]] std::optional<std::size_t> layer_at_row(int row) const;
 
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override;
@@ -82,7 +82,9 @@ class LayersPanel final : public olagarro::oui::Widget
         eye,
         remove
     };
-    [[nodiscard]] Part part_at(int column) const;
+    [[nodiscard]] Part part_at(double column) const;
+    // The whole rows above the buttons' bar, which takes the last row however tall that is.
+    [[nodiscard]] int layer_rows() const;
     [[nodiscard]] bool is_ticked(std::size_t index) const;
     // `over` is the colour under it, when it is not the panel's.
     void paint_icon(olagarro::oui::Painter& painter, const char* name, const olagarro::oui::Rect& cells,

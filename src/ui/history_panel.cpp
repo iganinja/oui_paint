@@ -151,7 +151,8 @@ bool HistoryPanel::handle_event(const oui::Event& event)
         return false;
     }
     const oui::Point cell{mouse->x - m_bounds.x, mouse->y - m_bounds.y};
-    if(cell.y == m_bounds.height - 1)
+    // The bar takes the last row however tall the panel is, so it starts between cells in a window.
+    if(oui::whole(cell.y - (m_bounds.height - 1)) == 0)
     {
         if(cell.x < 2 && m_undo)
         {
@@ -173,7 +174,7 @@ bool HistoryPanel::handle_event(const oui::Event& event)
 
 std::optional<std::string> HistoryPanel::tooltip_at(oui::Point point) const
 {
-    if(point.y != m_bounds.y + m_bounds.height - 1)
+    if(oui::whole(point.y - (m_bounds.y + m_bounds.height - 1)) != 0)
     {
         return std::nullopt;
     }

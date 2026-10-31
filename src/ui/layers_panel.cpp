@@ -88,17 +88,23 @@ void LayersPanel::on_action(std::function<void(Action)> action)
 
 std::optional<std::size_t> LayersPanel::layer_at_row(int row) const
 {
-    if(m_document == nullptr || row < 0 || row >= static_cast<int>(m_document->layers().size()))
+    if(m_document == nullptr || row < 0 || row >= static_cast<int>(m_document->layers().size()) ||
+       row >= layer_rows())
     {
         return std::nullopt;
     }
     return m_document->layers().size() - 1 - static_cast<std::size_t>(row);
 }
 
+int LayersPanel::layer_rows() const
+{
+    return std::max(0, oui::whole(m_bounds.height) - 1);
+}
+
 std::optional<LayersPanel::Action> LayersPanel::button_at(oui::Point cell) const
 {
     // The buttons along the bottom row, two cells each.
-    if(cell.y != m_bounds.height - 1 || cell.x < 0)
+    if(oui::whole(cell.y - (m_bounds.height - 1)) != 0 || cell.x < 0)
     {
         return std::nullopt;
     }
@@ -164,7 +170,7 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     if(m_document != nullptr)
     {
         const auto& layers{m_document->layers()};
-        for(int row{}; row < static_cast<int>(layers.size()) && row < m_bounds.height - 1; ++ row)
+        for(int row{}; row < static_cast<int>(layers.size()) && row < layer_rows(); ++ row)
         {
             const auto index{*layer_at_row(row)};
             const auto& layer{layers[index]};
@@ -261,7 +267,7 @@ void LayersPanel::clear_ticks()
     m_ticked.clear();
 }
 
-LayersPanel::Part LayersPanel::part_at(int column) const
+LayersPanel::Part LayersPanel::part_at(double column) const
 {
     if(column < tick_width)
     {
@@ -300,7 +306,7 @@ bool LayersPanel::handle_event(const oui::Event& event)
     {
         return false;
     }
-    switch(part_at(oui::whole(cell.x)))
+    switch(part_at(cell.x))
     {
     case Part::tick:
     {
@@ -344,7 +350,7 @@ std::optional<std::string> LayersPanel::tooltip_at(oui::Point point) const
 {
     if(layer_at_row(oui::whole(point.y - m_bounds.y)))
     {
-        switch(part_at(oui::whole(point.x - m_bounds.x)))
+        switch(part_at(point.x - m_bounds.x))
         {
         case Part::tick:
             return std::string{oui::translate("Panels", "Tick layers to delete them together")};
