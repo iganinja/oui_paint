@@ -41,7 +41,7 @@ class Capped final : public oui::Container
     [[nodiscard]] oui::Size measure(const oui::Constraints& constraints) const override
     {
         auto size{child_at(0).measure(constraints)};
-        size.width = std::min(size.width, m_columns);
+        size.width = std::min(size.width, static_cast<double>(m_columns));
         return size;
     }
 
@@ -74,7 +74,7 @@ class ToggleIcons final : public oui::Widget
 
     [[nodiscard]] oui::Size measure(const oui::Constraints& constraints) const override
     {
-        return constraints.constrain({static_cast<int>(m_toggles.size()) * button_width, 1});
+        return constraints.constrain({static_cast<double>(static_cast<int>(m_toggles.size()) * button_width), 1});
     }
 
     void paint(oui::Painter& painter, const oui::Theme& theme) const override
@@ -93,7 +93,8 @@ class ToggleIcons final : public oui::Widget
             }
             const auto over{*m_toggles[index].pressed ? std::optional<oui::Color>{theme.menu_selected_background}
                                                       : std::nullopt};
-            if(const auto* const picture{m_icons.picture(m_toggles[index].icon, area->width, area->height, over)})
+            if(const auto* const picture{
+                   m_icons.picture(m_toggles[index].icon, oui::whole(area->width), oui::whole(area->height), over)})
             {
                 oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
                 image.alpha = true;
@@ -109,7 +110,7 @@ class ToggleIcons final : public oui::Widget
         {
             return false;
         }
-        const auto index{static_cast<std::size_t>((mouse->x - m_bounds.x) / button_width)};
+        const auto index{static_cast<std::size_t>(oui::whole(mouse->x - m_bounds.x) / button_width)};
         if(mouse->x < m_bounds.x || index >= m_toggles.size())
         {
             return false;
@@ -121,7 +122,7 @@ class ToggleIcons final : public oui::Widget
 
     [[nodiscard]] std::optional<std::string> tooltip_at(oui::Point point) const override
     {
-        const auto index{static_cast<std::size_t>((point.x - m_bounds.x) / button_width)};
+        const auto index{static_cast<std::size_t>(oui::whole(point.x - m_bounds.x) / button_width)};
         if(point.x < m_bounds.x || index >= m_toggles.size())
         {
             return std::nullopt;
@@ -158,7 +159,7 @@ class IconButton final : public oui::Widget
         {
             return;
         }
-        if(const auto* const picture{m_icons.picture(m_icon, area->width, area->height)})
+        if(const auto* const picture{m_icons.picture(m_icon, oui::whole(area->width), oui::whole(area->height))})
         {
             oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
             image.alpha = true;
@@ -516,10 +517,10 @@ void ToolOptions::changed()
 
 oui::Size ToolOptions::measure(const oui::Constraints& constraints) const
 {
-    return {constraints.max_width, one_line(constraints.max_width) ? 1 : 2};
+    return {constraints.max_width, one_line(constraints.max_width) ? 1.0 : 2.0};
 }
 
-bool ToolOptions::one_line(int width) const
+bool ToolOptions::one_line(double width) const
 {
     if(!m_effects_group->is_visible())
     {

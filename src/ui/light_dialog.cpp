@@ -60,7 +60,7 @@ void LightDial::paint(oui::Painter& painter, const oui::Theme&) const
         return;
     }
     constexpr std::uint32_t background{0x202020};
-    m_drawing.resize(m_pixels->width, m_pixels->height, background);
+    m_drawing.resize(oui::whole(m_pixels->width), oui::whole(m_pixels->height), background);
     const auto cx{m_pixels->width / 2.0};
     const auto cy{m_pixels->height / 2.0};
     const auto radius{std::min(cx, cy) - 8.0};

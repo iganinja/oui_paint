@@ -28,7 +28,7 @@ class Section final : public olagarro::oui::Container
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override
     {
         const auto inner{
-            m_content->measure({constraints.max_width, std::max(0, constraints.max_height - title_rows())})};
+            m_content->measure({constraints.max_width, std::max(0.0, constraints.max_height - title_rows())})};
         // Nothing to show, as the palettes of an image that has none: no title either.
         if(inner.height == 0)
         {
@@ -41,7 +41,7 @@ class Section final : public olagarro::oui::Container
     {
         Widget::arrange(bounds);
         m_content->arrange(
-            {bounds.x, bounds.y + title_rows(), bounds.width, std::max(0, bounds.height - title_rows())});
+            {bounds.x, bounds.y + title_rows(), bounds.width, std::max(0.0, bounds.height - title_rows())});
     }
     void paint(olagarro::oui::Painter& painter, const olagarro::oui::Theme& theme) const override
     {
@@ -64,7 +64,7 @@ class Section final : public olagarro::oui::Container
     }
 
   private:
-    [[nodiscard]] int title_rows() const { return m_title.empty() ? 0 : 1; }
+    [[nodiscard]] double title_rows() const { return m_title.empty() ? 0.0 : 1.0; }
 
     std::string m_title;
     olagarro::oui::Widget* m_content;

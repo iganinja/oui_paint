@@ -100,7 +100,7 @@ std::optional<Color> ColorPanel::palette_at(oui::Point cell) const
         return std::nullopt;
     }
     // Two cells to a colour, so each is square, two to a row.
-    const auto index{static_cast<std::size_t>((cell.y - squares_rows) * 2 + cell.x / 2)};
+    const auto index{static_cast<std::size_t>((oui::whole(cell.y) - squares_rows) * 2 + oui::whole(cell.x) / 2)};
     if(index >= m_palette.size())
     {
         return std::nullopt;
@@ -110,7 +110,8 @@ std::optional<Color> ColorPanel::palette_at(oui::Point cell) const
 
 oui::Size ColorPanel::measure(const oui::Constraints& constraints) const
 {
-    return constraints.constrain({width, squares_rows + static_cast<int>((m_palette.size() + 1) / 2)});
+    return constraints.constrain(
+        {static_cast<double>(width), static_cast<double>(squares_rows + static_cast<int>((m_palette.size() + 1) / 2))});
 }
 
 void ColorPanel::paint(oui::Painter& painter, const oui::Theme& theme) const

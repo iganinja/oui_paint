@@ -25,7 +25,7 @@ LevelsBar::LevelsBar(int rows) : m_rows{rows}
 
 oui::Size LevelsBar::measure(const oui::Constraints& constraints) const
 {
-    return constraints.constrain({36, m_rows});
+    return constraints.constrain({36, static_cast<double>(m_rows)});
 }
 
 std::optional<double> LevelsBar::place_of(int pixel_x) const
@@ -46,9 +46,11 @@ void LevelsBar::paint(oui::Painter& painter, const oui::Theme&) const
         return;
     }
     constexpr std::uint32_t background{0x202020};
-    m_drawing.resize(m_pixels->width, m_pixels->height, background);
-    const auto side{m_pixels->width - 2 * margin - 1};
-    const auto bar_height{m_pixels->height - marker_size - 1};
+    const auto pixel_width{oui::whole(m_pixels->width)};
+    const auto pixel_height{oui::whole(m_pixels->height)};
+    m_drawing.resize(pixel_width, pixel_height, background);
+    const auto side{pixel_width - 2 * margin - 1};
+    const auto bar_height{pixel_height - marker_size - 1};
     for(int column{}; column <= side; ++ column)
     {
         const auto level{std::min(255, column * 256 / (side + 1))};
@@ -80,7 +82,7 @@ bool LevelsBar::handle_event(const oui::Event& event)
     {
         return false;
     }
-    const auto place{place_of(mouse->pixel->x)};
+    const auto place{place_of(oui::whole(mouse->pixel->x))};
     if(!place)
     {
         return false;

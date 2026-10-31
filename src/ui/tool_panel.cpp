@@ -41,7 +41,7 @@ std::optional<std::size_t> ToolPanel::button_at(oui::Point cell) const
     {
         return std::nullopt;
     }
-    const auto index{static_cast<std::size_t>(cell.y * columns + cell.x / button_width)};
+    const auto index{static_cast<std::size_t>(oui::whole(cell.y) * columns + oui::whole(cell.x) / button_width)};
     if(index >= m_buttons.size())
     {
         return std::nullopt;
@@ -59,7 +59,7 @@ oui::Rect ToolPanel::button_bounds(std::size_t index) const
 oui::Size ToolPanel::measure(const oui::Constraints& constraints) const
 {
     const auto rows{(static_cast<int>(m_buttons.size()) + columns - 1) / columns};
-    return constraints.constrain({columns * button_width, rows});
+    return constraints.constrain({columns * button_width, static_cast<double>(rows)});
 }
 
 void ToolPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
@@ -79,7 +79,7 @@ void ToolPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
         }
         const auto selected{m_buttons[index].id == m_selected};
         if(const auto* const picture{m_icons.picture(
-               m_buttons[index].icon, area->width, area->height,
+               m_buttons[index].icon, oui::whole(area->width), oui::whole(area->height),
                selected ? std::optional<oui::Color>{theme.menu_selected_background} : std::nullopt)})
         {
             oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};

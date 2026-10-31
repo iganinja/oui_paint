@@ -32,7 +32,7 @@ void HistoryPanel::on_choose(std::function<void(std::size_t)> choose)
 
 int HistoryPanel::step_rows() const
 {
-    return std::max(0, m_bounds.height - 1);
+    return std::max(0, oui::whole(m_bounds.height) - 1);
 }
 
 void HistoryPanel::follow() const
@@ -118,7 +118,7 @@ void HistoryPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
         const oui::Rect cell{m_bounds.x + column, bottom, 2, 1};
         if(const auto area{painter.pixel_bounds(cell)})
         {
-            if(const auto* const picture{m_icons.picture(icon, area->width, area->height)})
+            if(const auto* const picture{m_icons.picture(icon, oui::whole(area->width), oui::whole(area->height))})
             {
                 oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
                 image.alpha = true;
@@ -163,7 +163,7 @@ bool HistoryPanel::handle_event(const oui::Event& event)
         }
         return true;
     }
-    if(const auto position{position_at_row(cell.y)}; position && m_choose)
+    if(const auto position{position_at_row(oui::whole(cell.y))}; position && m_choose)
     {
         m_choose(*position);
         return true;

@@ -55,25 +55,27 @@ void AnchorGrid::paint(oui::Painter& painter, const oui::Theme& theme) const
                 continue;
             }
             const auto chosen{column == anchor_x && row == anchor_y};
+            const auto width{oui::whole(area->width)};
+            const auto height{oui::whole(area->height)};
             // A light square with a darker edge, the chosen one tinted as what is selected.
-            m_drawing.resize(area->width, area->height, 0xE8E6E0);
+            m_drawing.resize(width, height, 0xE8E6E0);
             const auto edge{0x8A8478u};
-            m_drawing.fill(0, 0, area->width, 1, edge);
-            m_drawing.fill(0, area->height - 1, area->width, 1, edge);
-            m_drawing.fill(0, 0, 1, area->height, edge);
-            m_drawing.fill(area->width - 1, 0, 1, area->height, edge);
+            m_drawing.fill(0, 0, width, 1, edge);
+            m_drawing.fill(0, height - 1, width, 1, edge);
+            m_drawing.fill(0, 0, 1, height, edge);
+            m_drawing.fill(width - 1, 0, 1, height, edge);
             if(chosen)
             {
-                m_drawing.fill(1, 1, area->width - 2, area->height - 2, 0xC8DCF0);
+                m_drawing.fill(1, 1, width - 2, height - 2, 0xC8DCF0);
             }
             const auto dx{column - anchor_x};
             const auto dy{row - anchor_y};
             if(!chosen && std::abs(dx) <= 1 && std::abs(dy) <= 1)
             {
                 // An arrow away from the anchor, where the canvas grows.
-                const auto cx{area->width / 2};
-                const auto cy{area->height / 2};
-                const auto reach{std::min(area->width, area->height) / 3};
+                const auto cx{width / 2};
+                const auto cy{height / 2};
+                const auto reach{std::min(width, height) / 3};
                 const auto length{std::hypot(dx, dy)};
                 const auto ux{dx / length};
                 const auto uy{dy / length};
@@ -102,11 +104,11 @@ void AnchorGrid::paint(oui::Painter& painter, const oui::Theme& theme) const
             if(chosen)
             {
                 // The image, where it stays, in the middle of its square.
-                const auto side{std::min(area->width, area->height) * 4 / 5};
+                const auto side{std::min(width, height) * 4 / 5};
                 if(const auto* const picture{m_icons.picture("Image", side, side)})
                 {
-                    const auto left{(area->width - picture->width) / 2};
-                    const auto top{(area->height - picture->height) / 2};
+                    const auto left{(width - picture->width) / 2};
+                    const auto top{(height - picture->height) / 2};
                     for(int y{}; y < picture->height; ++ y)
                     {
                         for(int x{}; x < picture->width; ++ x)
@@ -163,8 +165,8 @@ bool AnchorGrid::handle_event(const oui::Event& event)
     {
         return false;
     }
-    const auto column{(mouse->x - m_bounds.x) / square_width};
-    const auto row{(mouse->y - m_bounds.y) / square_height};
+    const auto column{oui::whole(mouse->x - m_bounds.x) / square_width};
+    const auto row{oui::whole(mouse->y - m_bounds.y) / square_height};
     if(column < 0 || column > 2 || row < 0 || row > 2)
     {
         return false;

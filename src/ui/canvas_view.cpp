@@ -105,8 +105,10 @@ void CanvasView::paint(oui::Painter& painter, const oui::Theme&) const
     {
         return;
     }
+    const auto width{oui::whole(m_pixels->width)};
+    const auto height{oui::whole(m_pixels->height)};
     auto& viewport{m_document.viewport()};
-    viewport.set_view_size(m_pixels->width, m_pixels->height);
+    viewport.set_view_size(width, height);
     if(!m_fitted)
     {
         // A document opens as big as fits, never above actual size, unless told where to start.
@@ -120,25 +122,25 @@ void CanvasView::paint(oui::Painter& painter, const oui::Theme&) const
         }
         m_fitted = true;
     }
-    m_buffer.resize(static_cast<std::size_t>(m_pixels->width) * m_pixels->height);
+    m_buffer.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
     const auto& document{m_document.document()};
-    render_view(viewport, m_document.display(), document.width(), document.height(), m_buffer.data(),
-                m_pixels->width, m_pixels->height, 0x808080u);
+    render_view(viewport, m_document.display(), document.width(), document.height(), m_buffer.data(), width, height,
+                0x808080u);
     // The edge worked out again only when the selection or the view changed: the ants moving only recolour it.
     const auto& mask{document.selection().mask()};
     const auto same_mask{mask.has_value() == m_edge.mask.has_value() && (!mask || mask->tiles() == m_edge.mask->tiles())};
     if(!same_mask || m_edge.origin.x != viewport.origin().x || m_edge.origin.y != viewport.origin().y ||
-       m_edge.zoom != viewport.zoom() || m_edge.width != m_pixels->width || m_edge.height != m_pixels->height)
+       m_edge.zoom != viewport.zoom() || m_edge.width != width || m_edge.height != height)
     {
-        m_edge = {mask, viewport.origin(), viewport.zoom(), m_pixels->width, m_pixels->height,
-                  selection_edge(viewport, document.selection(), m_pixels->width, m_pixels->height)};
+        m_edge = {mask, viewport.origin(), viewport.zoom(), width, height,
+                  selection_edge(viewport, document.selection(), width, height)};
     }
-    draw_marching_ants(m_edge.pixels, m_buffer.data(), m_pixels->width, m_ants_phase);
+    draw_marching_ants(m_edge.pixels, m_buffer.data(), width, m_ants_phase);
     if(m_overlay)
     {
-        m_overlay(m_buffer.data(), m_pixels->width, m_pixels->height);
+        m_overlay(m_buffer.data(), width, height);
     }
-    painter.draw_image(m_bounds, {m_buffer.data(), m_pixels->width, m_pixels->height, m_pixels->width}, {});
+    painter.draw_image(m_bounds, {m_buffer.data(), width, height, width}, {});
 }
 
 std::optional<Position> CanvasView::in_view(const oui::MouseEvent& mouse) const

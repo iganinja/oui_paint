@@ -7,7 +7,7 @@ using namespace oui_paint;
 namespace
 {
 
-olagarro::oui::MouseEvent click(int x, int y)
+olagarro::oui::MouseEvent click(double x, double y)
 {
     return olagarro::oui::MouseEvent{x, y, true};
 }

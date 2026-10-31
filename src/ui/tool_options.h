@@ -85,7 +85,7 @@ class ToolOptions final : public olagarro::oui::Container
     void changed();
     void text_changed();
     // Whether the options shown fit in one line `width` columns wide.
-    [[nodiscard]] bool one_line(int width) const;
+    [[nodiscard]] bool one_line(double width) const;
 
     BrushSettings m_settings;
     olagarro::oui::Row* m_width_group{};

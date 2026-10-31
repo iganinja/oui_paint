@@ -3,6 +3,7 @@
 #include <oui/container.h>
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 
 namespace oui_paint
@@ -23,7 +24,7 @@ class SideColumn final : public olagarro::oui::Container
 
     [[nodiscard]] olagarro::oui::Size measure(const olagarro::oui::Constraints& constraints) const override
     {
-        auto width{0};
+        auto width{0.0};
         for(const auto* const part : {m_top, m_middle, m_bottom})
         {
             width = std::max(width, part->measure(constraints).width);
@@ -36,9 +37,9 @@ class SideColumn final : public olagarro::oui::Container
         Widget::arrange(bounds);
         const auto bottom{
             m_bottom->is_visible() ? std::min(bounds.height, m_bottom->measure({bounds.width, bounds.height}).height)
-                                   : 0};
+                                   : 0.0};
         const auto above{bounds.height - bottom};
-        const auto top{m_top->is_visible() ? above / 3 : 0};
+        const auto top{m_top->is_visible() ? std::floor(above / 3) : 0.0};
         m_top->arrange({bounds.x, bounds.y, bounds.width, top});
         m_middle->arrange({bounds.x, bounds.y + top, bounds.width, above - top});
         m_bottom->arrange({bounds.x, bounds.y + above, bounds.width, bottom});

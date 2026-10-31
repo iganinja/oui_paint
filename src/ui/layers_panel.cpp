@@ -102,7 +102,7 @@ std::optional<LayersPanel::Action> LayersPanel::button_at(oui::Point cell) const
     {
         return std::nullopt;
     }
-    const auto index{static_cast<std::size_t>(cell.x / 2)};
+    const auto index{static_cast<std::size_t>(oui::whole(cell.x) / 2)};
     if(index >= m_buttons.size())
     {
         return std::nullopt;
@@ -112,7 +112,7 @@ std::optional<LayersPanel::Action> LayersPanel::button_at(oui::Point cell) const
 
 oui::Size LayersPanel::measure(const oui::Constraints& constraints) const
 {
-    return {std::min(width, constraints.max_width), constraints.max_height};
+    return {std::min(static_cast<double>(width), constraints.max_width), constraints.max_height};
 }
 
 void LayersPanel::paint_picture(oui::Painter& painter, const Layer& layer, const oui::Rect& cells) const
@@ -123,13 +123,15 @@ void LayersPanel::paint_picture(oui::Painter& painter, const Layer& layer, const
         return;
     }
     // The layer fitted in the cells, over a checkerboard, each pixel of the picture the image's pixel at its middle.
-    const auto scale{std::max(static_cast<double>(m_document->width()) / area->width,
-                              static_cast<double>(m_document->height()) / area->height)};
-    m_picture.assign(static_cast<std::size_t>(area->width) * area->height, 0x808080u);
+    const auto area_width{oui::whole(area->width)};
+    const auto area_height{oui::whole(area->height)};
+    const auto scale{std::max(static_cast<double>(m_document->width()) / area_width,
+                              static_cast<double>(m_document->height()) / area_height)};
+    m_picture.assign(static_cast<std::size_t>(area_width) * static_cast<std::size_t>(area_height), 0x808080u);
     const auto shown_width{static_cast<int>(m_document->width() / scale)};
     const auto shown_height{static_cast<int>(m_document->height() / scale)};
-    const auto left{(area->width - shown_width) / 2};
-    const auto top{(area->height - shown_height) / 2};
+    const auto left{(area_width - shown_width) / 2};
+    const auto top{(area_height - shown_height) / 2};
     for(int y{}; y < shown_height; ++ y)
     {
         for(int x{}; x < shown_width; ++ x)
@@ -148,12 +150,12 @@ void LayersPanel::paint_picture(oui::Painter& painter, const Layer& layer, const
             const auto alpha{pixel >> 24u};
             const auto mix{[alpha](std::uint32_t over, std::uint32_t base)
                            { return (over * alpha + base * (255u - alpha) + 127u) / 255u; }};
-            m_picture[static_cast<std::size_t>((top + y) * area->width + left + x)] =
+            m_picture[static_cast<std::size_t>((top + y) * area_width + left + x)] =
                 mix(pixel >> 16u & 0xffu, under >> 16u & 0xffu) << 16u |
                 mix(pixel >> 8u & 0xffu, under >> 8u & 0xffu) << 8u | mix(pixel & 0xffu, under & 0xffu);
         }
     }
-    painter.draw_image(cells, {m_picture.data(), area->width, area->height, area->width}, {});
+    painter.draw_image(cells, {m_picture.data(), area_width, area_height, area_width}, {});
 }
 
 void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
@@ -183,7 +185,7 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             // The name, then at the right the eye and the bin.
             const auto name_x{line.x + tick_width + picture_width + 1};
             const auto eye_x{line.x + line.width - eye_width - delete_width};
-            painter.push_clip({name_x, line.y, std::max(0, eye_x - name_x), 1});
+            painter.push_clip({name_x, line.y, std::max(0.0, eye_x - name_x), 1});
             painter.draw_label({name_x, line.y}, layer.name(), style);
             painter.pop_clip();
             // Over the active row's colour, the icons as that colour needs to show them.
@@ -205,7 +207,8 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
         const oui::Rect cell{m_bounds.x + static_cast<int>(index) * 2, bottom, 2, 1};
         if(const auto area{painter.pixel_bounds(cell)})
         {
-            if(const auto* const picture{m_icons.picture(m_buttons[index].icon, area->width, area->height)})
+            if(const auto* const picture{
+                   m_icons.picture(m_buttons[index].icon, oui::whole(area->width), oui::whole(area->height))})
             {
                 oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
                 image.alpha = true;
@@ -220,7 +223,7 @@ void LayersPanel::paint_icon(oui::Painter& painter, const char* name, const oui:
 {
     if(const auto area{painter.pixel_bounds(cells)})
     {
-        if(const auto* const picture{m_icons.picture(name, area->width, area->height, over)})
+        if(const auto* const picture{m_icons.picture(name, oui::whole(area->width), oui::whole(area->height), over)})
         {
             oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
             image.alpha = true;
@@ -292,12 +295,12 @@ bool LayersPanel::handle_event(const oui::Event& event)
         }
         return true;
     }
-    const auto index{layer_at_row(cell.y)};
+    const auto index{layer_at_row(oui::whole(cell.y))};
     if(!index)
     {
         return false;
     }
-    switch(part_at(cell.x))
+    switch(part_at(oui::whole(cell.x)))
     {
     case Part::tick:
     {
@@ -339,9 +342,9 @@ bool LayersPanel::handle_event(const oui::Event& event)
 
 std::optional<std::string> LayersPanel::tooltip_at(oui::Point point) const
 {
-    if(layer_at_row(point.y - m_bounds.y))
+    if(layer_at_row(oui::whole(point.y - m_bounds.y)))
     {
-        switch(part_at(point.x - m_bounds.x))
+        switch(part_at(oui::whole(point.x - m_bounds.x)))
         {
         case Part::tick:
             return std::string{oui::translate("Panels", "Tick layers to delete them together")};

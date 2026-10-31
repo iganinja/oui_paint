@@ -63,9 +63,11 @@ void CurveEditor::paint(oui::Painter& painter, const oui::Theme&) const
     }
     constexpr std::uint32_t background{0x202020};
     constexpr std::uint32_t grid{0x3A3A38};
-    m_drawing.resize(m_pixels->width, m_pixels->height, background);
-    const auto side_x{m_pixels->width - 2 * margin - 1};
-    const auto side_y{m_pixels->height - 2 * margin - 1};
+    const auto pixel_width{oui::whole(m_pixels->width)};
+    const auto pixel_height{oui::whole(m_pixels->height)};
+    m_drawing.resize(pixel_width, pixel_height, background);
+    const auto side_x{pixel_width - 2 * margin - 1};
+    const auto side_y{pixel_height - 2 * margin - 1};
     const auto at_x{[&](double x) { return margin + static_cast<int>(std::lround(x * side_x)); }};
     const auto at_y{[&](double y) { return margin + static_cast<int>(std::lround((1.0 - y) * side_y)); }};
     // The histogram, as bars from the bottom, the tallest reaching the top.

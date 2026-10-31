@@ -36,7 +36,7 @@ void PalettesPanel::on_slot(std::function<void(int slot)> slot)
 
 int PalettesPanel::across() const
 {
-    return std::max(1, m_bounds.width - label_width);
+    return std::max(1, oui::whole(m_bounds.width) - label_width);
 }
 
 int PalettesPanel::rows_per_palette() const
@@ -51,20 +51,22 @@ int PalettesPanel::rows_per_palette() const
 std::optional<PalettesPanel::Place> PalettesPanel::place_at(oui::Point cell) const
 {
     const auto rows{rows_per_palette()};
-    if(rows == 0 || cell.y < 0 || cell.x < 0)
+    const auto column{oui::whole(cell.x)};
+    const auto row{oui::whole(cell.y)};
+    if(rows == 0 || row < 0 || column < 0)
     {
         return std::nullopt;
     }
-    const auto slot{cell.y / rows};
+    const auto slot{row / rows};
     if(slot >= m_document->palettes()->count())
     {
         return std::nullopt;
     }
-    if(cell.x < label_width)
+    if(column < label_width)
     {
         return Place{slot, std::nullopt};
     }
-    const auto index{(cell.y % rows) * across() + cell.x - label_width};
+    const auto index{(row % rows) * across() + column - label_width};
     if(index >= m_document->palettes()->size)
     {
         return std::nullopt;
@@ -79,10 +81,11 @@ oui::Size PalettesPanel::measure(const oui::Constraints& constraints) const
         return {0, 0};
     }
     // As wide as the layers above, and as many rows as the palettes take at that width.
-    const auto width{std::min(constraints.max_width, 24)};
+    const auto width{std::min(oui::whole(constraints.max_width), 24)};
     const auto per_row{std::max(1, width - label_width)};
     const auto rows{(m_document->palettes()->size + per_row - 1) / per_row};
-    return constraints.constrain({width, rows * m_document->palettes()->count()});
+    return constraints.constrain(
+        {static_cast<double>(width), static_cast<double>(rows * m_document->palettes()->count())});
 }
 
 void PalettesPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
@@ -102,7 +105,7 @@ void PalettesPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
         const auto top{m_bounds.y + slot * rows};
         const oui::TextStyle style{slot == active ? theme.menu_selected_foreground : theme.status_foreground,
                                    slot == active ? theme.menu_selected_background : side_panel_color(theme)};
-        painter.fill_rect({m_bounds.x, top, label_width, rows}, style.background);
+        painter.fill_rect({m_bounds.x, top, label_width, static_cast<double>(rows)}, style.background);
         painter.draw_text({m_bounds.x, top}, (slot == active ? ">" : " ") + std::to_string(slot + 1), style);
         const auto& palette{setup.palettes[static_cast<std::size_t>(slot)]};
         for(int index{}; index < setup.size; ++ index)
