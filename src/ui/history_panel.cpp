@@ -104,7 +104,7 @@ void HistoryPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
                                             : theme.status_foreground,
                                    current ? theme.menu_selected_background : side_panel_color(theme)};
         const auto name{*position == 0 ? std::string{oui::translate("Panels", "Original")} : m_history->steps()[*position - 1].name};
-        painter.draw_label({line.x + 1, line.y}, name, style);
+        painter.draw_label({line.x + 1, line.y, std::max(0.0, line.width - 1), 1}, name, style);
     }
     // Undo and redo under the steps, on a bar of their own; none without a document to undo in.
     if(m_history == nullptr || m_bounds.height < 2)

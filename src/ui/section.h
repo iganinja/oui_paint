@@ -53,7 +53,7 @@ class Section final : public olagarro::oui::Container
         {
             const auto background{side_panel_color(theme)};
             painter.fill_rect({m_bounds.x, m_bounds.y, m_bounds.width, 1}, background);
-            painter.draw_label({m_bounds.x, m_bounds.y}, m_title, {theme.muted_text, background});
+            painter.draw_label({m_bounds.x, m_bounds.y, m_bounds.width, 1}, m_title, {theme.muted_text, background});
         }
         Container::paint(painter, theme);
         if(m_bounds.height > title_rows())

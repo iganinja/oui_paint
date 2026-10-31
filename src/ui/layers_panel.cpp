@@ -191,9 +191,7 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             // The name, then at the right the eye and the bin.
             const auto name_x{line.x + tick_width + picture_width + 1};
             const auto eye_x{line.x + line.width - eye_width - delete_width};
-            painter.push_clip({name_x, line.y, std::max(0.0, eye_x - name_x), 1});
-            painter.draw_label({name_x, line.y}, layer.name(), style);
-            painter.pop_clip();
+            painter.draw_label({name_x, line.y, std::max(0.0, eye_x - name_x), 1}, layer.name(), style);
             // Over the active row's colour, the icons as that colour needs to show them.
             const auto over{active ? std::optional<oui::Color>{theme.menu_selected_background} : std::nullopt};
             paint_icon(painter, layer.visible() ? "GuiVisibilityVisible" : "GuiVisibilityHidden",
