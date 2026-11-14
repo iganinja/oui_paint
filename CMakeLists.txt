@@ -37,6 +37,7 @@ add_library(oui_paint_core STATIC
     src/app/background_effect.cpp
     src/app/fonts.cpp
     src/app/help.cpp
+    src/app/updates.cpp
     src/app/new_image.cpp
     src/app/open_document.cpp
     src/app/plugin_api.cpp
@@ -185,6 +186,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/fonts_test.cpp
         tests/gradient_test.cpp
         tests/help_test.cpp
+        tests/updates_test.cpp
         tests/history_panel_test.cpp
         tests/history_test.cpp
         tests/icons_test.cpp

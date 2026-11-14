@@ -67,6 +67,7 @@ int main(int argument_count, char* const* const arguments)
     {
         static_cast<void>(paint.open(oui::path_from_utf8(*path)));
     }
+    paint.check_updates_at_start();
     const auto result{application.exec()};
     oui_paint::keep_window_place(settings, window.geometry());
     static_cast<void>(settings.save());

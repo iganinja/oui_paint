@@ -107,7 +107,8 @@
       "Zoom &Out": "A&lejar",
       "Zoom In": "Acercar",
       "Zoom to &Selection": "Ajustar a la &selección",
-      "Zoom to &Window": "Ajustar a la &ventana"
+      "Zoom to &Window": "Ajustar a la &ventana",
+      "Check for &Updates...": "Buscar &actualizaciones..."
     },
     "Dialogs": {
       "&Alpha:": "&Alfa:",
@@ -230,7 +231,8 @@
       "colors": "colores",
       "degrees": "grados",
       "of": "de",
-      "pixels": "píxeles"
+      "pixels": "píxeles",
+      "Check for &Updates...": "Buscar &actualizaciones..."
     },
     "Documents": {
       "Untitled": "Sin título",
@@ -536,7 +538,8 @@
       "System language": "Idioma del sistema",
       "The language changes when OUI Paint starts again.": "El idioma cambia cuando OUI Paint vuelve a empezar.",
       "Arrow keys with &Shift move (pixels):": "Las flechas con &Mayús mueven (píxeles):",
-      "Arrow keys with &Ctrl move (pixels):": "Las flechas con &Ctrl mueven (píxeles):"
+      "Arrow keys with &Ctrl move (pixels):": "Las flechas con &Ctrl mueven (píxeles):",
+      "Check for updates once a &day, as OUI Paint starts": "Buscar actualizaciones una vez al &día, al arrancar OUI Paint"
     },
     "Status": {
       "Grayscale, 16 bits per channel": "Escala de grises, 16 bits por canal",
@@ -609,6 +612,30 @@
       "Thought Bubble": "Bocadillo de pensamiento",
       "Arrow": "Flecha",
       "Star": "Estrella"
+    },
+    "Updates": {
+      "Check for Updates": "Buscar actualizaciones",
+      "Esc stops it.": "Esc lo detiene.",
+      "There is no curl, wget or PowerShell here to download with.": "No hay curl, wget ni PowerShell con los que descargar.",
+      "OK": "Aceptar",
+      "Open the Release's Page": "Abrir la página de la versión",
+      "Downloading {0} {1}...": "Descargando {0} {1}...",
+      "{0} {1} could not be downloaded.": "No se ha podido descargar {0} {1}.",
+      "The release lists no sum for {0}.": "La versión no da la suma de {0}.",
+      "What came is not what the release's sum says: it was left out.": "Lo descargado no coincide con la suma de la versión: se ha descartado.",
+      "{0} {1} is installed: it is the one that starts the next time.": "{0} {1} está instalado: es el que se abrirá la próxima vez.",
+      "{0} {1} is out; this one is {2}.": "Ha salido {0} {1}; este es {2}.",
+      "What Is New": "Novedades",
+      "Install it in place of this one?": "¿Instalarlo en lugar de este?",
+      "Install": "Instalar",
+      "Not Now": "Ahora no",
+      "APT installed it, and updates it with the rest of the system:": "Lo instaló APT, que lo actualiza con el resto del sistema:",
+      "This copy is not where the installers put it, so it is not replaced: the release's page has the new one.": "Esta copia no está donde la ponen los instaladores, así que no se sustituye: la nueva está en la página de la versión.",
+      "It could not take the place of {0}: {1}": "No ha podido sustituir a {0}: {1}",
+      "Asking GitHub for the latest {0}...": "Preguntando a GitHub por la última versión de {0}...",
+      "{0} could not ask GitHub for the latest version.": "{0} no ha podido preguntar a GitHub por la última versión.",
+      "GitHub's answer names no release.": "La respuesta de GitHub no nombra ninguna versión.",
+      "{0} {1} is the latest version.": "{0} {1} es la última versión."
     }
   }
 }

@@ -169,3 +169,18 @@ cada texto que escribe la herramienta Texto va a una capa nueva para él, con su
 
 OUI Paint guarda sus ajustes en `oui_paint.ini`: junto al programa cuando se puede escribir en su carpeta, y en la
 carpeta de configuración del usuario cuando no. La carpeta `plugins` de su lado guarda los plugins añadidos.
+
+## Actualizaciones
+
+Ayuda > Buscar actualizaciones, o el botón de Ayuda > Acerca de, pregunta a GitHub por la última versión, con curl,
+wget o PowerShell, lo que haya en el sistema. Si es más nueva:
+
+- Instalado con `install.sh` en `~/.local/bin`, o con `install.ps1` en `%LOCALAPPDATA%\Programs\oui_paint`, Instalar
+  la descarga, la comprueba con el `SHA256SUMS` de la versión y la pone en lugar de esta; es la que se abre la próxima
+  vez.
+- Instalado con APT, en `/usr/bin`, se actualiza con el resto del sistema: `sudo apt update && sudo apt upgrade`.
+- En cualquier otro sitio, como una build propia, no se sustituye: Novedades abre la página de la versión.
+
+Con Buscar actualizaciones una vez al día activado, en Preferencias, OUI Paint pregunta al arrancar, como mucho una
+vez al día, y no dice nada salvo que haya una versión nueva. Viene desactivado: OUI Paint solo sale a la red cuando se
+le pide.

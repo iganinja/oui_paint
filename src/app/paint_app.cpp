@@ -48,6 +48,7 @@
 #include <oui/window.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <set>
 #include <cmath>
@@ -371,7 +372,10 @@ void PaintApp::register_commands()
         oui::Shortcut{0, false, false, false, oui::Key::f7});
     add("help.documentation", oui::translate("Commands", "&Documentation"), [this] { show_help(m_application, help_pages(m_application.commands())); },
         oui::Shortcut{0, false, false, false, oui::Key::f1});
-    commands.register_command("help.about", oui::translate("Commands", "&About OUI Paint"), [this] { show_about(m_application); });
+    commands.register_command("help.check_updates", oui::translate("Commands", "Check for &Updates..."),
+                              [this] { check_for_updates(m_application, m_settings, oui_paint_update_program()); });
+    commands.register_command("help.about", oui::translate("Commands", "&About OUI Paint"),
+                              [this] { show_about(m_application, [this] { static_cast<void>(m_application.commands().execute("help.check_updates")); }); });
     const auto select_layer{[this](int step, bool to_end)
                             {
                                 return [this, step, to_end]
@@ -4114,7 +4118,7 @@ void PaintApp::load_plugins()
         m_adjustments_menu = m_menu_count;
         add_menu(oui::translate("Menus", "&Adjustments"), std::move(adjustments));
         add_menu(oui::translate("Menus", "Effe&cts"), std::move(effects));
-        add_menu(oui::translate("Menus", "&Help"), {"help.documentation", oui::menu_separator(), "help.about"});
+        add_menu(oui::translate("Menus", "&Help"), {"help.documentation", oui::menu_separator(), "help.check_updates", "help.about"});
         if(!failures.empty())
         {
             show_error(oui::translate("Messages", "Plugins"), oui::translate("Messages", "These plugins could not be loaded:") + "\n" + failures);
@@ -4430,6 +4434,13 @@ void PaintApp::open_last_session()
     }
 }
 
+void PaintApp::check_updates_at_start()
+{
+    remove_replaced(running_executable());
+    m_update_check.start(
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+}
+
 void PaintApp::show_preferences()
 {
     std::vector<std::pair<std::string, std::string>> languages{{"auto", oui::translate("Preferences", "System language")},
@@ -4450,6 +4461,7 @@ void PaintApp::show_preferences()
     start.theme = std::string{m_settings.value("theme", "classic")};
     start.shift_step = m_settings.int_value("arrow_shift_step", start.shift_step);
     start.control_step = m_settings.int_value("arrow_control_step", start.control_step);
+    start.check_updates = m_settings.bool_value("check_for_updates", false);
     // A theme chosen shows at once, and goes back if the preferences are cancelled.
     const auto chosen{ask_preferences(m_application, start, languages, themes, [this](const std::string& id) { use_theme(id); })};
     if(!chosen)
@@ -4463,6 +4475,7 @@ void PaintApp::show_preferences()
     m_settings.set_value("theme", chosen->theme);
     m_settings.set_int_value("arrow_shift_step", chosen->shift_step);
     m_settings.set_int_value("arrow_control_step", chosen->control_step);
+    m_settings.set_bool_value("check_for_updates", chosen->check_updates);
     static_cast<void>(m_settings.save());
     use_theme(chosen->theme);
 }

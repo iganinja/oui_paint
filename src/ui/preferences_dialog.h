@@ -25,6 +25,8 @@ struct Preferences
     // How many pixels an arrow key moves what is selected with Shift held, and with Ctrl; one pixel with neither.
     int shift_step{10};
     int control_step{50};
+    // As it starts, at most once a day, it asks GitHub for a newer version: off unless turned on.
+    bool check_updates{false};
 };
 
 // Asks for the preferences, starting from `start`; `languages` and `themes` are the ids and names to choose among,

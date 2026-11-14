@@ -88,7 +88,7 @@ void show_help(oui::Application& application, const std::vector<HelpPage>& pages
     static_cast<void>(application.show_modal(std::move(window)));
 }
 
-void show_about(oui::Application& application)
+void show_about(oui::Application& application, const std::function<void()>& check_updates)
 {
     auto window{oui::window(oui::translate("Dialogs", "About OUI Paint"))};
     window->set_preferred_size({84, 0});
@@ -111,9 +111,21 @@ void show_about(oui::Application& application)
                     static_cast<void>(application.show_modal(std::move(notices)));
                 });
     auto& window_reference{*window};
+    // It checks once About has closed, as what it shows takes the screen.
+    auto checking{false};
+    oui::button(oui::translate("Dialogs", "Check for &Updates..."), buttons,
+                [&window_reference, &checking]
+                {
+                    checking = true;
+                    window_reference.close(oui::DialogResult::accepted);
+                });
     oui::button(oui::translate("Dialogs", "&Close"), buttons, [&window_reference] { window_reference.close(oui::DialogResult::cancelled); });
     application.post([&application, &view] { application.focus(view); });
     static_cast<void>(application.show_modal(std::move(window)));
+    if(checking && check_updates)
+    {
+        check_updates();
+    }
 }
 
 } // namespace oui_paint

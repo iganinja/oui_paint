@@ -82,6 +82,10 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
         step_field(oui::translate("Preferences", "Arrow keys with &Shift move (pixels):"), start.shift_step)};
     auto* const control_step{
         step_field(oui::translate("Preferences", "Arrow keys with &Ctrl move (pixels):"), start.control_step)};
+    oui::label("", form);
+    auto& check_updates{
+        oui::check_button(oui::translate("Preferences", "Check for updates once a &day, as OUI Paint starts"), form)};
+    check_updates.set_checked(start.check_updates);
 
     auto& buttons{oui::row(content)};
     buttons.set_gap(oui::Spacing::normal);
@@ -107,6 +111,7 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
     chosen_preferences.theme = themes.at(theme.selected()).first;
     chosen_preferences.shift_step = static_cast<int>(shift_step->value());
     chosen_preferences.control_step = static_cast<int>(control_step->value());
+    chosen_preferences.check_updates = check_updates.is_checked();
     return chosen_preferences;
 }
 

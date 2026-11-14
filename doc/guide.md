@@ -159,3 +159,18 @@ text the Text tool types goes on a new layer of its own, named after it.
 
 OUI Paint keeps its settings in `oui_paint.ini`: beside the program when its folder can be written to, in the user's
 configuration folder when not. The `plugins` folder beside it holds the plugins added.
+
+## Updates
+
+Help > Check for Updates, or the button in Help > About, asks GitHub for the latest version, with curl, wget or
+PowerShell, whichever the system has. When it is newer:
+
+- Installed by `install.sh` in `~/.local/bin`, or by `install.ps1` in `%LOCALAPPDATA%\Programs\oui_paint`, Install
+  downloads it, checks it against the release's `SHA256SUMS` and puts it in place of this one; it is the one that
+  starts the next time.
+- Installed by APT, in `/usr/bin`, it is updated with the rest of the system: `sudo apt update && sudo apt upgrade`.
+- Anywhere else, as a build of your own, it is not replaced: What Is New opens the release's page.
+
+With Check for updates once a day on, in Preferences, OUI Paint asks as it starts, at most once a day, and says
+nothing unless there is a newer version. It is off unless you turn it on: OUI Paint goes to the network only when
+asked.

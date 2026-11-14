@@ -4,6 +4,7 @@
 
 #include <oui/application.h>
 
+#include <functional>
 #include <vector>
 
 namespace oui_paint
@@ -13,7 +14,8 @@ namespace oui_paint
 // a web address, opens in the system's browser.
 void show_help(olagarro::oui::Application& application, const std::vector<HelpPage>& pages, std::size_t first = 0);
 
-// About OUI Paint: its version and license, with a button for the licenses of what it carries.
-void show_about(olagarro::oui::Application& application);
+// About OUI Paint: its version and license, with a button for the licenses of what it carries, and one that closes
+// it to check for updates with `check_updates`.
+void show_about(olagarro::oui::Application& application, const std::function<void()>& check_updates);
 
 } // namespace oui_paint

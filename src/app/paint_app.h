@@ -2,6 +2,7 @@
 
 #include "app/new_image.h"
 #include "app/open_document.h"
+#include "app/updates.h"
 #include "core/selection.h"
 #include "effects/plugins.h"
 #include "tools/arc.h"
@@ -52,6 +53,10 @@ class PaintApp
              olagarro::oui::Settings& settings);
     PaintApp(const PaintApp&) = delete;
     PaintApp& operator=(const PaintApp&) = delete;
+
+    // As it starts: takes away what an update left on Windows, and asks GitHub for a newer version, at most once a day,
+    // when Preferences say so.
+    void check_updates_at_start();
 
     // Opens a file in a new tab; false, having said why, when it cannot.
     bool open(const std::filesystem::path& path);
@@ -256,6 +261,7 @@ class PaintApp
     olagarro::oui::Application& m_application;
     olagarro::oui::PixelBackend& m_window;
     olagarro::oui::Settings& m_settings;
+    StartupUpdateCheck m_update_check{m_application, m_settings, oui_paint_update_program()};
     Icons m_icons;
     MainFrame* m_frame{};
     ToolPanel* m_tool_panel{};
