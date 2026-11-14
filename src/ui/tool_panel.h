@@ -51,6 +51,8 @@ class ToolPanel final : public olagarro::oui::Widget
     Icons& m_icons;
     std::string m_selected;
     std::function<void(const std::string&)> m_picked;
+    // Where the pointer last passed over the panel, to light the button under it.
+    std::optional<olagarro::oui::Point> m_pointer;
 };
 
 } // namespace oui_paint

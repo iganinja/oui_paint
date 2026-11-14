@@ -74,6 +74,8 @@ class LayersPanel final : public olagarro::oui::Widget
     };
 
     [[nodiscard]] std::optional<Action> button_at(olagarro::oui::Point cell) const;
+    // Whether the pointer is over `cells`, a button lit then.
+    [[nodiscard]] bool pointer_over(const olagarro::oui::Rect& cells) const;
     // What of a layer's row is at a column of the panel.
     enum class Part
     {
@@ -87,6 +89,8 @@ class LayersPanel final : public olagarro::oui::Widget
     [[nodiscard]] int layer_rows() const;
     [[nodiscard]] bool is_ticked(std::size_t index) const;
     // `over` is the colour under it, when it is not the panel's.
+    // Where the pointer last passed over the panel.
+    std::optional<olagarro::oui::Point> m_pointer;
     void paint_icon(olagarro::oui::Painter& painter, const char* name, const olagarro::oui::Rect& cells,
                     const olagarro::oui::Theme& theme, std::optional<olagarro::oui::Color> over = std::nullopt) const;
     void paint_picture(olagarro::oui::Painter& painter, const Layer& layer, const olagarro::oui::Rect& cells) const;

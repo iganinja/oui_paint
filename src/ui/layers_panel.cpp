@@ -194,9 +194,19 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             painter.draw_label({name_x, line.y, std::max(0.0, eye_x - name_x), 1}, layer.name(), style);
             // Over the active row's colour, the icons as that colour needs to show them.
             const auto over{active ? std::optional<oui::Color>{theme.menu_selected_background} : std::nullopt};
-            paint_icon(painter, layer.visible() ? "GuiVisibilityVisible" : "GuiVisibilityHidden",
-                       {eye_x, line.y, eye_width, 1}, theme, over);
-            paint_icon(painter, "Remove", {eye_x + eye_width, line.y, delete_width, 1}, theme, over);
+            // The eye and the cross are buttons too, lit under the pointer.
+            const auto icon{[&](const char* name, const oui::Rect& cells)
+                            {
+                                if(!pointer_over(cells))
+                                {
+                                    paint_icon(painter, name, cells, theme, over);
+                                    return;
+                                }
+                                painter.fill_rect(cells, side_panel_hover_color(theme));
+                                paint_icon(painter, name, cells, theme, side_panel_hover_color(theme));
+                            }};
+            icon(layer.visible() ? "GuiVisibilityVisible" : "GuiVisibilityHidden", {eye_x, line.y, eye_width, 1});
+            icon("Remove", {eye_x + eye_width, line.y, delete_width, 1});
         }
     }
     // The buttons on a bar of their own, as a toolbar; none without a document to work on.
@@ -209,10 +219,17 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     for(std::size_t index{}; index < m_buttons.size(); ++ index)
     {
         const oui::Rect cell{m_bounds.x + static_cast<int>(index) * 2, bottom, 2, 1};
+        // The one under the pointer is lit, as OUI's buttons that show it.
+        const auto hovered{pointer_over(cell)};
+        if(hovered)
+        {
+            painter.fill_rect(cell, side_panel_hover_color(theme));
+        }
         if(const auto area{painter.pixel_bounds(cell)})
         {
-            if(const auto* const picture{
-                   m_icons.picture(m_buttons[index].icon, oui::whole(area->width), oui::whole(area->height))})
+            if(const auto* const picture{m_icons.picture(
+                   m_buttons[index].icon, oui::whole(area->width), oui::whole(area->height),
+                   hovered ? std::optional<oui::Color>{side_panel_hover_color(theme)} : std::nullopt)})
             {
                 oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
                 image.alpha = true;
@@ -220,6 +237,11 @@ void LayersPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
             }
         }
     }
+}
+
+bool LayersPanel::pointer_over(const oui::Rect& cells) const
+{
+    return is_hovered() && m_pointer && holds_point(cells, *m_pointer);
 }
 
 void LayersPanel::paint_icon(oui::Painter& painter, const char* name, const oui::Rect& cells,
@@ -286,6 +308,10 @@ LayersPanel::Part LayersPanel::part_at(double column) const
 bool LayersPanel::handle_event(const oui::Event& event)
 {
     const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+    if(mouse != nullptr && (mouse->hover || mouse->pressed))
+    {
+        m_pointer = oui::Point{mouse->x, mouse->y};
+    }
     if(mouse == nullptr || !mouse->pressed || mouse->right)
     {
         return false;

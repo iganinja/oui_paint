@@ -24,6 +24,23 @@ namespace oui_paint
     return {shade(face.red), shade(face.green), shade(face.blue)};
 }
 
+// Behind a panel's button under the pointer: the panel's colour with some of the selected one's, as OUI's buttons
+// that show the pointer over them are tinted.
+[[nodiscard]] inline olagarro::oui::Color side_panel_hover_color(const olagarro::oui::Theme& theme)
+{
+    const auto panel{side_panel_color(theme)};
+    const auto& selected{theme.menu_selected_background};
+    const auto mix{[](std::uint8_t from, std::uint8_t to)
+                   { return static_cast<std::uint8_t>((from * 65 + to * 35 + 50) / 100); }};
+    return {mix(panel.red, selected.red), mix(panel.green, selected.green), mix(panel.blue, selected.blue)};
+}
+
+// Whether `point` is inside `rect`, its right and bottom edges not.
+[[nodiscard]] inline bool holds_point(const olagarro::oui::Rect& rect, olagarro::oui::Point point)
+{
+    return point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height;
+}
+
 // A side of the window: what it holds on the panel colour, as tall as the side and as wide as it asks.
 class SidePanel final : public olagarro::oui::Container
 {

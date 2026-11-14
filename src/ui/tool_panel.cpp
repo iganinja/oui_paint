@@ -68,9 +68,15 @@ void ToolPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     for(std::size_t index{}; index < m_buttons.size(); ++ index)
     {
         const auto bounds{button_bounds(index)};
+        // The one under the pointer is lit, as OUI's buttons that show it.
+        const auto hovered{is_hovered() && m_pointer && holds_point(bounds, *m_pointer)};
         if(m_buttons[index].id == m_selected)
         {
             painter.fill_rect(bounds, theme.menu_selected_background);
+        }
+        else if(hovered)
+        {
+            painter.fill_rect(bounds, side_panel_hover_color(theme));
         }
         const auto area{painter.pixel_bounds(bounds)};
         if(!area)
@@ -80,7 +86,9 @@ void ToolPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
         const auto selected{m_buttons[index].id == m_selected};
         if(const auto* const picture{m_icons.picture(
                m_buttons[index].icon, oui::whole(area->width), oui::whole(area->height),
-               selected ? std::optional<oui::Color>{theme.menu_selected_background} : std::nullopt)})
+               selected  ? std::optional<oui::Color>{theme.menu_selected_background}
+               : hovered ? std::optional<oui::Color>{side_panel_hover_color(theme)}
+                         : std::nullopt)})
         {
             oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
             image.alpha = true;
@@ -92,6 +100,10 @@ void ToolPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
 bool ToolPanel::handle_event(const oui::Event& event)
 {
     const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+    if(mouse != nullptr && (mouse->hover || mouse->pressed))
+    {
+        m_pointer = oui::Point{mouse->x, mouse->y};
+    }
     if(mouse == nullptr || !mouse->pressed || mouse->right)
     {
         return false;
