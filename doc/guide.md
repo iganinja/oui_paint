@@ -16,7 +16,8 @@ tools and keys, 8 and 16 bits per channel, indexed images with palettes, and eff
 - **The status bar** says where the pointer is in the image, its size and kind, and the zoom.
 
 The left button paints with the primary color and the right button with the secondary one. View > Bigger Interface
-and Smaller Interface change the size of everything but the image; the size is kept for the next time.
+and Smaller Interface, Ctrl+Alt++ and Ctrl+Alt+-, change the size of everything but the image, and Ctrl+Alt+0 takes
+it back to how it starts; the size is kept for the next time.
 
 ## Moving around
 

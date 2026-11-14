@@ -525,9 +525,10 @@ void PaintApp::register_commands()
         },
         {U'b', true, false, true});
     // The interface's text, bigger or smaller: Ctrl with plus and minus zoom the image, so Ctrl and Alt with them.
+    // The menu shows the first key, plus: where = is Shift and 0, as on a Spanish keyboard, Ctrl+Alt+= is Ctrl+Alt+0.
     add("view.interface_bigger", oui::translate("Commands", "&Bigger Interface"), [this] { static_cast<void>(m_application.zoom(1)); },
-        {U'=', true, true});
-    commands.bind("view.interface_bigger", {U'+', true, true});
+        {U'+', true, true});
+    commands.bind("view.interface_bigger", {U'=', true, true});
     add("view.interface_smaller", oui::translate("Commands", "&Smaller Interface"), [this] { static_cast<void>(m_application.zoom(-1)); },
         {U'-', true, true});
     add("view.interface_reset", oui::translate("Commands", "&Interface Size as It Starts"), [this] { static_cast<void>(m_application.zoom(0)); },

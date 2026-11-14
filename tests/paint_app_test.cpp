@@ -124,6 +124,16 @@ TEST_F(PaintAppTest, CopiesCutsAndPastesWithTheInsertAndDeleteKeysToo)
     EXPECT_TRUE(copy->control);
 }
 
+TEST_F(PaintAppTest, TheMenuShowsCtrlAltPlusForABiggerInterface)
+{
+    // Where = is Shift and 0, as on a Spanish keyboard, Ctrl+Alt+= would be Ctrl+Alt+0, which sets it as it starts.
+    const auto bigger{m_application->commands().shortcut("view.interface_bigger")};
+    ASSERT_TRUE(bigger.has_value());
+    EXPECT_EQ(bigger->character, U'+');
+    EXPECT_TRUE(bigger->control);
+    EXPECT_TRUE(bigger->alt);
+}
+
 TEST_F(PaintAppTest, TheArrowKeysMoveTheSelectionAPixelOrMoreWithShiftOrCtrl)
 {
     auto& image{add_image(200, 100)};

@@ -67,6 +67,8 @@ Pressing a tool's letter again goes to the next tool that shares it.
 | Ctrl+B | Zoom to Window (twice: center the image) |
 | Ctrl+Shift+B | Zoom to Selection |
 | Ctrl+0 | Actual Size |
+| Ctrl+Alt++, Ctrl+Alt+- | Bigger Interface, Smaller Interface: everything but the image |
+| Ctrl+Alt+0 | Interface Size as It Starts |
 | Ctrl+Tab, Ctrl+Page Down | Next image |
 | Ctrl+Shift+Tab, Ctrl+Page Up | Previous image |
 | Alt+1 … Alt+9 | Image 1 to 9 |

@@ -19,7 +19,8 @@ como plugins.
 - **La barra de estado** dice dónde está el puntero en la imagen, su tamaño y su tipo, y el zoom.
 
 El botón izquierdo pinta con el color primario y el derecho con el secundario. Ver > Interfaz más grande e Interfaz más
-pequeña cambian el tamaño de todo menos de la imagen; el tamaño se guarda para la próxima vez.
+pequeña, Ctrl+Alt++ y Ctrl+Alt+-, cambian el tamaño de todo menos de la imagen, y Ctrl+Alt+0 lo deja como al empezar;
+el tamaño se guarda para la próxima vez.
 
 ## Moverse
 
