@@ -534,7 +534,9 @@
       "Preferences": "Preferencias",
       "Put each text on a &new layer": "Poner cada texto en una capa &nueva",
       "System language": "Idioma del sistema",
-      "The language changes when OUI Paint starts again.": "El idioma cambia cuando OUI Paint vuelve a empezar."
+      "The language changes when OUI Paint starts again.": "El idioma cambia cuando OUI Paint vuelve a empezar.",
+      "Arrow keys with &Shift move (pixels):": "Las flechas con &Mayús mueven (píxeles):",
+      "Arrow keys with &Ctrl move (pixels):": "Las flechas con &Ctrl mueven (píxeles):"
     },
     "Status": {
       "Grayscale, 16 bits per channel": "Escala de grises, 16 bits por canal",

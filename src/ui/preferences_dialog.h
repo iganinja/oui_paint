@@ -22,6 +22,9 @@ struct Preferences
     bool text_on_new_layer{false};
     // The look, by the id of one of OUI's graphical themes.
     std::string theme{"classic"};
+    // How many pixels an arrow key moves what is selected with Shift held, and with Ctrl; one pixel with neither.
+    int shift_step{10};
+    int control_step{50};
 };
 
 // Asks for the preferences, starting from `start`; `languages` and `themes` are the ids and names to choose among,

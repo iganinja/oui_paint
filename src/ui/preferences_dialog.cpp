@@ -5,7 +5,9 @@
 #include <oui/combo_box.h>
 #include <oui/grid.h>
 #include <oui/label.h>
+#include <oui/line_edit.h>
 #include <oui/layout.h>
+#include <oui/number_field.h>
 #include <oui/translation.h>
 #include <oui/window.h>
 
@@ -66,6 +68,20 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
     oui::label("", form);
     auto& text_layer{oui::check_button(oui::translate("Preferences", "Put each text on a &new layer"), form)};
     text_layer.set_checked(start.text_on_new_layer);
+    // What the arrow keys move a selection by with the two move tools: a pixel, or more with Shift or Ctrl.
+    const auto step_field{[&form](std::string_view title, int value)
+                          {
+                              auto& title_label{oui::label(title, form)};
+                              auto& field{oui::number_field(form)};
+                              field.set_range(1, 1000);
+                              field.set_value(value);
+                              title_label.set_buddy(field.text_field());
+                              return &field;
+                          }};
+    auto* const shift_step{
+        step_field(oui::translate("Preferences", "Arrow keys with &Shift move (pixels):"), start.shift_step)};
+    auto* const control_step{
+        step_field(oui::translate("Preferences", "Arrow keys with &Ctrl move (pixels):"), start.control_step)};
 
     auto& buttons{oui::row(content)};
     buttons.set_gap(oui::Spacing::normal);
@@ -89,6 +105,8 @@ std::optional<Preferences> ask_preferences(oui::Application& application, const 
     chosen_preferences.reopen_last_session = reopen.is_checked();
     chosen_preferences.text_on_new_layer = text_layer.is_checked();
     chosen_preferences.theme = themes.at(theme.selected()).first;
+    chosen_preferences.shift_step = static_cast<int>(shift_step->value());
+    chosen_preferences.control_step = static_cast<int>(control_step->value());
     return chosen_preferences;
 }
 

@@ -27,6 +27,7 @@ Pressing a tool's letter again goes to the next tool that shares it.
 | X | Swap the primary and secondary colors |
 | C | Switch between editing the primary and the secondary color |
 | [ and ] | Brush width down and up by 1; with Ctrl, by 5 |
+| Arrow keys | With Move Selected Pixels, move what is selected a pixel; with Move Selection, its outline. With Shift 10 pixels, with Ctrl 50, as Preferences say |
 
 ## File
 

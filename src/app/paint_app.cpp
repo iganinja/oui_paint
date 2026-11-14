@@ -758,6 +758,8 @@ void PaintApp::build_window()
     auto window{oui::window("OUI Paint")};
     window->set_border(oui::WindowBorder::none);
     window->set_close_on_escape(false);
+    // The arrow keys nobody took move what is selected, with Move Selected Pixels or Move Selection.
+    window->set_key_handler([this](const oui::Event& event) { return nudge_selected(event); });
     window->add(std::move(frame));
     m_application.set_window(std::move(window));
 }
@@ -833,6 +835,8 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
     auto view{std::make_unique<CanvasView>(*document)};
     view->on_tool([this](const ToolEvent& event) { take_tool_event(event); });
     view->on_keys([this](const oui::Event& event) { return type_key(event); });
+    // Before the tabs it is in, which take Left and Right; the window's own hears them from elsewhere.
+    view->set_key_handler([this](const oui::Event& event) { return nudge_selected(event); });
     view->on_pan_key([this] { return m_window.is_key_held(oui::Key::space); });
     view->on_overlay(
         [this](std::uint32_t* pixels, int width, int height)
@@ -2524,6 +2528,55 @@ void PaintApp::move_selected(const ToolEvent& event, bool outline_only)
     }
 }
 
+bool PaintApp::nudge_selected(const oui::Event& event)
+{
+    const auto* const key{std::get_if<oui::KeyEvent>(&event)};
+    if(key == nullptr || key->alt || m_moving)
+    {
+        return false;
+    }
+    auto dx{0};
+    auto dy{0};
+    switch(key->key)
+    {
+    case oui::Key::left:
+        dx = -1;
+        break;
+    case oui::Key::right:
+        dx = 1;
+        break;
+    case oui::Key::up:
+        dy = -1;
+        break;
+    case oui::Key::down:
+        dy = 1;
+        break;
+    default:
+        return false;
+    }
+    const auto& tool{m_tool_panel->selected()};
+    if(current() == nullptr || (tool != "move_pixels" && tool != "move_selection"))
+    {
+        return false;
+    }
+    // As Paint.NET: a pixel at a time, more with Shift and more again with Ctrl, as the preferences say.
+    const auto step{key->control ? m_settings.int_value("arrow_control_step", 50)
+                    : key->shift ? m_settings.int_value("arrow_shift_step", 10)
+                                 : 1};
+    // As a drag that goes that far, from far off any handle or sign: one step, as a drag is.
+    ToolEvent drag;
+    drag.at = {0.5, 0.5};
+    drag.in_view = {-1e9, -1e9};
+    const auto outline_only{tool == "move_selection"};
+    move_selected(drag, outline_only);
+    drag.at = {0.5 + dx * step, 0.5 + dy * step};
+    drag.phase = ToolEvent::Phase::move;
+    move_selected(drag, outline_only);
+    drag.phase = ToolEvent::Phase::release;
+    move_selected(drag, outline_only);
+    return true;
+}
+
 bool PaintApp::copy(bool merged)
 {
     auto* const open{current()};
@@ -4186,6 +4239,8 @@ void PaintApp::show_preferences()
     start.reopen_last_session = m_settings.bool_value("reopen_last_session", true);
     start.text_on_new_layer = m_settings.bool_value("text_on_new_layer", false);
     start.theme = std::string{m_settings.value("theme", "classic")};
+    start.shift_step = m_settings.int_value("arrow_shift_step", start.shift_step);
+    start.control_step = m_settings.int_value("arrow_control_step", start.control_step);
     // A theme chosen shows at once, and goes back if the preferences are cancelled.
     const auto chosen{ask_preferences(m_application, start, languages, themes, [this](const std::string& id) { use_theme(id); })};
     if(!chosen)
@@ -4197,6 +4252,8 @@ void PaintApp::show_preferences()
     m_settings.set_bool_value("reopen_last_session", chosen->reopen_last_session);
     m_settings.set_bool_value("text_on_new_layer", chosen->text_on_new_layer);
     m_settings.set_value("theme", chosen->theme);
+    m_settings.set_int_value("arrow_shift_step", chosen->shift_step);
+    m_settings.set_int_value("arrow_control_step", chosen->control_step);
     static_cast<void>(m_settings.save());
     use_theme(chosen->theme);
 }

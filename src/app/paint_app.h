@@ -163,6 +163,8 @@ class PaintApp
     void paste(PasteInto into);
     // Uses Move Selected Pixels, or Move Selection when `outline_only`.
     void move_selected(const ToolEvent& event, bool outline_only);
+    // An arrow key with either move tool moves what is selected, as a drag that far would; false for other keys.
+    bool nudge_selected(const olagarro::oui::Event& event);
     // What the Text tool does with a key: true when it took it.
     bool type_key(const olagarro::oui::Event& event);
     // Draws the text being typed, with its cursor while it is being typed.

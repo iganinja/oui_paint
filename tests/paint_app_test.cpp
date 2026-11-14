@@ -46,10 +46,13 @@ class PaintAppTest : public ::testing::Test
         std::filesystem::remove_all(m_folder, ignored);
     }
 
-    // A new image of `width` by `height` in a tab of its own, the current one.
+    // A new image of `width` by `height`, one layer, in a tab of its own, the current one.
     OpenDocument& add_image(int width, int height)
     {
-        m_paint->add(std::make_unique<OpenDocument>(Document{width, height, PixelFormat::rgba8}));
+        // With a layer, as New Image makes it.
+        Document document{width, height, PixelFormat::rgba8};
+        static_cast<void>(document.add_layer("Background"));
+        m_paint->add(std::make_unique<OpenDocument>(std::move(document)));
         m_application->render();
         return *m_paint->current();
     }
@@ -85,6 +88,68 @@ TEST_F(PaintAppTest, CopiesCutsAndPastesWithTheInsertAndDeleteKeysToo)
     ASSERT_TRUE(copy.has_value());
     EXPECT_EQ(copy->character, U'c');
     EXPECT_TRUE(copy->control);
+}
+
+TEST_F(PaintAppTest, TheArrowKeysMoveTheSelectionAPixelOrMoreWithShiftOrCtrl)
+{
+    auto& image{add_image(200, 100)};
+    auto& selection{image.document().selection()};
+    selection.add_rectangle({10, 20, 5, 5}, SelectionMode::replace);
+    // M, then M again: Move Selected Pixels, then Move Selection.
+    ASSERT_TRUE(m_application->commands().execute("tool.key_m"));
+    ASSERT_TRUE(m_application->commands().execute("tool.key_m"));
+    const auto press{[this](oui::Key key, bool shift, bool control)
+                     { m_application->dispatch_event(oui::KeyEvent{key, control, false, shift}); }};
+    press(oui::Key::right, false, false);
+    EXPECT_EQ(selection.bounds().x, 11);
+    press(oui::Key::down, true, false);
+    EXPECT_EQ(selection.bounds().y, 30) << "ten with Shift";
+    press(oui::Key::right, false, true);
+    EXPECT_EQ(selection.bounds().x, 61) << "fifty with Ctrl";
+    press(oui::Key::left, false, false);
+    press(oui::Key::up, false, false);
+    EXPECT_EQ(selection.bounds().x, 60);
+    EXPECT_EQ(selection.bounds().y, 29);
+    EXPECT_EQ(selection.bounds().width, 5);
+    // Each one a step of its own, undone as one.
+    ASSERT_TRUE(m_application->commands().execute("edit.undo"));
+    EXPECT_EQ(selection.bounds().y, 30);
+}
+
+TEST_F(PaintAppTest, TheStepsWithShiftAndCtrlAreThePreferences)
+{
+    m_settings.set_int_value("arrow_shift_step", 3);
+    m_settings.set_int_value("arrow_control_step", 7);
+    auto& image{add_image(100, 100)};
+    auto& selection{image.document().selection()};
+    selection.add_rectangle({10, 10, 5, 5}, SelectionMode::replace);
+    ASSERT_TRUE(m_application->commands().execute("tool.key_m"));
+    ASSERT_TRUE(m_application->commands().execute("tool.key_m"));
+    m_application->dispatch_event(oui::KeyEvent{oui::Key::right, false, false, true});
+    m_application->dispatch_event(oui::KeyEvent{oui::Key::down, true});
+    EXPECT_EQ(selection.bounds().x, 13);
+    EXPECT_EQ(selection.bounds().y, 17);
+}
+
+TEST_F(PaintAppTest, TheArrowKeysMoveTheSelectedPixelsWithMoveSelectedPixels)
+{
+    auto& image{add_image(100, 100)};
+    auto& selection{image.document().selection()};
+    selection.add_rectangle({10, 10, 5, 5}, SelectionMode::replace);
+    ASSERT_TRUE(m_application->commands().execute("tool.key_m"));
+    m_application->dispatch_event(oui::KeyEvent{oui::Key::left});
+    m_application->dispatch_event(oui::KeyEvent{oui::Key::left});
+    EXPECT_EQ(selection.bounds().x, 8) << "the selection goes with the pixels";
+    EXPECT_TRUE(image.modified());
+}
+
+TEST_F(PaintAppTest, TheArrowKeysMoveNothingWithOtherTools)
+{
+    auto& image{add_image(100, 100)};
+    auto& selection{image.document().selection()};
+    selection.add_rectangle({10, 10, 5, 5}, SelectionMode::replace);
+    m_application->dispatch_event(oui::KeyEvent{oui::Key::right});
+    EXPECT_EQ(selection.bounds().x, 10);
 }
 
 } // namespace
