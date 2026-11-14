@@ -42,6 +42,8 @@ class HistoryPanel final : public olagarro::oui::Widget
     [[nodiscard]] int step_rows() const;
     // Scrolls so the position it is at shows, when it changed since last looked.
     void follow() const;
+    // Whether the pointer is over `cells`, to light the button there.
+    [[nodiscard]] bool pointer_over(const olagarro::oui::Rect& cells) const;
 
     Icons& m_icons;
     const History* m_history{};
@@ -51,6 +53,8 @@ class HistoryPanel final : public olagarro::oui::Widget
     // The first position shown, and the one it was at when last followed.
     mutable std::size_t m_first{0};
     mutable std::optional<std::size_t> m_followed;
+    // Where the pointer was last seen over it.
+    std::optional<olagarro::oui::Point> m_pointer;
 };
 
 } // namespace oui_paint

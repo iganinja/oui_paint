@@ -1,5 +1,9 @@
 #include "ui/history_panel.h"
 
+#include <oui/application.h>
+#include <oui/graphics/canvas.h>
+#include <oui/graphics/pixel_backend.h>
+
 #include <gtest/gtest.h>
 
 using namespace oui_paint;
@@ -93,4 +97,41 @@ TEST(HistoryPanel, ItScrollsSoTheStepItIsAtShows)
     EXPECT_EQ(panel.position_at_row(0), std::optional<std::size_t>{16});
     static_cast<void>(history.go_to(document, 2));
     EXPECT_EQ(panel.position_at_row(0), std::optional<std::size_t>{2}) << "gone back, it follows";
+}
+
+TEST(HistoryPanel, TheButtonUnderThePointerIsLit)
+{
+    namespace oui = olagarro::oui;
+    auto backend{oui::image_backend({480, 240})};
+    auto& window{*backend};
+    oui::Application application{std::move(backend)};
+    Document document{16, 16, PixelFormat::gray_alpha8};
+    document.add_layer("Background");
+    auto history{made(document, 2)};
+    Icons icons;
+    auto panel{std::make_unique<HistoryPanel>(icons)};
+    panel->set_history(&history);
+    application.set_content(std::move(panel));
+    application.run_frame();
+    const auto cell_x{oui::whole(480.0 / window.size().width)};
+    const auto cell_y{oui::whole(240.0 / window.size().height)};
+    const auto bottom{oui::whole(window.size().height) - 1};
+    // The corners of undo and redo, on the last row.
+    const auto undo{[&] { return window.canvas().pixel_at(1, bottom * cell_y + 1); }};
+    const auto redo{[&] { return window.canvas().pixel_at(2 * cell_x + 1, bottom * cell_y + 1); }};
+    const auto resting{undo()};
+    const auto hover{[&](double x, double y)
+                     {
+                         oui::MouseEvent mouse{x, y, false};
+                         mouse.hover = true;
+                         window.push(mouse);
+                         application.run_frame();
+                     }};
+    hover(0.5, bottom + 0.5);
+    const auto lit{undo()};
+    EXPECT_FALSE(lit.red == resting.red && lit.green == resting.green && lit.blue == resting.blue);
+    EXPECT_EQ(redo().red, resting.red) << "only the one under the pointer";
+    hover(5.5, 0.5);
+    EXPECT_EQ(undo().red, resting.red);
+    EXPECT_EQ(undo().green, resting.green);
 }

@@ -6,6 +6,7 @@
 #include <oui/widget.h>
 
 #include <functional>
+#include <optional>
 
 namespace oui_paint
 {
@@ -38,6 +39,8 @@ class AnchorGrid final : public olagarro::oui::Widget
     int m_anchor;
     std::function<void(int)> m_changed;
     mutable PixelDrawing m_drawing;
+    // Where the pointer was last seen over it, to light the square there.
+    std::optional<olagarro::oui::Point> m_pointer;
 };
 
 } // namespace oui_paint

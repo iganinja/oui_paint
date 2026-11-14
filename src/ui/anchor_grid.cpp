@@ -68,6 +68,12 @@ void AnchorGrid::paint(oui::Painter& painter, const oui::Theme& theme) const
             {
                 m_drawing.fill(1, 1, width - 2, height - 2, 0xC8DCF0);
             }
+            else if(is_hovered() && m_pointer && column == oui::whole(m_pointer->x - m_bounds.x) / square_width &&
+                    row == oui::whole(m_pointer->y - m_bounds.y) / square_height)
+            {
+                // The one under the pointer lit, between plain and chosen, as a button that shows it.
+                m_drawing.fill(1, 1, width - 2, height - 2, 0xD8E1E8);
+            }
             const auto dx{column - anchor_x};
             const auto dy{row - anchor_y};
             if(!chosen && std::abs(dx) <= 1 && std::abs(dy) <= 1)
@@ -161,6 +167,10 @@ bool AnchorGrid::handle_event(const oui::Event& event)
         }
     }
     const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+    if(mouse != nullptr && (mouse->hover || mouse->pressed))
+    {
+        m_pointer = olagarro::oui::Point{mouse->x, mouse->y};
+    }
     if(mouse == nullptr || !mouse->pressed || mouse->right)
     {
         return false;

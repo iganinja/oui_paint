@@ -116,9 +116,17 @@ void HistoryPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     for(const auto& [column, icon] : {std::pair<int, const char*>{0, "RotateLeft"}, {2, "RotateRight"}})
     {
         const oui::Rect cell{m_bounds.x + column, bottom, 2, 1};
+        // The one under the pointer is lit, as the layers' buttons are.
+        const auto hovered{pointer_over(cell)};
+        if(hovered)
+        {
+            painter.fill_rect(cell, side_panel_hover_color(theme));
+        }
         if(const auto area{painter.pixel_bounds(cell)})
         {
-            if(const auto* const picture{m_icons.picture(icon, oui::whole(area->width), oui::whole(area->height))})
+            if(const auto* const picture{m_icons.picture(
+                   icon, oui::whole(area->width), oui::whole(area->height),
+                   hovered ? std::optional<oui::Color>{side_panel_hover_color(theme)} : std::nullopt)})
             {
                 oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
                 image.alpha = true;
@@ -128,9 +136,18 @@ void HistoryPanel::paint(oui::Painter& painter, const oui::Theme& theme) const
     }
 }
 
+bool HistoryPanel::pointer_over(const oui::Rect& cells) const
+{
+    return is_hovered() && m_pointer && holds_point(cells, *m_pointer);
+}
+
 bool HistoryPanel::handle_event(const oui::Event& event)
 {
     const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+    if(mouse != nullptr && (mouse->hover || mouse->pressed))
+    {
+        m_pointer = oui::Point{mouse->x, mouse->y};
+    }
     if(mouse == nullptr || m_history == nullptr)
     {
         return false;

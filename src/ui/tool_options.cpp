@@ -2,6 +2,7 @@
 
 #include "ui/color_panel.h"
 #include "ui/shown_names.h"
+#include "ui/side_panel.h"
 
 #include <oui/translation.h>
 #include <oui/check_button.h>
@@ -82,17 +83,27 @@ class ToggleIcons final : public oui::Widget
         for(std::size_t index{}; index < m_toggles.size(); ++ index)
         {
             const oui::Rect bounds{m_bounds.x + static_cast<int>(index) * button_width, m_bounds.y, button_width, 1};
-            if(*m_toggles[index].pressed)
+            const auto pressed{*m_toggles[index].pressed};
+            // The one under the pointer is lit, pressed or not, as the panels' buttons are.
+            const auto hovered{is_hovered() && m_pointer && holds_point(bounds, *m_pointer)};
+            std::optional<oui::Color> over;
+            if(hovered)
             {
-                painter.fill_rect(bounds, theme.menu_selected_background);
+                over = hover_color(theme, theme.status_background, pressed);
+            }
+            else if(pressed)
+            {
+                over = theme.menu_selected_background;
+            }
+            if(over)
+            {
+                painter.fill_rect(bounds, *over);
             }
             const auto area{painter.pixel_bounds(bounds)};
             if(!area)
             {
                 continue;
             }
-            const auto over{*m_toggles[index].pressed ? std::optional<oui::Color>{theme.menu_selected_background}
-                                                      : std::nullopt};
             if(const auto* const picture{
                    m_icons.picture(m_toggles[index].icon, oui::whole(area->width), oui::whole(area->height), over)})
             {
@@ -106,6 +117,10 @@ class ToggleIcons final : public oui::Widget
     bool handle_event(const oui::Event& event) override
     {
         const auto* const mouse{std::get_if<oui::MouseEvent>(&event)};
+        if(mouse != nullptr && (mouse->hover || mouse->pressed))
+        {
+            m_pointer = oui::Point{mouse->x, mouse->y};
+        }
         if(mouse == nullptr || !mouse->pressed || mouse->right)
         {
             return false;
@@ -136,6 +151,8 @@ class ToggleIcons final : public oui::Widget
     Icons& m_icons;
     std::vector<Toggle> m_toggles;
     std::function<void()> m_changed;
+    // Where the pointer was last seen over them.
+    std::optional<oui::Point> m_pointer;
 };
 
 // A button that is an icon, as the bar's sun: a click on it calls `clicked`.
@@ -154,12 +171,20 @@ class IconButton final : public oui::Widget
 
     void paint(oui::Painter& painter, const oui::Theme& theme) const override
     {
+        // Lit under the pointer, as the panels' buttons are.
+        std::optional<oui::Color> over;
+        if(is_hovered())
+        {
+            over = hover_color(theme, theme.status_background);
+            painter.fill_rect(m_bounds, *over);
+        }
         const auto area{painter.pixel_bounds(m_bounds)};
         if(!area)
         {
             return;
         }
-        if(const auto* const picture{m_icons.picture(m_icon, oui::whole(area->width), oui::whole(area->height))})
+        if(const auto* const picture{
+               m_icons.picture(m_icon, oui::whole(area->width), oui::whole(area->height), over)})
         {
             oui::PixelImage image{picture->pixels.data(), picture->width, picture->height, picture->width};
             image.alpha = true;

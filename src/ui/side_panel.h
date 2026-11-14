@@ -24,15 +24,22 @@ namespace oui_paint
     return {shade(face.red), shade(face.green), shade(face.blue)};
 }
 
-// Behind a panel's button under the pointer: the panel's colour with some of the selected one's, as OUI's buttons
-// that show the pointer over them are tinted.
+// Behind a button under the pointer on `face`: the face with some of the selected colour, as OUI's buttons that show
+// the pointer over them are tinted. On a button pressed, its face the selected colour, a little of `face` instead.
+[[nodiscard]] inline olagarro::oui::Color hover_color(const olagarro::oui::Theme& theme,
+                                                      const olagarro::oui::Color& face, bool pressed = false)
+{
+    const auto& selected{theme.menu_selected_background};
+    const auto mix{[pressed](std::uint8_t from, std::uint8_t to)
+                   { return static_cast<std::uint8_t>(pressed ? (from * 20 + to * 80 + 50) / 100
+                                                              : (from * 65 + to * 35 + 50) / 100); }};
+    return {mix(face.red, selected.red), mix(face.green, selected.green), mix(face.blue, selected.blue)};
+}
+
+// Behind a panel's button under the pointer.
 [[nodiscard]] inline olagarro::oui::Color side_panel_hover_color(const olagarro::oui::Theme& theme)
 {
-    const auto panel{side_panel_color(theme)};
-    const auto& selected{theme.menu_selected_background};
-    const auto mix{[](std::uint8_t from, std::uint8_t to)
-                   { return static_cast<std::uint8_t>((from * 65 + to * 35 + 50) / 100); }};
-    return {mix(panel.red, selected.red), mix(panel.green, selected.green), mix(panel.blue, selected.blue)};
+    return hover_color(theme, side_panel_color(theme));
 }
 
 // Whether `point` is inside `rect`, its right and bottom edges not.
