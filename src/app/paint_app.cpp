@@ -585,7 +585,12 @@ void PaintApp::build_window()
     left->add(std::make_unique<Section>("", std::move(colors)));
     m_color_panel->on_edit([this](bool primary) { edit_color(primary); });
     // Text being typed is in the colours as they are now.
-    m_color_panel->on_changed([this] { show_typing(true); });
+    m_color_panel->on_changed(
+        [this]
+        {
+            show_typing(true);
+            redraw_shape();
+        });
     // A colour picked from the colour panel's palette is used as the nearest index, not one picked before.
     m_color_panel->on_picked(
         [this](bool secondary) { (secondary ? m_secondary_index : m_primary_index).reset(); });
@@ -708,6 +713,8 @@ void PaintApp::build_window()
     m_tool_options = options.get();
     // Text being typed shows a change of its look at once.
     m_tool_options->on_text_changed([this] { show_typing(true); });
+    // A shape being edited takes the options as they change.
+    m_tool_options->on_changed([this](const BrushSettings&) { redraw_shape(); });
     m_frame->set_top(std::move(options));
     auto tabs{std::make_unique<oui::TabView>()};
     m_tabs = tabs.get();
@@ -890,9 +897,32 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
             }
             const auto moving{m_tool_panel->selected() == "move_pixels"};
             const auto typing{m_typing && m_typing->document == current()};
-            if(!moving && !m_line_edit && !typing)
+            const auto shaping{m_shape_edit && m_shape_edit->document == current()};
+            if(!moving && !m_line_edit && !typing && !shaping)
             {
                 return;
+            }
+            // A shape being moved and sized: the box it fills, in dashes of black and white.
+            if(shaping)
+            {
+                const auto handles{shape_handles()};
+                for(std::size_t side{}; side < 4; ++ side)
+                {
+                    const auto from{handles[side]};
+                    const auto to{handles[(side + 1) % 4]};
+                    const auto steps{static_cast<int>(std::ceil(std::hypot(to.x - from.x, to.y - from.y)))};
+                    for(int step{}; step <= steps; ++ step)
+                    {
+                        const auto along{steps == 0 ? 0.0 : static_cast<double>(step) / steps};
+                        const auto px{static_cast<int>(std::lround(from.x + (to.x - from.x) * along))};
+                        const auto py{static_cast<int>(std::lround(from.y + (to.y - from.y) * along))};
+                        if(px >= 0 && py >= 0 && px < width && py < height)
+                        {
+                            pixels[static_cast<std::ptrdiff_t>(py) * width + px] =
+                                (step / 4) % 2 == 0 ? 0x000000u : 0xffffffu;
+                        }
+                    }
+                }
             }
             // Text being typed: the box its lines take, in dashes of black and white that show on any colour.
             if(typing)
@@ -994,7 +1024,7 @@ void PaintApp::add(std::unique_ptr<OpenDocument> document)
                 }
             }
             // Squares of nine pixels, white with a black edge, where the handles are.
-            for(const auto& handle : moving ? floating_handles() : line_handles())
+            for(const auto& handle : moving ? floating_handles() : shaping ? shape_handles() : line_handles())
             {
                 const auto center_x{static_cast<int>(std::lround(handle.x))};
                 const auto center_y{static_cast<int>(std::lround(handle.y))};
@@ -1417,6 +1447,10 @@ bool PaintApp::close(std::size_t index)
     {
         finish_line();
     }
+    if(m_shape_edit && m_shape_edit->document == document)
+    {
+        finish_shape();
+    }
     if(m_arc && m_arc->document == document)
     {
         cancel_arc();
@@ -1565,11 +1599,11 @@ void PaintApp::use_tool(const ToolEvent& event)
         move_selected(event, tool == "move_selection");
         return;
     }
-    // The Text tool keeps typing across its own clicks, Line / Curve the line it bends; any other tool puts down what
-    // was floating.
+    // The Text tool keeps typing across its own clicks, Line / Curve the line it bends and Shapes the shape it sizes;
+    // any other tool puts down what was floating.
     if(tool != "text")
     {
-        settle(tool == "line");
+        settle(tool == "line", tool == "shapes");
     }
     if(tool == "rectangle_select" || tool == "ellipse_select")
     {
@@ -1903,6 +1937,99 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
             return;
         }
     }
+    // A shape still to move and size: a press on a handle sizes it, inside it moves it, and elsewhere leaves it as it is
+    // and starts another.
+    if(tool == "shapes" && m_shape_edit)
+    {
+        auto& edit{*m_shape_edit};
+        if(event.phase == ToolEvent::Phase::press)
+        {
+            const auto handles{edit.document == open ? shape_handles() : std::vector<Position>{}};
+            std::optional<std::size_t> took;
+            for(std::size_t index{}; index < handles.size() && !took; ++ index)
+            {
+                if(std::abs(handles[index].x - event.in_view.x) <= 6.0 &&
+                   std::abs(handles[index].y - event.in_view.y) <= 6.0)
+                {
+                    took = index;
+                }
+            }
+            const auto inside{edit.document == open &&
+                              event.at.x >= std::min(edit.corner.x, edit.opposite.x) &&
+                              event.at.x <= std::max(edit.corner.x, edit.opposite.x) &&
+                              event.at.y >= std::min(edit.corner.y, edit.opposite.y) &&
+                              event.at.y <= std::max(edit.corner.y, edit.opposite.y)};
+            if(took || inside)
+            {
+                edit.held = took.value_or(8);
+                edit.grabbed = event.at;
+                edit.start_corner = edit.corner;
+                edit.start_opposite = edit.opposite;
+                return;
+            }
+            finish_shape();
+        }
+        else if(edit.held)
+        {
+            // The box as left, top, right and bottom, whichever corner each was drawn from.
+            const auto left_is_corner{edit.start_corner.x <= edit.start_opposite.x};
+            const auto top_is_corner{edit.start_corner.y <= edit.start_opposite.y};
+            auto& left{left_is_corner ? edit.corner.x : edit.opposite.x};
+            auto& right{left_is_corner ? edit.opposite.x : edit.corner.x};
+            auto& top{top_is_corner ? edit.corner.y : edit.opposite.y};
+            auto& bottom{top_is_corner ? edit.opposite.y : edit.corner.y};
+            switch(*edit.held)
+            {
+            case 0:
+                left = event.at.x;
+                top = event.at.y;
+                break;
+            case 1:
+                right = event.at.x;
+                top = event.at.y;
+                break;
+            case 2:
+                right = event.at.x;
+                bottom = event.at.y;
+                break;
+            case 3:
+                left = event.at.x;
+                bottom = event.at.y;
+                break;
+            case 4:
+                top = event.at.y;
+                break;
+            case 5:
+                right = event.at.x;
+                break;
+            case 6:
+                bottom = event.at.y;
+                break;
+            case 7:
+                left = event.at.x;
+                break;
+            default:
+            {
+                // By whole pixels, as Move Selected Pixels moves.
+                const auto dx{std::round(event.at.x - edit.grabbed.x)};
+                const auto dy{std::round(event.at.y - edit.grabbed.y)};
+                edit.corner = {edit.start_corner.x + dx, edit.start_corner.y + dy};
+                edit.opposite = {edit.start_opposite.x + dx, edit.start_opposite.y + dy};
+                break;
+            }
+            }
+            redraw_shape();
+            if(event.phase == ToolEvent::Phase::release)
+            {
+                edit.held.reset();
+            }
+            return;
+        }
+        else if(event.phase == ToolEvent::Phase::release || event.phase == ToolEvent::Phase::move)
+        {
+            return;
+        }
+    }
     if(event.phase == ToolEvent::Phase::press)
     {
         open->history().begin_step(document);
@@ -1979,6 +2106,18 @@ void PaintApp::drag_draw(const ToolEvent& event, const std::string& tool)
                                brush.antialias,
                                m_tool_options->line(),
                                std::nullopt};
+        m_dragging.reset();
+        // Enter and Esc reach it from the canvas, which hands on what it does not take.
+        if(auto* const view{current_view()})
+        {
+            view->claim_keys(true);
+        }
+        return;
+    }
+    if(event.phase == ToolEvent::Phase::release && tool == "shapes")
+    {
+        // Drawn, it waits to be moved and sized, with handles round it.
+        m_shape_edit = ShapeEdit{open, m_dragging->base, from, to, m_dragging->secondary, std::nullopt, {}, {}, {}};
         m_dragging.reset();
         // Enter and Esc reach it from the canvas, which hands on what it does not take.
         if(auto* const view{current_view()})
@@ -2067,7 +2206,7 @@ void PaintApp::redraw_arc()
 
 void PaintApp::release_keys()
 {
-    if(auto* const view{current_view()}; view != nullptr && !m_typing && !m_line_edit && !m_arc)
+    if(auto* const view{current_view()}; view != nullptr && !m_typing && !m_line_edit && !m_shape_edit && !m_arc)
     {
         view->claim_keys(false);
     }
@@ -2113,6 +2252,66 @@ void PaintApp::finish_line()
     open.history().finish_step(oui::translate("History", "Line / Curve"), open.document());
     open.set_modified(true);
     refresh_titles();
+}
+
+void PaintApp::redraw_shape()
+{
+    if(!m_shape_edit)
+    {
+        return;
+    }
+    auto& edit{*m_shape_edit};
+    auto& document{edit.document->document()};
+    auto& layer{document.layers()[document.active_layer()]};
+    const auto before{LayersState::of(document)};
+    layer = edit.base;
+    // The right button swaps the colours, as in Paint.NET.
+    const auto first{ink(edit.secondary)};
+    const auto second{ink(!edit.secondary)};
+    auto brush{m_tool_options->settings()};
+    brush.antialias = brush.antialias && !document.indexed();
+    const auto shape{m_tool_options->shape()};
+    static_cast<void>(draw_shape(layer, document.selection(), shape.kind, shape.style, edit.corner, edit.opposite, first,
+                                 second, brush.width, brush.antialias));
+    edit.document->refresh(changed_tiles(before, LayersState::of(document)));
+}
+
+void PaintApp::finish_shape()
+{
+    if(!m_shape_edit)
+    {
+        return;
+    }
+    auto& open{*m_shape_edit->document};
+    m_shape_edit.reset();
+    release_keys();
+    open.history().finish_step(oui::translate("History", "Shapes"), open.document());
+    open.set_modified(true);
+    refresh_titles();
+}
+
+std::vector<Position> PaintApp::shape_handles()
+{
+    std::vector<Position> handles;
+    if(!m_shape_edit || m_shape_edit->document != current())
+    {
+        return handles;
+    }
+    const auto& edit{*m_shape_edit};
+    const auto left{std::min(edit.corner.x, edit.opposite.x)};
+    const auto right{std::max(edit.corner.x, edit.opposite.x)};
+    const auto top{std::min(edit.corner.y, edit.opposite.y)};
+    const auto bottom{std::max(edit.corner.y, edit.opposite.y)};
+    const auto middle_x{(left + right) / 2.0};
+    const auto middle_y{(top + bottom) / 2.0};
+    const auto& viewport{edit.document->viewport()};
+    for(const auto& point : {Position{left, top}, Position{right, top}, Position{right, bottom}, Position{left, bottom},
+                             Position{middle_x, top}, Position{right, middle_y}, Position{middle_x, bottom},
+                             Position{left, middle_y}})
+    {
+        handles.push_back(viewport.view_at(point));
+    }
+    return handles;
 }
 
 std::vector<Position> PaintApp::line_handles()
@@ -2826,6 +3025,13 @@ bool PaintApp::type_key(const oui::Event& event)
         finish_line();
         return true;
     }
+    // And a shape being moved and sized.
+    if(const auto* const key{std::get_if<oui::KeyEvent>(&event)};
+       m_shape_edit && key != nullptr && (key->key == oui::Key::enter || key->key == oui::Key::escape))
+    {
+        finish_shape();
+        return true;
+    }
     if(!m_typing)
     {
         return false;
@@ -2917,11 +3123,15 @@ std::string PaintApp::shortened(std::string_view text, std::size_t most)
     return std::string{text.substr(0, end)} + "...";
 }
 
-void PaintApp::settle(bool keep_line)
+void PaintApp::settle(bool keep_line, bool keep_shape)
 {
     if(!keep_line)
     {
         finish_line();
+    }
+    if(!keep_shape)
+    {
+        finish_shape();
     }
     cancel_arc();
     m_floating.reset();
@@ -2960,10 +3170,8 @@ void PaintApp::settle(bool keep_line)
             open.history().cancel_step();
         }
     }
-    if(auto* const view{current_view()})
-    {
-        view->claim_keys(false);
-    }
+    // The canvas stops taking keys first, unless a line or a shape kept is still open.
+    release_keys();
 }
 
 void PaintApp::update_ants()

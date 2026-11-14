@@ -148,6 +148,12 @@ class PaintApp
     void release_keys();
     // Ends bending the line: it stays as it is, one step.
     void finish_line();
+    // Draws the shape being edited as its box, the tool's options and the colours are now.
+    void redraw_shape();
+    // Ends editing the shape: it stays as it is, one step.
+    void finish_shape();
+    // Where the shape's eight handles are in the view: the corners from the top left round, then the edges' middles.
+    [[nodiscard]] std::vector<Position> shape_handles();
     // Where the line's points are in the view, for its handles.
     [[nodiscard]] std::vector<Position> line_handles();
     // Copies what is selected of the active layer, or of the whole image when `merged`, as PNG.
@@ -198,8 +204,9 @@ class PaintApp
     std::optional<Pivot> m_pivot;
     [[nodiscard]] std::optional<Position> pivot();
     // Puts floating pixels down where they are, and text being typed.
-    // `keep_line`: but the line being bent, which Line / Curve itself goes on with.
-    void settle(bool keep_line = false);
+    // `keep_line`: but the line being bent, which Line / Curve itself goes on with; `keep_shape` the same for the shape
+    // being sized, which Shapes goes on with.
+    void settle(bool keep_line = false, bool keep_shape = false);
     // `text` in at most `most` bytes, whole characters, with "..." when cut.
     [[nodiscard]] static std::string shortened(std::string_view text, std::size_t most);
     // Starts or stops the marching ants as the current document has a selection or not.
@@ -345,6 +352,24 @@ class PaintApp
         std::optional<std::size_t> held;
     };
     std::optional<LineEdit> m_line_edit;
+    // A shape just drawn with Shapes, still to move and size: the two corners of the box it fills, which the eight
+    // handles drag and a drag inside it moves, and the button it was drawn with. Drawn as the tool's options and the
+    // colours are now; it stays one step, open until it is done with.
+    struct ShapeEdit
+    {
+        OpenDocument* document{};
+        Layer base;
+        Position corner;
+        Position opposite;
+        bool secondary{false};
+        // What a press took: 0 to 3 the corners from the top left round, 4 to 7 the edges from the top round, 8 the
+        // whole shape; and where it was pressed, and the box then.
+        std::optional<std::size_t> held;
+        Position grabbed;
+        Position start_corner;
+        Position start_opposite;
+    };
+    std::optional<ShapeEdit> m_shape_edit;
     // An arc being drawn with the Arc tool, between its clicks: the layer before it, and the button it started with.
     struct ArcDrawing
     {
