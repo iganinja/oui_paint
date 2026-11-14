@@ -198,6 +198,7 @@ if(OUI_PAINT_BUILD_TESTS)
         tests/light_dialog_test.cpp
         tests/main_frame_test.cpp
         tests/openraster_test.cpp
+        tests/paint_app_test.cpp
         tests/palettes_test.cpp
         tests/pieces_test.cpp
         tests/plugin_api_test.cpp

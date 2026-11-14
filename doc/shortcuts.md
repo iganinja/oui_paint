@@ -46,9 +46,9 @@ Pressing a tool's letter again goes to the next tool that shares it.
 | Key | Command |
 |---|---|
 | Ctrl+Z, Ctrl+Y | Undo, Redo |
-| Ctrl+X, Ctrl+C | Cut, Copy |
+| Ctrl+X or Shift+Del, Ctrl+C or Ctrl+Ins | Cut, Copy |
 | Ctrl+Shift+C | Copy Merged |
-| Ctrl+V | Paste |
+| Ctrl+V or Shift+Ins | Paste |
 | Ctrl+Shift+V | Paste into New Layer |
 | Ctrl+Alt+V | Paste into New Image |
 | Delete | Erase Selection |

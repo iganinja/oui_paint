@@ -217,6 +217,10 @@ void PaintApp::register_commands()
             }
         },
         {U'v', true});
+    // The clipboard's keys from before Ctrl+C, X and V, as in Paint.NET: Ctrl+Insert, Shift+Delete and Shift+Insert.
+    commands.bind("edit.copy", oui::KeyShortcut{oui::Key::insert_, true});
+    commands.bind("edit.cut", oui::KeyShortcut{oui::Key::delete_, false, false, true});
+    commands.bind("edit.paste", oui::KeyShortcut{oui::Key::insert_, false, false, true});
     add("edit.paste_new_layer", oui::translate("Commands", "Paste into New &Layer"), [this] { paste(PasteInto::new_layer); },
         {U'v', true, false, true});
     add("edit.paste_new_image", oui::translate("Commands", "Paste into New &Image"), [this] { paste(PasteInto::new_image); }, {U'v', true, true});
