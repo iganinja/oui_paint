@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <set>
+#include <utility>
 
 namespace oui_paint
 {
@@ -69,6 +70,48 @@ namespace
     }
     const auto in{sign_changes == 0 || sign_changes == 3};
     return in ? -nearest : nearest;
+}
+
+// Distance to a polygon, closed, negative inside by the even-odd rule.
+[[nodiscard]] double polygon_distance(double x, double y, const std::vector<Position>& corners)
+{
+    auto nearest{1e18};
+    auto in{false};
+    for(std::size_t index{}, previous{corners.size() - 1}; index < corners.size(); previous = index ++)
+    {
+        const auto& a{corners[index]};
+        const auto& b{corners[previous]};
+        nearest = std::min(nearest, segment_distance(x, y, a, b));
+        if((a.y > y) != (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x)
+        {
+            in = !in;
+        }
+    }
+    return in ? -nearest : nearest;
+}
+
+[[nodiscard]] double circle_distance(double x, double y, Position center, double radius)
+{
+    return std::hypot(x - center.x, y - center.y) - radius;
+}
+
+// The corners of a star of five points in the box, its top point up, the inner ones 0.38 of the way out.
+[[nodiscard]] std::vector<Position> star_corners(double center_x, double center_y, double half_width,
+                                                 double half_height)
+{
+    constexpr auto pi{3.14159265358979323846};
+    std::vector<Position> corners;
+    // The star's lowest points fall short of the bottom of a circle: stretched so it fills the box from top to bottom.
+    const auto reach_down{std::cos(pi / 5.0)};
+    const auto radius_y{2.0 * half_height / (1.0 + reach_down)};
+    const auto middle_y{center_y - half_height + radius_y};
+    for(int index{}; index < 10; ++ index)
+    {
+        const auto angle{-pi / 2.0 + index * pi / 5.0};
+        const auto out{index % 2 == 0 ? 1.0 : 0.38};
+        corners.push_back({center_x + std::cos(angle) * half_width * out, middle_y + std::sin(angle) * radius_y * out});
+    }
+    return corners;
 }
 
 [[nodiscard]] int tile_of(int coordinate)
@@ -177,9 +220,17 @@ std::string_view shape_name(ShapeKind kind)
     case ShapeKind::rounded_rectangle:
         return "Rounded Rectangle";
     case ShapeKind::ellipse:
+        return "Ellipse";
+    case ShapeKind::speech_bubble:
+        return "Speech Bubble";
+    case ShapeKind::thought_bubble:
+        return "Thought Bubble";
+    case ShapeKind::arrow:
+        return "Arrow";
+    case ShapeKind::star:
         break;
     }
-    return "Ellipse";
+    return "Star";
 }
 
 std::string_view shape_style_name(ShapeStyle style)
@@ -209,12 +260,116 @@ std::vector<TilePoint> draw_shape(Layer& layer, const Selection& selection, Shap
     const auto half_width{(right - left) / 2.0};
     const auto half_height{(bottom - top) / 2.0};
     const auto radius{kind == ShapeKind::rounded_rectangle ? std::min({half_width, half_height, 20.0}) : 0.0};
+    // Which way it was drawn: a bubble's tail goes to the bottom corner on that side, an arrow points that way.
+    const auto towards_right{opposite.x >= corner.x};
+    const auto towards_bottom{opposite.y >= corner.y};
+    // A bubble's balloon takes the top four fifths of the box, its tail the rest, down to the corner it was drawn to.
+    const auto balloon_x{std::max(0.5, half_width)};
+    const auto balloon_y{std::max(0.5, half_height * 0.8)};
+    const auto balloon_center_y{top + balloon_y};
+    const auto side{towards_right ? 1.0 : -1.0};
+    const std::array<Position, 3> tail{
+        Position{center_x + side * balloon_x * 0.05, balloon_center_y + balloon_y * 0.5},
+        Position{center_x + side * balloon_x * 0.45, balloon_center_y + balloon_y * 0.5},
+        Position{center_x + side * half_width * 0.85, bottom}};
+    // A cloud: an ellipse with bumps round it, as circles on its edge.
+    std::vector<std::pair<Position, double>> cloud;
+    // Its middle: the ellipse the bumps sit on, so each bump is half over it.
+    auto bump{0.0};
+    if(kind == ShapeKind::thought_bubble)
+    {
+        constexpr auto pi{3.14159265358979323846};
+        bump = std::min(balloon_x, balloon_y) * 0.32;
+        const auto ring_x{std::max(0.5, balloon_x - bump)};
+        const auto ring_y{std::max(0.5, balloon_y - bump)};
+        // The bumps evenly round the ring by the length along it, as many as overlap a little, so a long flat cloud
+        // has as many along its sides as it needs.
+        constexpr int samples{360};
+        std::vector<double> along(samples + 1, 0.0);
+        const auto point{[&](int index)
+                         {
+                             const auto angle{2.0 * pi * index / samples};
+                             return Position{center_x + std::cos(angle) * ring_x,
+                                             balloon_center_y + std::sin(angle) * ring_y};
+                         }};
+        for(int index{1}; index <= samples; ++ index)
+        {
+            const auto a{point(index - 1)};
+            const auto b{point(index)};
+            along[static_cast<std::size_t>(index)] =
+                along[static_cast<std::size_t>(index - 1)] + std::hypot(b.x - a.x, b.y - a.y);
+        }
+        const auto perimeter{along.back()};
+        const auto count{std::clamp(static_cast<int>(std::ceil(perimeter / (bump * 1.5))), 6, 64)};
+        auto sample{0};
+        for(int index{}; index < count; ++ index)
+        {
+            const auto wanted{perimeter * index / count};
+            while(sample < samples && along[static_cast<std::size_t>(sample + 1)] < wanted)
+            {
+                ++ sample;
+            }
+            cloud.push_back({point(sample), bump});
+        }
+        // Two little bubbles going down to the corner.
+        const auto little{std::min(balloon_x, half_height) * 0.09};
+        cloud.push_back({{center_x + side * half_width * 0.55, balloon_center_y + balloon_y + little * 1.2}, little});
+        cloud.push_back({{center_x + side * half_width * 0.8, bottom - little * 0.6}, little * 0.6});
+    }
+    // An arrow along the longer side: its shaft half as thick as the box, its head as long as the box is thick.
+    std::vector<Position> arrow;
+    if(kind == ShapeKind::arrow)
+    {
+        const auto along_x{right - left >= bottom - top};
+        const auto length{along_x ? right - left : bottom - top};
+        const auto thick{along_x ? bottom - top : right - left};
+        const auto head{std::min(length * 0.6, thick)};
+        const auto forward{along_x ? towards_right : towards_bottom};
+        // In the arrow's own frame, from its tail at 0 to its point at `length`, across from -thick/2 to thick/2.
+        for(const auto& [a, b] : std::vector<std::pair<double, double>>{{0.0, -thick / 4.0},
+                                                                         {length - head, -thick / 4.0},
+                                                                         {length - head, -thick / 2.0},
+                                                                         {length, 0.0},
+                                                                         {length - head, thick / 2.0},
+                                                                         {length - head, thick / 4.0},
+                                                                         {0.0, thick / 4.0}})
+        {
+            const auto at{forward ? a : length - a};
+            arrow.push_back(along_x ? Position{left + at, center_y + b} : Position{center_x + b, top + at});
+        }
+    }
+    const auto star{kind == ShapeKind::star ? star_corners(center_x, center_y, half_width, half_height)
+                                            : std::vector<Position>{}};
     const auto distance{[&](double x, double y)
                         {
-                            if(kind == ShapeKind::ellipse)
+                            switch(kind)
                             {
+                            case ShapeKind::ellipse:
                                 return ellipse_distance(x, y, center_x, center_y, std::max(0.5, half_width),
                                                         std::max(0.5, half_height));
+                            case ShapeKind::speech_bubble:
+                                return std::min(
+                                    ellipse_distance(x, y, center_x, balloon_center_y, balloon_x, balloon_y),
+                                    triangle_distance(x, y, tail));
+                            case ShapeKind::thought_bubble:
+                            {
+                                // The cloud's middle, the ring the bumps sit on, and the bumps.
+                                auto nearest{ellipse_distance(x, y, center_x, balloon_center_y,
+                                                              std::max(0.5, balloon_x - bump),
+                                                              std::max(0.5, balloon_y - bump))};
+                                for(const auto& [middle, bump_radius] : cloud)
+                                {
+                                    nearest = std::min(nearest, circle_distance(x, y, middle, bump_radius));
+                                }
+                                return nearest;
+                            }
+                            case ShapeKind::arrow:
+                                return polygon_distance(x, y, arrow);
+                            case ShapeKind::star:
+                                return polygon_distance(x, y, star);
+                            case ShapeKind::rectangle:
+                            case ShapeKind::rounded_rectangle:
+                                break;
                             }
                             return rectangle_distance(x, y, center_x, center_y, half_width, half_height, radius);
                         }};

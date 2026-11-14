@@ -17,6 +17,14 @@ enum class ShapeKind
     rectangle,
     rounded_rectangle,
     ellipse,
+    // A comic's balloon of speech: an ellipse with a tail to the bottom corner it was drawn towards.
+    speech_bubble,
+    // A comic's balloon of thought: a cloud, with two little bubbles going down to that corner.
+    thought_bubble,
+    // A wide arrow along the box's longer side, pointing the way it was drawn.
+    arrow,
+    // A star of five points.
+    star,
 };
 
 // Paint.NET's: the outline in the primary colour, filled with the primary colour, or both, the inside then in the
@@ -44,6 +52,7 @@ struct LineSettings
 };
 
 // A shape between two corners, `width` pixels of outline inside its edge, mixed over the layer inside the selection.
+// The way from `corner` to `opposite` says where a bubble's tail goes and where an arrow points.
 std::vector<TilePoint> draw_shape(Layer& layer, const Selection& selection, ShapeKind kind, ShapeStyle style,
                                   Position corner, Position opposite, const Color& outline, const Color& fill,
                                   double width, bool antialias);

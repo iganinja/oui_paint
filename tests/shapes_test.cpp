@@ -116,3 +116,82 @@ TEST(Shapes, ACurveWithItsHandlesOnTheLineIsTheStraightLine)
         }
     }
 }
+
+TEST(Shapes, ASpeechBubblesTailGoesToTheBottomCornerItWasDrawnTowards)
+{
+    const Selection everything{200, 200};
+    Layer right{PixelFormat::rgba8, "Right"};
+    draw_shape(right, everything, ShapeKind::speech_bubble, ShapeStyle::filled, {10, 10}, {110, 110}, {0, 0, 0, 1}, {},
+               2.0, false);
+    EXPECT_EQ(alpha_at(right, 60, 50), 255) << "the balloon";
+    EXPECT_EQ(alpha_at(right, 99, 106), 255) << "the tail's point, low on the right";
+    EXPECT_EQ(alpha_at(right, 20, 106), 0);
+    Layer left{PixelFormat::rgba8, "Left"};
+    draw_shape(left, everything, ShapeKind::speech_bubble, ShapeStyle::filled, {110, 10}, {10, 110}, {0, 0, 0, 1}, {},
+               2.0, false);
+    EXPECT_EQ(alpha_at(left, 20, 106), 255) << "drawn leftwards, the tail is on the left";
+    EXPECT_EQ(alpha_at(left, 99, 106), 0);
+}
+
+TEST(Shapes, AThoughtBubbleIsACloudWithLittleBubblesBelowIt)
+{
+    const Selection everything{200, 200};
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    draw_shape(layer, everything, ShapeKind::thought_bubble, ShapeStyle::filled, {10, 10}, {110, 110}, {0, 0, 0, 1},
+               {}, 2.0, false);
+    EXPECT_EQ(alpha_at(layer, 60, 50), 255) << "the cloud";
+    EXPECT_EQ(alpha_at(layer, 11, 11), 0) << "round, not its box";
+    EXPECT_EQ(alpha_at(layer, 60, 105), 0) << "under the cloud, beside the bubbles";
+    // Nothing outside the box.
+    for(const auto& [x, y] : {std::pair{5, 60}, std::pair{115, 60}, std::pair{60, 5}, std::pair{60, 115}})
+    {
+        EXPECT_EQ(alpha_at(layer, x, y), 0) << x << ", " << y;
+    }
+}
+
+TEST(Shapes, AnArrowPointsTheWayItWasDrawnAlongItsLongerSide)
+{
+    const Selection everything{200, 200};
+    const auto drawn{[&](Position corner, Position opposite)
+                     {
+                         Layer layer{PixelFormat::rgba8, "Layer"};
+                         draw_shape(layer, everything, ShapeKind::arrow, ShapeStyle::filled, corner, opposite,
+                                    {0, 0, 0, 1}, {}, 2.0, false);
+                         return layer;
+                     }};
+    const auto rightwards{drawn({10, 10}, {110, 50})};
+    EXPECT_EQ(alpha_at(rightwards, 107, 30), 255) << "its point";
+    EXPECT_EQ(alpha_at(rightwards, 12, 30), 255) << "its tail, the shaft's middle";
+    EXPECT_EQ(alpha_at(rightwards, 12, 12), 0) << "beside the shaft";
+    EXPECT_EQ(alpha_at(rightwards, 72, 12), 255) << "the head as thick as the box";
+    const auto leftwards{drawn({110, 10}, {10, 50})};
+    EXPECT_EQ(alpha_at(leftwards, 47, 12), 255) << "its head on the left";
+    EXPECT_EQ(alpha_at(leftwards, 72, 12), 0);
+    const auto upwards{drawn({30, 110}, {60, 10})};
+    EXPECT_EQ(alpha_at(upwards, 45, 12), 255) << "taller than wide, it points up";
+    EXPECT_EQ(alpha_at(upwards, 32, 37), 255) << "its head as wide as the box";
+    EXPECT_EQ(alpha_at(upwards, 32, 100), 0);
+}
+
+TEST(Shapes, AStarHasFivePointsAndFillsItsBoxFromTopToBottom)
+{
+    const Selection everything{200, 200};
+    Layer layer{PixelFormat::rgba8, "Layer"};
+    draw_shape(layer, everything, ShapeKind::star, ShapeStyle::filled, {10, 10}, {110, 110}, {0, 0, 0, 1}, {}, 2.0,
+               false);
+    EXPECT_EQ(alpha_at(layer, 60, 60), 255) << "its middle";
+    EXPECT_EQ(alpha_at(layer, 60, 16), 255) << "its top point";
+    EXPECT_EQ(alpha_at(layer, 60, 105), 0) << "between its two lower points";
+    EXPECT_EQ(alpha_at(layer, 16, 48), 255) << "its left point";
+    EXPECT_EQ(alpha_at(layer, 11, 11), 0);
+    EXPECT_EQ(alpha_at(layer, 60, 115), 0) << "nothing below its box";
+}
+
+TEST(Shapes, EveryShapeHasItsName)
+{
+    EXPECT_EQ(shape_name(ShapeKind::speech_bubble), "Speech Bubble");
+    EXPECT_EQ(shape_name(ShapeKind::thought_bubble), "Thought Bubble");
+    EXPECT_EQ(shape_name(ShapeKind::arrow), "Arrow");
+    EXPECT_EQ(shape_name(ShapeKind::star), "Star");
+    EXPECT_EQ(shape_name(ShapeKind::ellipse), "Ellipse");
+}

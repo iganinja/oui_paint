@@ -292,7 +292,7 @@ ToolOptions::ToolOptions(BrushSettings settings, std::vector<FontFamily> fonts, 
     m_arrow_end = &oui::check_button(oui::translate("Tools", "Arrow at &end"), *m_line_group);
 
     m_shape_group = &group(bar);
-    m_shape_kind = &choice(*m_shape_group, oui::translate("Tools", "&Shape:"), {oui::translate("Tools", "Rectangle"), oui::translate("Tools", "Rounded Rectangle"), oui::translate("Tools", "Ellipse")});
+    m_shape_kind = &choice(*m_shape_group, oui::translate("Tools", "&Shape:"), {oui::translate("Tools", "Rectangle"), oui::translate("Tools", "Rounded Rectangle"), oui::translate("Tools", "Ellipse"), oui::translate("Tools", "Speech Bubble"), oui::translate("Tools", "Thought Bubble"), oui::translate("Tools", "Arrow"), oui::translate("Tools", "Star")});
     m_shape_style = &choice(*m_shape_group, oui::translate("Tools", "St&yle:"), {oui::translate("Tools", "Outline"), oui::translate("Tools", "Filled"), oui::translate("Tools", "Filled with Outline")});
     // A shape still being edited follows them.
     static_cast<void>(m_shape_kind->on_selected([this](std::size_t) { changed(); }));

@@ -604,7 +604,11 @@
       "Strikethrough": "Tachado",
       "Text": "Texto",
       "Transparency": "Transparencia",
-      "Zoom": "Zoom"
+      "Zoom": "Zoom",
+      "Speech Bubble": "Bocadillo",
+      "Thought Bubble": "Bocadillo de pensamiento",
+      "Arrow": "Flecha",
+      "Star": "Estrella"
     }
   }
 }
