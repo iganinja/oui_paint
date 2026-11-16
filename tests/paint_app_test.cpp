@@ -265,3 +265,16 @@ TEST_F(PaintAppTest, EnterLeavesALineAsItIsAfterItWasBent)
 }
 
 } // namespace
+
+TEST_F(PaintAppTest, TheAntsStandStillWhileTheWindowIsNotTheOneInUse)
+{
+    static_cast<void>(add_image(40, 30));
+    ASSERT_TRUE(m_application->commands().execute("edit.select_all"));
+    EXPECT_TRUE(m_paint->ants_moving());
+    m_application->dispatch_event(oui::FocusEvent{false});
+    EXPECT_FALSE(m_paint->ants_moving()) << "each step of theirs draws the window again, for nobody";
+    m_application->dispatch_event(oui::FocusEvent{true});
+    EXPECT_TRUE(m_paint->ants_moving());
+    ASSERT_TRUE(m_application->commands().execute("edit.deselect"));
+    EXPECT_FALSE(m_paint->ants_moving());
+}

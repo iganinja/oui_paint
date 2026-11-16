@@ -209,3 +209,17 @@ TEST(Viewport, ZoomingToAnAreaShowsItAllAsBigAsItFitsInTheMiddle)
     EXPECT_GE(viewport.image_at({400, 300}).x, 1900.0);
     EXPECT_GE(viewport.image_at({400, 300}).y, 900.0);
 }
+
+TEST(Render, TheDisplayCountsEachChangeSoAViewKnowsWhenToDrawAgain)
+{
+    const auto document{two_by_two()};
+    DisplayCache cache{document};
+    const auto start{cache.generation()};
+    static_cast<void>(cache.tile({0, 0}, 0));
+    EXPECT_EQ(cache.generation(), start) << "making a tile changes nothing shown";
+    cache.invalidate({0, 0});
+    EXPECT_GT(cache.generation(), start);
+    const auto after{cache.generation()};
+    cache.invalidate_all();
+    EXPECT_GT(cache.generation(), after);
+}

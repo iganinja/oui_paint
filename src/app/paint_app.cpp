@@ -115,6 +115,14 @@ PaintApp::PaintApp(oui::Application& application, oui::PixelBackend& window, oui
     build_window();
     load_plugins();
     m_application.on_close_requested([this] { quit(); });
+    // The ants stand still while the window is not the one in use, minimised among it: each step of theirs draws the
+    // window again, which left alone for days is a core kept busy for nothing.
+    m_application.on_terminal_focus_changed(
+        [this](bool focused)
+        {
+            m_window_focused = focused;
+            update_ants();
+        });
     // The interface's size, kept as it was left.
     m_application.on_zoomed(
         [this]
@@ -3182,7 +3190,7 @@ void PaintApp::settle(bool keep_line, bool keep_shape)
 void PaintApp::update_ants()
 {
     auto* const open{current()};
-    const auto showing{open != nullptr && open->document().selection().active()};
+    const auto showing{m_window_focused && open != nullptr && open->document().selection().active()};
     if(showing && !m_ants.is_active())
     {
         m_ants = m_application.start_timer(std::chrono::milliseconds{150},

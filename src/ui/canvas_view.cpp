@@ -122,10 +122,21 @@ void CanvasView::paint(oui::Painter& painter, const oui::Theme&) const
         }
         m_fitted = true;
     }
-    m_buffer.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+    const auto size{static_cast<std::size_t>(width) * static_cast<std::size_t>(height)};
     const auto& document{m_document.document()};
-    render_view(viewport, m_document.display(), document.width(), document.height(), m_buffer.data(), width, height,
-                0x808080u);
+    auto& display{m_document.display()};
+    const Drawn now{display.generation(), viewport.origin(), viewport.zoom(), width, height, document.width(),
+                    document.height()};
+    if(!m_drawn || m_drawn->generation != now.generation || m_drawn->origin.x != now.origin.x ||
+       m_drawn->origin.y != now.origin.y || m_drawn->zoom != now.zoom || m_drawn->width != now.width ||
+       m_drawn->height != now.height || m_drawn->image_width != now.image_width ||
+       m_drawn->image_height != now.image_height)
+    {
+        m_view.resize(size);
+        render_view(viewport, display, document.width(), document.height(), m_view.data(), width, height, 0x808080u);
+        m_drawn = now;
+    }
+    m_buffer.assign(m_view.begin(), m_view.end());
     // The edge worked out again only when the selection or the view changed: the ants moving only recolour it.
     const auto& mask{document.selection().mask()};
     const auto same_mask{mask.has_value() == m_edge.mask.has_value() && (!mask || mask->tiles() == m_edge.mask->tiles())};

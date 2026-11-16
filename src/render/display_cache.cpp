@@ -71,11 +71,13 @@ DisplayCache::DisplayCache(const Document& document) : m_document{document}
 
 void DisplayCache::invalidate_all()
 {
+    ++ m_generation;
     m_tiles.clear();
 }
 
 void DisplayCache::invalidate(TilePoint point)
 {
+    ++ m_generation;
     for(int level{}; level < levels; ++ level)
     {
         m_tiles.erase({level, point});

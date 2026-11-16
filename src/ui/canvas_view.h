@@ -114,6 +114,20 @@ class CanvasView final : public olagarro::oui::Widget
     // Where it was last painted, in the window's pixels, and what it painted.
     mutable std::optional<olagarro::oui::Rect> m_pixels;
     mutable std::vector<std::uint32_t> m_buffer;
+    // The image as last drawn, before the ants and the overlay, and what it was drawn for: drawn again only when the
+    // document or the view changed, as the ants moving alone draw the window again several times a second.
+    struct Drawn
+    {
+        std::uint64_t generation{0};
+        Position origin;
+        double zoom{0.0};
+        int width{0};
+        int height{0};
+        int image_width{0};
+        int image_height{0};
+    };
+    mutable std::optional<Drawn> m_drawn;
+    mutable std::vector<std::uint32_t> m_view;
     // The selection's edge as last worked out, and what it was worked out for: the mask, its tiles shared, and the
     // view.
     struct Edge

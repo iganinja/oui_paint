@@ -64,6 +64,8 @@ class PaintApp
     void add(std::unique_ptr<OpenDocument> document);
     [[nodiscard]] std::size_t document_count() const { return m_documents.size(); }
     [[nodiscard]] OpenDocument* current();
+    // Whether the marching ants are moving, as they do only while a selection shows in the window in use.
+    [[nodiscard]] bool ants_moving() const { return m_ants.is_active(); }
 
     void new_image();
     void open_with_dialog();
@@ -420,9 +422,10 @@ class PaintApp
     std::optional<Position> m_panning;
     // A drag's latest move, waiting for the frame to end so the moves before it in the same frame are skipped.
     std::optional<ToolEvent> m_pending_move;
-    // The marching ants move while there is a selection to show.
+    // The marching ants move while there is a selection to show and the window is the one in use.
     olagarro::oui::Timer m_ants;
     int m_ants_phase{0};
+    bool m_window_focused{true};
     olagarro::oui::TabView* m_tabs{};
     std::vector<std::unique_ptr<OpenDocument>> m_documents;
     NewImage m_last_new_image;

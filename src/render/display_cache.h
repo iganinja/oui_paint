@@ -25,6 +25,9 @@ class DisplayCache
     void invalidate_all();
     // The tile at `point` changed, and every reduced tile it is part of.
     void invalidate(TilePoint point);
+    // Counts up each time a tile is told it changed: a view drawn at the same count, and the same place, is still
+    // what the document looks like.
+    [[nodiscard]] std::uint64_t generation() const { return m_generation; }
     // The tile at `point` of `level`, (tile_size >> level) pixels a side, row after row.
     [[nodiscard]] const std::vector<std::uint32_t>& tile(TilePoint point, int level);
     // Makes every tile of `points` at `level` that is not kept, and the levels above it that it is made from, the
@@ -44,6 +47,7 @@ class DisplayCache
 
     const Document& m_document;
     std::map<std::pair<int, TilePoint>, std::vector<std::uint32_t>> m_tiles;
+    std::uint64_t m_generation{0};
 };
 
 // The view of a document as `viewport` places it, in 0x00RRGGBB pixels row after row, `width` by `height`: the image
