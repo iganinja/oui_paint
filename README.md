@@ -23,6 +23,9 @@ curl -fsSL https://raw.githubusercontent.com/iganinja/oui_paint/master/install.s
 irm https://raw.githubusercontent.com/iganinja/oui_paint/master/install.ps1 | iex
 ```
 
+`install.ps1` downloaded and run as `.\install.ps1` is stopped by Windows, as a script from the internet that is not
+signed: run it with `powershell -ExecutionPolicy Bypass -File .\install.ps1`, or `Unblock-File .\install.ps1` first.
+
 **Debian, Ubuntu and the like**, kept up to date by `apt upgrade` and in the desktop's menu
 
 ```sh
