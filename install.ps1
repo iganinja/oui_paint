@@ -143,6 +143,6 @@ try {
     Install-OuiPaint
 } catch {
     Write-Host $_.Exception.Message -ForegroundColor Red
-    # Run as a file it ends with a code saying so; through iex, exit would close the window.
-    if ($PSCommandPath) { exit 1 }
+    # Run as a file, or by install.cmd, it ends with a code saying so; through iex, exit would close the window.
+    if ($PSCommandPath -or $env:OUI_INSTALLER) { exit 1 }
 }

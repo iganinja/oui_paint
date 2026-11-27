@@ -17,14 +17,9 @@ OUI Paint, ready to run. One line in a terminal, for your system:
 curl -fsSL https://raw.githubusercontent.com/iganinja/oui_paint/master/install.sh | sh
 ```
 
-**Windows**, in PowerShell
-
-```powershell
-irm https://raw.githubusercontent.com/iganinja/oui_paint/master/install.ps1 | iex
-```
-
-`install.ps1` downloaded and run as `.\install.ps1` is stopped by Windows, as a script from the internet that is not
-signed: run it with `powershell -ExecutionPolicy Bypass -File .\install.ps1`, or `Unblock-File .\install.ps1` first.
+**Windows**: download [install.cmd](https://github.com/iganinja/oui_paint/releases/latest/download/install.cmd) and
+open it with a double click. If Windows says it protected the computer, *More info* and *Run anyway* let it run. It
+asks what to install, and puts it in `%LOCALAPPDATA%\Programs\oui_paint`, where Help > Check for Updates updates it.
 
 **Debian, Ubuntu and the like**, kept up to date by `apt upgrade` and in the desktop's menu
 
